@@ -6,9 +6,11 @@ Our toolkit currently consists of three agents, each designed to simplify and en
 
 - [**Talk2BioModels**](talk2biomodels/models/intro.md): Engage directly with mathematical models in systems biology.
 
-- [**Talk2Cells**](talk2cells/intro.md) *(Work in progress)*: Query and analyze sequencing data with ease.
+- [**Talk2Cells**](talk2cells/intro.md) _(Work in progress)_: Query and analyze sequencing data with ease.
 
-- [**Talk2KnowledgeGraphs**](talk2knowledgegraphs/intro.md) *(Coming soon)*: Access and explore complex biological knowledge graphs for insightful data connections.
+- [**Talk2KnowledgeGraphs**](talk2knowledgegraphs/intro.md) _(Coming soon)_: Access and explore complex biological knowledge graphs for insightful data connections.
+
+- [**Talk2Competitors**](talk2competitors/intro.md) _(Work in progress)_: Access and explore papers and receive recommendations for academic papers using natural language processing.
 
 ### Prerequisites
 
@@ -19,47 +21,58 @@ Our toolkit currently consists of three agents, each designed to simplify and en
 ### Installation
 
 #### Option 1: PyPI
-   ```bash
-   pip install aiagents4pharma
-   ```
+
+```bash
+pip install aiagents4pharma
+```
 
 Check out the tutorials on each agent for detailed instrcutions.
 
 #### Option 2: Git
+
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/VirtualPatientEngine/AIAgents4Pharma
    cd AIAgents4Pharma
    ```
 
 2. **Install dependencies:**
+
    ```bash
    pip install -r requirements.txt
    ```
 
 3. **Initialize OPENAI_API_KEY**
+
    ```bash
-   export OPENAI_API_KEY = ....
+   export OPENAI_API_KEY=....
    ```
 
 4. **[Optional] Set up login credentials**
+
    ```bash
    vi .streamlit/secrets.toml
    ```
+
    and enter
+
    ```
    password='XXX'
    ```
+
    Please note that the passowrd will be same for all.
 
 5. **[Optional] Initialize LANGSMITH_API_KEY**
+
    ```bash
    export LANGCHAIN_TRACING_V2=true
    export LANGCHAIN_API_KEY=<your-api-key>
    ```
-   Please note that this will create a new tracing project in your Langsmith 
-   account with the name `<user_name>@<uuid>`, where `user_name` is the name 
-   you provided in the previous step. If you skip the previous step, it will 
+
+   Please note that this will create a new tracing project in your Langsmith
+   account with the name `<user_name>@<uuid>`, where `user_name` is the name
+   you provided in the previous step. If you skip the previous step, it will
    default to `default` (a 128 bit unique ID created for the session).
 
 6. **Launch the app:**
