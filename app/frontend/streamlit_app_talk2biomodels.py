@@ -274,15 +274,39 @@ with main_col2:
                                 df_simulated = pd.DataFrame(
                                     df_simulated_data[df_simulated_data['tool_call_id'] == msg.tool_call_id]['data'].iloc[0])
                                 df_selected = df_simulated
-                            else:
+                            elif msg.name == "custom_plotter":
                                 if msg.artifact:
                                     df_selected = pd.DataFrame.from_dict(msg.artifact)
                                     # print (df_selected)
                                 else:
                                     continue
                             # Display the toggle button to suppress the table
-                            streamlit_utils.render_table_plotly(
-                                uniq_msg_id, msg.content, df_selected)
+                            streamlit_utils.render_toggle(
+                                key="toggle_plotly_"+uniq_msg_id,
+                                toggle_text="Show Plot",
+                                toggle_state=True,
+                                save_toggle=True)
+                            # Display the plotly chart
+                            streamlit_utils.render_plotly(
+                                df_selected,
+                                key="plotly_"+uniq_msg_id,
+                                title=msg.content,
+                                # tool_name=msg.name,
+                                # tool_call_id=msg.tool_call_id,
+                                save_chart=True)
+                            # Display the toggle button to suppress the table
+                            streamlit_utils.render_toggle(
+                                key="toggle_table_"+uniq_msg_id,
+                                toggle_text="Show Table",
+                                toggle_state=False,
+                                save_toggle=True)
+                            # Display the table
+                            streamlit_utils.render_table(
+                                df_selected,
+                                key="dataframe_"+uniq_msg_id,
+                                # tool_name=msg.name,
+                                # tool_call_id=msg.tool_call_id,
+                                save_table=True)
                         elif msg.name == "parameter_scan":
                             # Convert the scanned data to a single dictionary
                             print ('-', len(current_state.values["dic_scanned_data"]))
