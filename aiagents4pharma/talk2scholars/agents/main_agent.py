@@ -10,8 +10,9 @@ for multi-agent systems and implements proper state management.
 The main components are:
 1. Supervisor node with ReAct pattern for intelligent routing.
 2. S2 agent node for handling academic paper queries.
-3. Shared state management via Talk2Scholars.
-4. Hydra-based configuration system.
+3. Zotero agent node for processing paper queries from Zotero library.
+4. Shared state management via Talk2Scholars.
+5. Hydra-based configuration system.
 
 Example:
     app = get_app("thread_123", "gpt-4o-mini")
@@ -30,6 +31,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import create_react_agent
 from langgraph.types import Command
 from ..agents import s2_agent
+from ..agents import zotero_agent
 from ..state.state_talk2scholars import Talk2Scholars
 
 # Configure logging
@@ -88,12 +90,13 @@ def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
 
     def supervisor_node(
         state: Talk2Scholars,
-    ) -> Command[Literal["s2_agent", "__end__"]]:
+    ) -> Command[Literal["s2_agent", "zotero_agent", "__end__"]]:
         """
         Processes user queries and determines the next step in the conversation flow.
 
         This function examines the conversation state and decides whether to forward
-        the query to a specialized sub-agent (e.g., S2 agent) or conclude the interaction.
+        the query to a specialized sub-agent (e.g., S2 agent, Zotero agent) or conclude
+        the interaction.
 
         Args:
             state (Talk2Scholars): The current state of the conversation, containing
@@ -115,7 +118,7 @@ def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
         result = supervisor_agent.invoke(
             state, {"configurable": {"thread_id": thread_id}}
         )
-        goto = "s2_agent"
+        goto = ["s2_agent", "zotero_agent"]
         logger.info("Supervisor agent completed with result: %s", result)
 
         return Command(goto=goto)
@@ -188,6 +191,49 @@ def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
             },
         )
 
+    def call_zotero_agent(
+        state: Talk2Scholars,
+    ) -> Command[Literal["supervisor", "__end__"]]:
+        """
+        Calls the Zotero agent to process paper queries from Zotero library.
+
+        This function invokes the Zotero agent, retrieves papers from Zotero,
+        and updates the conversation state accordingly.
+
+        Args:
+            state (Talk2Scholars): The current conversation state, including user queries
+                and any previously retrieved papers.
+
+        Returns:
+            Command: The next action to execute, along with updated messages and papers.
+
+        Example:
+            result = call_zotero_agent(current_state)
+            next_step = result.goto
+        """
+        logger.info("Calling Zotero agent with state: %s", state)
+        app = zotero_agent.get_app(thread_id, llm_model)
+
+        # Invoke the Zotero agent, passing state
+        response = app.invoke(
+            state,
+            {
+                "configurable": {
+                    "config_id": thread_id,
+                    "thread_id": thread_id,
+                }
+            },
+        )
+        logger.info("Zotero agent completed with response: %s", response)
+
+        return Command(
+            goto=END,
+            update={
+                "messages": response["messages"],
+                "zotero_papers": response.get("zotero_papers", {}),
+            },
+        )
+
     # Initialize LLM
     logger.info("Using OpenAI model %s with temperature %s", llm_model, cfg.temperature)
     llm = ChatOpenAI(model=llm_model, temperature=cfg.temperature)
@@ -198,8 +244,10 @@ def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
 
     workflow.add_node("supervisor", supervisor)
     workflow.add_node("s2_agent", call_s2_agent)
+    workflow.add_node("zotero_agent", call_zotero_agent)
     workflow.add_edge(START, "supervisor")
     workflow.add_edge("s2_agent", END)
+    workflow.add_edge("zotero_agent", END)
 
     # Compile the graph without initial state
     app = workflow.compile(checkpointer=MemorySaver())
