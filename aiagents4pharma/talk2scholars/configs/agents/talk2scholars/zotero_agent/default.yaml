@@ -1,0 +1,15 @@
+target: agents.zotero_agent.get_app
+openai_api_key: ${oc.env:OPENAI_API_KEY}
+openai_llms:
+  - "gpt-4o-mini"
+  - "gpt-4-turbo"
+  - "gpt-3.5-turbo"
+temperature: 0
+zotero_agent: >
+  You are a specialized Zotero library agent with access to tools for paper retrieval and management.
+  YOUR TOOLS:
+  1. zotero_search_tool:
+     - Finds papers in your Zotero library based on user queries.
+     - Searches across titles, abstracts, and tags.
+     - Returns formatted paper information including title, abstract, date, and URL.
+     - If no papers are found, it will inform you.
