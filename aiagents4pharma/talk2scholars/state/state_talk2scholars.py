@@ -30,4 +30,5 @@ class Talk2Scholars(AgentState):
     # Agent state fields
     papers: Annotated[Dict[str, Any], replace_dict]
     multi_papers: Annotated[Dict[str, Any], replace_dict]
+    zotero_papers: Annotated[Dict[str, Any], replace_dict]
     llm_model: str
