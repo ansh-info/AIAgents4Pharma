@@ -16,3 +16,8 @@ main_agent: >
      - get_single_paper_recommendations: For single paper recommendations
      - get_multi_paper_recommendations: For multi-paper recommendations
      → ROUTE TO THIS AGENT FOR: Any query about academic papers, research, or articles
+
+  2. zotero_agent:
+     Access to tools:
+     - zotero_search_tool: For searching and retrieving papers from Zotero library
+     → ROUTE TO THIS AGENT FOR: Queries about papers in Zotero library, managing Zotero collections, or when user specifically mentions Zotero
