@@ -22,7 +22,7 @@ Example:
 """
 
 import logging
-from typing import Literal, Callable
+from typing import Literal, Callable, TypedDict
 import hydra
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
@@ -57,71 +57,36 @@ def get_hydra_config():
 
 
 def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
-    """
-    Creates and returns a supervisor node for intelligent routing using the ReAct pattern.
-
-    This function initializes a supervisor agent that processes user queries and
-    determines the appropriate sub-agent for further processing. It applies structured
-    reasoning to manage conversations and direct queries based on context.
-
-    Args:
-        llm (BaseChatModel): The language model used by the supervisor agent.
-        thread_id (str): Unique identifier for the conversation session.
-
-    Returns:
-        Callable: A function that acts as the supervisor node in the LangGraph workflow.
-
-    Example:
-        supervisor = make_supervisor_node(llm, "thread_123")
-        workflow.add_node("supervisor", supervisor)
-    """
+    """Creates supervisor node for routing."""
     logger.info("Loading Hydra configuration for Talk2Scholars main agent.")
     cfg = get_hydra_config()
     logger.info("Hydra configuration loaded with values: %s", cfg)
+    members = ["s2_agent", "zotero_agent"]
+    options = ["FINISH"] + members
+    system_prompt = cfg.main_agent  # Use existing Hydra config
 
-    # Create the supervisor agent using the main agent's configuration
-    supervisor_agent = create_react_agent(
-        llm,
-        tools=[],  # Will add sub-agents later
-        state_modifier=cfg.main_agent,
-        state_schema=Talk2Scholars,
-        checkpointer=MemorySaver(),
-    )
+    class Router(TypedDict):
+        """Worker to route to next. If no workers needed, route to FINISH."""
+
+        next: Literal[*options]
+
+        # next: Literal["s2_agent", "zotero_agent", "FINISH"]
 
     def supervisor_node(
         state: Talk2Scholars,
-    ) -> Command[Literal["s2_agent", "zotero_agent", "__end__"]]:
-        """
-        Processes user queries and determines the next step in the conversation flow.
+    ) -> Command[Literal["s2_agent", "zotero_agent", END]]:
+        messages = [
+            {"role": "system", "content": system_prompt},
+        ] + state[
+            "messages"
+        ], {"configurable": {"thread_id": thread_id}}
 
-        This function examines the conversation state and decides whether to forward
-        the query to a specialized sub-agent (e.g., S2 agent, Zotero agent) or conclude
-        the interaction.
+        response = llm.with_structured_output(Router).invoke(messages)
+        goto = response["next"]
+        if goto == "FINISH":
+            goto = END  # Using END from langgraph.graph
 
-        Args:
-            state (Talk2Scholars): The current state of the conversation, containing
-                messages, papers, and metadata.
-
-        Returns:
-            Command: The next action to be executed, along with updated state data.
-
-        Example:
-            result = supervisor_node(current_state)
-            next_step = result.goto
-        """
-        logger.info(
-            "Supervisor node called - Messages count: %d",
-            len(state["messages"]),
-        )
-
-        # Invoke the supervisor agent with configurable thread_id
-        result = supervisor_agent.invoke(
-            state, {"configurable": {"thread_id": thread_id}}
-        )
-        goto = ["s2_agent", "zotero_agent"]
-        logger.info("Supervisor agent completed with result: %s", result)
-
-        return Command(goto=goto)
+        return Command(goto=goto, update={"next": goto})
 
     return supervisor_node
 
@@ -245,11 +210,15 @@ def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
     workflow.add_node("supervisor", supervisor)
     workflow.add_node("s2_agent", call_s2_agent)
     workflow.add_node("zotero_agent", call_zotero_agent)
-    workflow.add_edge(START, "supervisor")
-    workflow.add_edge("s2_agent", END)
-    workflow.add_edge("zotero_agent", END)
 
-    # Compile the graph without initial state
+    # Only supervisor can decide to END
+    workflow.add_edge(START, "supervisor")
+    workflow.add_edge("s2_agent", "supervisor")
+    workflow.add_edge("zotero_agent", "supervisor")
+    workflow.add_edge("supervisor", "s2_agent")
+    workflow.add_edge("supervisor", "zotero_agent")
+    # workflow.add_edge("supervisor", END)
+
     app = workflow.compile(checkpointer=MemorySaver())
     logger.info("Main agent workflow compiled")
     return app

@@ -6,6 +6,8 @@ Agent for interacting with Semantic Scholar
 
 import logging
 import hydra
+
+from typing import Literal, Callable
 from langchain_openai import ChatOpenAI
 from langgraph.graph import START, StateGraph
 from langgraph.prebuilt import create_react_agent, ToolNode
@@ -17,7 +19,8 @@ from ..tools.s2.single_paper_rec import (
     get_single_paper_recommendations as s2_single_rec,
 )
 from ..tools.s2.multi_paper_rec import get_multi_paper_recommendations as s2_multi_rec
-
+from langgraph.types import Command
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
@@ -29,13 +32,24 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
     This function returns the langraph app.
     """
 
-    def agent_s2_node(state: Talk2Scholars):
+    def agent_s2_node(state: Talk2Scholars) -> Command[Literal["supervisor"]]:
         """
-        This function calls the model.
+        This function calls the model and always returns to supervisor.
         """
         logger.log(logging.INFO, "Creating Agent_S2 node with thread_id %s", uniq_id)
-        response = model.invoke(state, {"configurable": {"thread_id": uniq_id}})
-        return response
+        result = model.invoke(state, {"configurable": {"thread_id": uniq_id}})
+
+        return Command(
+            update={
+                "messages": [
+                    HumanMessage(
+                        content=result["messages"][-1].content, name="s2_agent"
+                    )
+                ]
+            },
+            # Always return to supervisor
+            goto="supervisor",
+        )
 
     # Load hydra configuration
     logger.log(logging.INFO, "Load Hydra configuration for Talk2Scholars S2 agent.")
@@ -62,15 +76,10 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
         checkpointer=MemorySaver(),
     )
 
-    # Define a new graph
     workflow = StateGraph(Talk2Scholars)
-
-    # Define the two nodes we will cycle between
     workflow.add_node("agent_s2", agent_s2_node)
-
-    # Set the entrypoint as `agent`
-    # This means that this node is the first one called
     workflow.add_edge(START, "agent_s2")
+    workflow.add_edge("agent_s2", "supervisor")
 
     # Initialize memory to persist state between graph runs
     checkpointer = MemorySaver()

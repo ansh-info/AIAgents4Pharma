@@ -6,12 +6,15 @@ Agent for interacting with Zotero
 
 import logging
 import hydra
+from typing import Literal, Callable
 from langchain_openai import ChatOpenAI
 from langgraph.graph import START, StateGraph
 from langgraph.prebuilt import create_react_agent, ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 from ..state.state_talk2scholars import Talk2Scholars
 from ..tools.zotero.zotero_read import zotero_search_tool
+from langgraph.types import Command
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
@@ -23,15 +26,26 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
     This function returns the langraph app.
     """
 
-    def agent_zotero_node(state: Talk2Scholars):
+    def agent_zotero_node(state: Talk2Scholars) -> Command[Literal["supervisor"]]:
         """
-        This function calls the model.
+        This function calls the model and always returns to supervisor.
         """
         logger.log(
             logging.INFO, "Creating Agent_Zotero node with thread_id %s", uniq_id
         )
-        response = model.invoke(state, {"configurable": {"thread_id": uniq_id}})
-        return response
+        result = model.invoke(state, {"configurable": {"thread_id": uniq_id}})
+
+        return Command(
+            update={
+                "messages": [
+                    HumanMessage(
+                        content=result["messages"][-1].content, name="zotero_agent"
+                    )
+                ]
+            },
+            # Always return to supervisor
+            goto="supervisor",
+        )
 
     # Load hydra configuration
     logger.log(logging.INFO, "Load Hydra configuration for Talk2Scholars Zotero agent.")
@@ -58,14 +72,10 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
         checkpointer=MemorySaver(),
     )
 
-    # Define a new graph
     workflow = StateGraph(Talk2Scholars)
-
-    # Define the node we will use
     workflow.add_node("agent_zotero", agent_zotero_node)
-
-    # Set the entrypoint as `agent`
     workflow.add_edge(START, "agent_zotero")
+    workflow.add_edge("agent_zotero", "supervisor")
 
     # Initialize memory to persist state between graph runs
     checkpointer = MemorySaver()
