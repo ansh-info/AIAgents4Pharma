@@ -26,7 +26,8 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
     This function returns the langraph app.
     """
 
-    def agent_zotero_node(state: Talk2Scholars) -> Command[Literal["supervisor"]]:
+    # def agent_zotero_node(state: Talk2Scholars) -> Command[Literal["supervisor"]]:
+    def agent_zotero_node(state: Talk2Scholars) -> Command:
         """
         This function calls the model and always returns to supervisor.
         """
@@ -35,17 +36,18 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
         )
         result = model.invoke(state, {"configurable": {"thread_id": uniq_id}})
 
-        return Command(
-            update={
-                "messages": [
-                    HumanMessage(
-                        content=result["messages"][-1].content, name="zotero_agent"
-                    )
-                ]
-            },
-            # Always return to supervisor
-            goto="supervisor",
-        )
+        return result
+        # return Command(
+        #     update={
+        #         "messages": [
+        #             HumanMessage(
+        #                 content=result["messages"][-1].content, name="zotero_agent"
+        #             )
+        #         ]
+        #     },
+        #     # Always return to supervisor
+        #     goto="supervisor",
+        # )
 
     # Load hydra configuration
     logger.log(logging.INFO, "Load Hydra configuration for Talk2Scholars Zotero agent.")
@@ -75,7 +77,7 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
     workflow = StateGraph(Talk2Scholars)
     workflow.add_node("agent_zotero", agent_zotero_node)
     workflow.add_edge(START, "agent_zotero")
-    workflow.add_edge("agent_zotero", "supervisor")
+    # workflow.add_edge("agent_zotero", "supervisor")
 
     # Initialize memory to persist state between graph runs
     checkpointer = MemorySaver()

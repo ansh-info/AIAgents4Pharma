@@ -30,6 +30,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import create_react_agent
 from langgraph.types import Command
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from ..agents import s2_agent
 from ..agents import zotero_agent
 from ..state.state_talk2scholars import Talk2Scholars
@@ -63,7 +64,14 @@ def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
     logger.info("Hydra configuration loaded with values: %s", cfg)
     members = ["s2_agent", "zotero_agent"]
     options = ["FINISH"] + members
-    system_prompt = cfg.main_agent  # Use existing Hydra config
+    # system_prompt = cfg.main_agent  # Use existing Hydra config
+    system_prompt = (
+        "You are a supervisor tasked with managing a conversation between the"
+        f" following workers: {members}. Given the following user request,"
+        " respond with the worker to act next. Each worker will perform a"
+        " task and respond with their results and status. When finished,"
+        " respond with FINISH."
+    )
 
     class Router(TypedDict):
         """Worker to route to next. If no workers needed, route to FINISH."""
@@ -74,19 +82,21 @@ def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
 
     def supervisor_node(
         state: Talk2Scholars,
-    ) -> Command[Literal["s2_agent", "zotero_agent", END]]:
+    ) -> Command:
         messages = [
             {"role": "system", "content": system_prompt},
         ] + state[
             "messages"
-        ], {"configurable": {"thread_id": thread_id}}
+        ]
 
         response = llm.with_structured_output(Router).invoke(messages)
         goto = response["next"]
+        print ("GOTO: ", goto)
         if goto == "FINISH":
+            print ("GOTO: ", goto)
             goto = END  # Using END from langgraph.graph
 
-        return Command(goto=goto, update={"next": goto})
+        return Command(goto=goto)
 
     return supervisor_node
 
@@ -113,7 +123,7 @@ def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
 
     def call_s2_agent(
         state: Talk2Scholars,
-    ) -> Command[Literal["supervisor", "__end__"]]:
+    ) -> Command[Literal["supervisor"]]:
         """
         Calls the Semantic Scholar (S2) agent to process academic paper queries.
 
@@ -146,19 +156,33 @@ def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
             },
         )
         logger.info("S2 agent completed with response: %s", response)
+        # import sys
+        # sys.exit()
 
+        # return Command(
+        #     # goto=END,
+        #     goto="supervisor",
+        #     update={
+        #         "messages": response["messages"],
+        #         "papers": response.get("papers", {}),
+        #         "multi_papers": response.get("multi_papers", {}),
+        #     },
+        # )
         return Command(
-            goto=END,
             update={
-                "messages": response["messages"],
-                "papers": response.get("papers", {}),
-                "multi_papers": response.get("multi_papers", {}),
+                "messages": [
+                    HumanMessage(
+                        content=response["messages"][-1].content, name="s2_agent"
+                    )
+                ]
             },
+            # Always return to supervisor
+            goto="supervisor",
         )
 
     def call_zotero_agent(
         state: Talk2Scholars,
-    ) -> Command[Literal["supervisor", "__end__"]]:
+    ) -> Command[Literal["supervisor"]]:
         """
         Calls the Zotero agent to process paper queries from Zotero library.
 
@@ -191,12 +215,23 @@ def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
         )
         logger.info("Zotero agent completed with response: %s", response)
 
+        # return Command(
+        #     goto=END,
+        #     update={
+        #         "messages": response["messages"],
+        #         "zotero_papers": response.get("zotero_papers", {}),
+        #     },
+        # )
         return Command(
-            goto=END,
             update={
-                "messages": response["messages"],
-                "zotero_papers": response.get("zotero_papers", {}),
+                "messages": [
+                    HumanMessage(
+                        content=response["messages"][-1].content, name="zotero_agent"
+                    )
+                ]
             },
+            # Always return to supervisor
+            goto="supervisor",
         )
 
     # Initialize LLM
@@ -213,10 +248,8 @@ def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
 
     # Only supervisor can decide to END
     workflow.add_edge(START, "supervisor")
-    workflow.add_edge("s2_agent", "supervisor")
-    workflow.add_edge("zotero_agent", "supervisor")
-    workflow.add_edge("supervisor", "s2_agent")
-    workflow.add_edge("supervisor", "zotero_agent")
+    # workflow.add_edge("supervisor", "s2_agent")
+    # workflow.add_edge("supervisor", "zotero_agent")
     # workflow.add_edge("supervisor", END)
 
     app = workflow.compile(checkpointer=MemorySaver())

@@ -32,24 +32,26 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
     This function returns the langraph app.
     """
 
-    def agent_s2_node(state: Talk2Scholars) -> Command[Literal["supervisor"]]:
+    # def agent_s2_node(state: Talk2Scholars) -> Command[Literal["supervisor"]]:
+    def agent_s2_node(state: Talk2Scholars) -> Command:
         """
         This function calls the model and always returns to supervisor.
         """
         logger.log(logging.INFO, "Creating Agent_S2 node with thread_id %s", uniq_id)
         result = model.invoke(state, {"configurable": {"thread_id": uniq_id}})
 
-        return Command(
-            update={
-                "messages": [
-                    HumanMessage(
-                        content=result["messages"][-1].content, name="s2_agent"
-                    )
-                ]
-            },
-            # Always return to supervisor
-            goto="supervisor",
-        )
+        return result
+        # return Command(
+        #     update={
+        #         "messages": [
+        #             HumanMessage(
+        #                 content=result["messages"][-1].content, name="s2_agent"
+        #             )
+        #         ]
+        #     },
+        #     # Always return to supervisor
+        #     # goto="supervisor",
+        # )
 
     # Load hydra configuration
     logger.log(logging.INFO, "Load Hydra configuration for Talk2Scholars S2 agent.")
@@ -79,7 +81,7 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
     workflow = StateGraph(Talk2Scholars)
     workflow.add_node("agent_s2", agent_s2_node)
     workflow.add_edge(START, "agent_s2")
-    workflow.add_edge("agent_s2", "supervisor")
+    # workflow.add_edge("agent_s2", "supervisor")
 
     # Initialize memory to persist state between graph runs
     checkpointer = MemorySaver()
