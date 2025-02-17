@@ -12,9 +12,11 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import START, StateGraph
 from langgraph.prebuilt import create_react_agent, ToolNode
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.tools import tool
 from ..state.state_talk2scholars import Talk2Scholars
 from ..tools.s2.search import search_tool as s2_search
 from ..tools.s2.display_results import display_results as s2_display
+from ..tools.s2.last_displayed_papers import last_displayed_papers as s2_last_displayed_papers
 from ..tools.s2.single_paper_rec import (
     get_single_paper_recommendations as s2_single_rec,
 )
@@ -26,12 +28,10 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 def get_app(uniq_id, llm_model="gpt-4o-mini"):
     """
-    This function returns the langraph app.
+    This function returns the langraph app for the S2 agent.
     """
-
     # def agent_s2_node(state: Talk2Scholars) -> Command[Literal["supervisor"]]:
     def agent_s2_node(state: Talk2Scholars) -> Command:
         """
@@ -41,18 +41,8 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
         result = model.invoke(state, {"configurable": {"thread_id": uniq_id}})
 
         return result
-        # return Command(
-        #     update={
-        #         "messages": [
-        #             HumanMessage(
-        #                 content=result["messages"][-1].content, name="s2_agent"
-        #             )
-        #         ]
-        #     },
-        #     # Always return to supervisor
-        #     # goto="supervisor",
-        # )
 
+    logger.log(logging.INFO, "thread_id, llm_model: %s, %s", uniq_id, llm_model)
     # Load hydra configuration
     logger.log(logging.INFO, "Load Hydra configuration for Talk2Scholars S2 agent.")
     with hydra.initialize(version_base=None, config_path="../configs"):
@@ -62,7 +52,8 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
         cfg = cfg.agents.talk2scholars.s2_agent
 
     # Define the tools
-    tools = ToolNode([s2_search, s2_display, s2_single_rec, s2_multi_rec])
+    # tools = ToolNode([s2_search, s2_display, s2_single_rec, s2_multi_rec])
+    tools = ToolNode([s2_search, s2_last_displayed_papers, s2_single_rec, s2_multi_rec])
 
     # Define the model
     logger.log(logging.INFO, "Using OpenAI model %s", llm_model)

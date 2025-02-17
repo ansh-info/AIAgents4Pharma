@@ -19,7 +19,7 @@ class NoPapersFoundError(Exception):
 
 
 @tool("display_results")
-def display_results(state: Annotated[dict, InjectedState]) -> Dict[str, Any]:
+def display_results(state: Annotated[dict, InjectedState]) -> str:
     """
     Display the papers in the state. If no papers are found, raises an exception
     indicating that a search is needed.
@@ -28,7 +28,7 @@ def display_results(state: Annotated[dict, InjectedState]) -> Dict[str, Any]:
         state (dict): The state of the agent containing the papers.
 
     Returns:
-        dict: A dictionary containing the papers and multi_papers from the state.
+        str: A message indicating that the papers have been displayed.
 
     Raises:
         NoPapersFoundError: If no papers are found in the state.
@@ -43,8 +43,21 @@ def display_results(state: Annotated[dict, InjectedState]) -> Dict[str, Any]:
         raise NoPapersFoundError(
             "No papers found. A search needs to be performed first."
         )
+    
+    return "Retrieved papers successfully."
+    # return Command(
+    #         update={
+    #             "papers": filtered_papers,  # Now sending the dictionary directly
+    #             "messages": [
+    #                 ToolMessage(
+    #                     content="Search Successful.",
+    #                     tool_call_id=tool_call_id,
+    #                 )
+    #             ],
+    #         }
+    #     )
 
-    return {
-        "papers": state.get("papers"),
-        "multi_papers": state.get("multi_papers"),
-    }
+    # return {
+    #     "papers": state.get("papers"),
+    #     "multi_papers": state.get("multi_papers"),
+    # }

@@ -1,257 +1,140 @@
-#!/usr/bin/env python3
+# /usr/bin/env python3
 
 """
-Main agent for the talk2scholars app using ReAct pattern.
-
-This module implements a hierarchical agent system where a supervisor agent
-routes queries to specialized sub-agents. It follows the LangGraph patterns
-for multi-agent systems and implements proper state management.
-
-The main components are:
-1. Supervisor node with ReAct pattern for intelligent routing.
-2. S2 agent node for handling academic paper queries.
-3. Zotero agent node for processing paper queries from Zotero library.
-4. Shared state management via Talk2Scholars.
-5. Hydra-based configuration system.
-
-Example:
-    app = get_app("thread_123", "gpt-4o-mini")
-    result = app.invoke({
-        "messages": [("human", "Find papers about AI agents")]
-    })
+Agent for interacting with Semantic Scholar
 """
 
 import logging
-from typing import Literal, Callable, TypedDict
 import hydra
-from langchain_core.language_models.chat_models import BaseChatModel
+from typing import Annotated
+from pydantic import Field
 from langchain_openai import ChatOpenAI
+from langgraph.graph import START, StateGraph
+from langgraph.prebuilt import create_react_agent, ToolNode
+from langchain_core.tools.base import InjectedToolCallId
+from langgraph.prebuilt import InjectedState
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import END, START, StateGraph
-from langgraph.prebuilt import create_react_agent
+from langchain_core.tools import tool
 from langgraph.types import Command
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from ..agents import s2_agent
-from ..agents import zotero_agent
+from langchain_core.messages import HumanMessage, ToolMessage
 from ..state.state_talk2scholars import Talk2Scholars
+from ..agents import s2_agent
 
-# Configure logging
+# Initialize logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-def get_hydra_config():
+@tool(parse_docstring=True)
+def s2_tool(tool_call_id: Annotated[str, InjectedToolCallId],
+            state: Annotated[dict, InjectedState],
+            task: str = Field(
+                        description="The task to be performed by the tool"
+                        "e.g. 'Find papers about AI agents',"
+                        " 'Get recommendations for this paper'"
+                        " 'Get recommendations for multiple papers'")
+                        ) -> Command:
     """
-    Loads and returns the Hydra configuration for the main agent.
+    This tool can be used to search or get recommendations for papers.
 
-    This function fetches the configuration settings for the Talk2Scholars
-    agent, ensuring that all required parameters are properly initialized.
+    Args:
+        tool_call_id (str): The unique identifier for the tool call.
+        state (dict): The state of the main agent.
+        task (str): The task to be performed by the tool.
 
     Returns:
-        Any: The configuration object for the main agent.
+        Command: The command to be executed by the agent.
     """
+    logger.log(logging.INFO, "Searching for papers on %s", task)
+    s2_agent_get_app = s2_agent.get_app("thread_123", "gpt-4o-mini")
+    config = {"configurable": {"thread_id": "thread_123"}}
+    # Updte the state of s2 agent with the state of main agent
+    s2_agent_get_app.update_state(config,
+                                  {"papers": state["papers"],
+                                    "multi_papers": state["multi_papers"],
+                                    "last_displayed_papers": state["last_displayed_papers"]})
+    # Invoke the s2 agent
+    s2_agent_get_app.invoke(
+                        {"messages": [HumanMessage(content=task)]},
+                        config = config
+                    )
+    # Get the current state of s2 agent
+    current_state = s2_agent_get_app.get_state(config)
+    # Prepare tool messages list
+    # This will contain the artifacts of the tools of s2 agent
+    # to be used by the main agent
+    tool_artifacts = {}
+    tool_contents = {}
+    for msg in current_state.values["messages"]:
+        if isinstance(msg, ToolMessage):
+            if not msg.artifact:
+                continue
+            tool_artifacts[msg.name] = msg.artifact
+            tool_contents[msg.name] = msg.content
+    return Command(
+            update={
+                    "papers": current_state.values["papers"],
+                    "multi_papers": current_state.values["multi_papers"],
+                    "last_displayed_papers": current_state.values["last_displayed_papers"],
+                    "messages":[
+                                ToolMessage(
+                                    content=tool_contents,
+                                    tool_call_id=tool_call_id,
+                                    artifact=tool_artifacts
+                                )
+                            ]
+            },
+        )
+
+def get_app(uniq_id, llm_model="gpt-4o-mini"):
+    """
+    This function returns the langraph app for the Main agent.
+    """
+    def agent_main_node(state: Talk2Scholars) -> Command:
+        """
+        This function calls the model and always returns to supervisor.
+        """
+        logger.log(logging.INFO, "Creating Agent_Main node with thread_id %s", uniq_id)
+        result = model.invoke(state, {"configurable": {"thread_id": uniq_id}})
+
+        return result
+
+    logger.log(logging.INFO, "thread_id, llm_model: %s, %s", uniq_id, llm_model)
+    # Load hydra configuration
+    logger.log(logging.INFO, "Load Hydra configuration for the main agent.")
     with hydra.initialize(version_base=None, config_path="../configs"):
         cfg = hydra.compose(
             config_name="config", overrides=["agents/talk2scholars/main_agent=default"]
         )
-    return cfg.agents.talk2scholars.main_agent
+        cfg = cfg.agents.talk2scholars.s2_agent
 
+    # Define the tools
+    tools = ToolNode([s2_tool])
 
-def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
-    """Creates supervisor node for routing."""
-    logger.info("Loading Hydra configuration for Talk2Scholars main agent.")
-    cfg = get_hydra_config()
-    logger.info("Hydra configuration loaded with values: %s", cfg)
-    members = ["s2_agent", "zotero_agent"]
-    options = ["FINISH"] + members
-    # system_prompt = cfg.main_agent  # Use existing Hydra config
-    system_prompt = (
-        "You are a supervisor tasked with managing a conversation between the"
-        f" following workers: {members}. Given the following user request,"
-        " respond with the worker to act next. Each worker will perform a"
-        " task and respond with their results and status. When finished,"
-        " respond with FINISH."
-    )
-
-    class Router(TypedDict):
-        """Worker to route to next. If no workers needed, route to FINISH."""
-
-        next: Literal[*options]
-
-        # next: Literal["s2_agent", "zotero_agent", "FINISH"]
-
-    def supervisor_node(
-        state: Talk2Scholars,
-    ) -> Command:
-        messages = [
-            {"role": "system", "content": system_prompt},
-        ] + state[
-            "messages"
-        ]
-
-        response = llm.with_structured_output(Router).invoke(messages)
-        goto = response["next"]
-        print ("GOTO: ", goto)
-        if goto == "FINISH":
-            print ("GOTO: ", goto)
-            goto = END  # Using END from langgraph.graph
-
-        return Command(goto=goto)
-
-    return supervisor_node
-
-
-def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
-    """
-    Initializes and returns the LangGraph application with a hierarchical agent system.
-
-    This function sets up the full agent architecture, including the supervisor
-    and sub-agents, and compiles the LangGraph workflow for handling user queries.
-
-    Args:
-        thread_id (str): Unique identifier for the conversation session.
-        llm_model (str, optional): The language model to be used. Defaults to "gpt-4o-mini".
-
-    Returns:
-        StateGraph: A compiled LangGraph application ready for query invocation.
-
-    Example:
-        app = get_app("thread_123")
-        result = app.invoke(initial_state)
-    """
-    cfg = get_hydra_config()
-
-    def call_s2_agent(
-        state: Talk2Scholars,
-    ) -> Command[Literal["supervisor"]]:
-        """
-        Calls the Semantic Scholar (S2) agent to process academic paper queries.
-
-        This function invokes the S2 agent, retrieves relevant research papers,
-        and updates the conversation state accordingly.
-
-        Args:
-            state (Talk2Scholars): The current conversation state, including user queries
-                and any previously retrieved papers.
-
-        Returns:
-            Command: The next action to execute, along with updated messages and papers.
-
-        Example:
-            result = call_s2_agent(current_state)
-            next_step = result.goto
-        """
-        logger.info("Calling S2 agent with state: %s", state)
-        app = s2_agent.get_app(thread_id, llm_model)
-
-        # Invoke the S2 agent, passing state,
-        # Pass both config_id and thread_id
-        response = app.invoke(
-            state,
-            {
-                "configurable": {
-                    "config_id": thread_id,
-                    "thread_id": thread_id,
-                }
-            },
-        )
-        logger.info("S2 agent completed with response: %s", response)
-        # import sys
-        # sys.exit()
-
-        # return Command(
-        #     # goto=END,
-        #     goto="supervisor",
-        #     update={
-        #         "messages": response["messages"],
-        #         "papers": response.get("papers", {}),
-        #         "multi_papers": response.get("multi_papers", {}),
-        #     },
-        # )
-        return Command(
-            update={
-                "messages": [
-                    HumanMessage(
-                        content=response["messages"][-1].content, name="s2_agent"
-                    )
-                ]
-            },
-            # Always return to supervisor
-            goto="supervisor",
-        )
-
-    def call_zotero_agent(
-        state: Talk2Scholars,
-    ) -> Command[Literal["supervisor"]]:
-        """
-        Calls the Zotero agent to process paper queries from Zotero library.
-
-        This function invokes the Zotero agent, retrieves papers from Zotero,
-        and updates the conversation state accordingly.
-
-        Args:
-            state (Talk2Scholars): The current conversation state, including user queries
-                and any previously retrieved papers.
-
-        Returns:
-            Command: The next action to execute, along with updated messages and papers.
-
-        Example:
-            result = call_zotero_agent(current_state)
-            next_step = result.goto
-        """
-        logger.info("Calling Zotero agent with state: %s", state)
-        app = zotero_agent.get_app(thread_id, llm_model)
-
-        # Invoke the Zotero agent, passing state
-        response = app.invoke(
-            state,
-            {
-                "configurable": {
-                    "config_id": thread_id,
-                    "thread_id": thread_id,
-                }
-            },
-        )
-        logger.info("Zotero agent completed with response: %s", response)
-
-        # return Command(
-        #     goto=END,
-        #     update={
-        #         "messages": response["messages"],
-        #         "zotero_papers": response.get("zotero_papers", {}),
-        #     },
-        # )
-        return Command(
-            update={
-                "messages": [
-                    HumanMessage(
-                        content=response["messages"][-1].content, name="zotero_agent"
-                    )
-                ]
-            },
-            # Always return to supervisor
-            goto="supervisor",
-        )
-
-    # Initialize LLM
-    logger.info("Using OpenAI model %s with temperature %s", llm_model, cfg.temperature)
+    # Define the model
+    logger.log(logging.INFO, "Using OpenAI model %s", llm_model)
     llm = ChatOpenAI(model=llm_model, temperature=cfg.temperature)
 
-    # Build the graph
+    # Create the agent
+    model = create_react_agent(
+        llm,
+        tools=tools,
+        state_schema=Talk2Scholars,
+        state_modifier=cfg.s2_agent,
+        checkpointer=MemorySaver(),
+    )
+
     workflow = StateGraph(Talk2Scholars)
-    supervisor = make_supervisor_node(llm, thread_id)
+    workflow.add_node("agent_main", agent_main_node)
+    workflow.add_edge(START, "agent_main")
 
-    workflow.add_node("supervisor", supervisor)
-    workflow.add_node("s2_agent", call_s2_agent)
-    workflow.add_node("zotero_agent", call_zotero_agent)
+    # Initialize memory to persist state between graph runs
+    checkpointer = MemorySaver()
 
-    # Only supervisor can decide to END
-    workflow.add_edge(START, "supervisor")
-    # workflow.add_edge("supervisor", "s2_agent")
-    # workflow.add_edge("supervisor", "zotero_agent")
-    # workflow.add_edge("supervisor", END)
+    # Finally, we compile it!
+    # This compiles it into a LangChain Runnable,
+    # meaning you can use it as you would any other runnable.
+    # Note that we're (optionally) passing the memory when compiling the graph
+    app = workflow.compile(checkpointer=checkpointer)
+    logger.log(logging.INFO, "Compiled the graph")
 
-    app = workflow.compile(checkpointer=MemorySaver())
-    logger.info("Main agent workflow compiled")
     return app

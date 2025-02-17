@@ -72,7 +72,7 @@ def get_multi_paper_recommendations(
     Returns:
         Dict[str, Any]: The recommendations and related information.
     """
-    logging.info("Starting multi-paper recommendations search.")
+    logging.info("Starting multi-paper recommendations search with paper IDs: %s", paper_ids)
 
     endpoint = cfg.api_endpoint
     headers = cfg.headers
@@ -101,6 +101,16 @@ def get_multi_paper_recommendations(
     data = response.json()
     recommendations = data.get("recommendedPapers", [])
 
+    if not recommendations:
+        return Command(
+            messages=[
+                ToolMessage(
+                    content="No recommendations found based on multiple papers.",
+                    tool_call_id=tool_call_id,
+                )
+            ]
+        )
+
     # Create a dictionary to store the papers
     filtered_papers = {
         paper["paperId"]: {
@@ -114,13 +124,21 @@ def get_multi_paper_recommendations(
         if paper.get("title") and paper.get("paperId")
     }
 
+    content = "Recommendations based on multiple papers was successful."
+    content += " Here is a summary of the recommendations:"
+    content += f"Number of papers found: {len(filtered_papers)}\n"
+    content += f"Query Paper IDs: {', '.join(paper_ids)}\n"
+    content += f"Year: {year}\n" if year else ""
+
     return Command(
         update={
-            "multi_papers": filtered_papers,  # Now sending the dictionary directly
+            "papers": filtered_papers,  # Now sending the dictionary directly
+            "last_displayed_papers": filtered_papers,
             "messages": [
                 ToolMessage(
-                    content=f"Search Successful: {filtered_papers}",
-                    tool_call_id=tool_call_id
+                    content=content,
+                    tool_call_id=tool_call_id,
+                    artifact=filtered_papers,
                 )
             ],
         }

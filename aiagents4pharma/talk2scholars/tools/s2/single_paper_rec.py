@@ -26,7 +26,7 @@ class SinglePaperRecInput(BaseModel):
         description="Semantic Scholar Paper ID to get recommendations for (40-character string)"
     )
     limit: int = Field(
-        default=2,
+        default=5,
         description="Maximum number of recommendations to return",
         ge=1,
         le=500,
@@ -52,7 +52,7 @@ with hydra.initialize(version_base=None, config_path="../../configs"):
 def get_single_paper_recommendations(
     paper_id: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
-    limit: int = 2,
+    limit: int = 5,
     year: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
@@ -68,7 +68,7 @@ def get_single_paper_recommendations(
     Returns:
         Dict[str, Any]: The recommendations and related information.
     """
-    logger.info("Starting single paper recommendations search.")
+    logger.info("Starting single paper recommendations search with paper ID: %s", paper_id)
 
     endpoint = f"{cfg.api_endpoint}/{paper_id}"
     params = {
@@ -96,6 +96,19 @@ def get_single_paper_recommendations(
     data = response.json()
     recommendations = data.get("recommendedPapers", [])
 
+    if not recommendations:
+        return Command(
+            update={
+                "papers": {},
+                "messages": [
+                    ToolMessage(
+                        content=f"No recommendations found for {paper_id}.",
+                        tool_call_id=tool_call_id,
+                    )
+                ],
+            }
+        )
+
     # Extract paper ID and title from recommendations
     filtered_papers = {
         paper["paperId"]: {
@@ -109,13 +122,21 @@ def get_single_paper_recommendations(
         if paper.get("title") and paper.get("authors")
     }
 
+    content = "Recommendations based on a single paper were successful."
+    content += " Here is a summary of the recommendations:"
+    content += f"Number of papers found: {len(filtered_papers)}\n"
+    content += f"Query Paper ID: {paper_id}\n"
+    content += f"Year: {year}\n" if year else ""
+
     return Command(
         update={
             "papers": filtered_papers,  # Now sending the dictionary directly
+            "last_displayed_papers": filtered_papers,
             "messages": [
                 ToolMessage(
-                    content=f"Search Successful: {filtered_papers}",
-                    tool_call_id=tool_call_id
+                    content=content,
+                    tool_call_id=tool_call_id,
+                    artifact=filtered_papers,
                 )
             ],
         }

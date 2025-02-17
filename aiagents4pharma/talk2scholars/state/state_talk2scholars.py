@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def replace_dict(existing: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
     """Replace the existing dict with the new one."""
-    logger.info("Updating existing state %s with the state dict: %s", existing, new)
+    # logger.info("Updating existing state %s with the state dict: %s", existing, new)
     return new
 
 
@@ -28,6 +28,7 @@ class Talk2Scholars(AgentState):
     """
 
     # Agent state fields
+    last_displayed_papers: Annotated[Dict[str, Any], replace_dict]
     papers: Annotated[Dict[str, Any], replace_dict]
     multi_papers: Annotated[Dict[str, Any], replace_dict]
     zotero_papers: Annotated[Dict[str, Any], replace_dict]
