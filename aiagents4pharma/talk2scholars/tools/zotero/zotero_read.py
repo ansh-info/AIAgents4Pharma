@@ -18,12 +18,15 @@ from pydantic import BaseModel, Field
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class ZoteroSearchInput(BaseModel):
     """Input schema for the Zotero search tool."""
 
     query: str = Field(
         description="Search query string to find papers in Zotero library."
+    )
+    only_articles: bool = Field(
+        default=True, description="Whether to only search for journal articles/"
+        "conference papers."
     )
     limit: int = Field(
         default=2, description="Maximum number of results to return", ge=1, le=100
@@ -36,15 +39,15 @@ with hydra.initialize(version_base=None, config_path="../../configs"):
     cfg = hydra.compose(config_name="config", overrides=["tools/zotero=default"])
     cfg = cfg.tools.zotero
 
-
-@tool(args_schema=ZoteroSearchInput)
+@tool(args_schema=ZoteroSearchInput, parse_docstring=True)
 def zotero_search_tool(
     query: str,
+    only_articles: bool,
     tool_call_id: Annotated[str, InjectedToolCallId],
     limit: int = 2,
 ) -> Dict[str, Any]:
     """
-    Search for papers in Zotero library.
+    Use this tool to search and retrieve papers from Zotero library.
 
     Args:
         query (str): The search query string to find papers.
@@ -54,7 +57,9 @@ def zotero_search_tool(
     Returns:
         Dict[str, Any]: The search results and related information.
     """
-    logger.info("Starting Zotero paper search...")
+    logger.info("Starting Zotero search with query and filter: %s, %s",
+                query,
+                only_articles)
 
     # Initialize Zotero client
     zot = zotero.Zotero(cfg.user_id, cfg.library_type, cfg.api_key)
@@ -63,55 +68,44 @@ def zotero_search_tool(
     items = zot.items(q=query, limit=min(limit, 100))
     logger.info("Received %d items from Zotero", len(items))
 
+    # Filter only articles
+    filter_item_types = None
+    if only_articles:
+        filter_item_types = ["journalArticle", "conferencePaper", "preprint"]
+
     # Filter and format papers
     filtered_papers = {}
     for item in items:
         data = item.get("data", {})
-        if data.get("itemType") == "journalArticle":
-            item_key = data.get("key")
-            if item_key:
-                filtered_papers[item_key] = {
-                    "title": data.get("title", "N/A"),
-                    "abstract": data.get("abstractNote", "N/A"),
-                    "date": data.get("date", "N/A"),
-                    "url": data.get("url", "N/A"),
-                    "type": data.get("itemType", "N/A"),
-                }
+        # Filter only articles
+        if only_articles:
+            if data.get("itemType") not in filter_item_types:
+                continue
+        # Add to filtered papers
+        item_key = data.get("key")
+        if item_key:
+            filtered_papers[item_key] = {
+                "Title": data.get("title", "N/A"),
+                "Abstract": data.get("abstractNote", "N/A"),
+                "Date": data.get("date", "N/A"),
+                "URL": data.get("url", "N/A"),
+                "Type": data.get("itemType", "N/A"),
+            }
 
-    logger.info("Filtered %d journal articles", len(filtered_papers))
+    logger.info("Filtered %d items", len(filtered_papers))
 
-    # # Filter and format papers
-    # filtered_papers = {}
-    #
-    # # Process each item
-    # for item in items:
-    #     if not isinstance(item, dict):
-    #         continue
-    #
-    #     data = item.get("data", {})
-    #     if not data or data.get("itemType") != cfg.item_type:
-    #         continue
-    #
-    #     key = data.get("key")
-    #     if not key:
-    #         continue
-    #
-    #     filtered_papers[key] = {
-    #         "title": data.get("title", "N/A"),
-    #         "abstract": data.get("abstractNote", "N/A"),
-    #         "date": data.get("date", "N/A"),
-    #         "url": data.get("url", "N/A"),
-    #         "type": data.get("itemType", "N/A"),
-    #     }
-    #
-    # logger.info("Filtered %d papers from Zotero", len(filtered_papers))
+    content = "Retrieval was successful. Papers are attached as an artifact."
+    content += " And here is a summary of the retrieval results:"
+    content += f"Number of papers found: {len(filtered_papers)}\n"
+    content += f"Query: {query}\n"
 
     return Command(
         update={
             "zotero_papers": filtered_papers,
+            "last_displayed_papers": "zotero_papers",
             "messages": [
                 ToolMessage(
-                    content=f"Search Successful: {filtered_papers}",
+                    content=content,
                     tool_call_id=tool_call_id,
                 )
             ],

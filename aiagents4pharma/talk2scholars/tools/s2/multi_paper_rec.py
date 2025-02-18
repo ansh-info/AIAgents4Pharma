@@ -52,7 +52,7 @@ with hydra.initialize(version_base=None, config_path="../../configs"):
     cfg = cfg.tools.multi_paper_recommendation
 
 
-@tool(args_schema=MultiPaperRecInput)
+@tool(args_schema=MultiPaperRecInput, parse_docstring=True)
 def get_multi_paper_recommendations(
     paper_ids: List[str],
     tool_call_id: Annotated[str, InjectedToolCallId],
@@ -60,7 +60,8 @@ def get_multi_paper_recommendations(
     year: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Get paper recommendations based on multiple papers.
+    Get recommendations for a group of multiple papers using the Semantic Scholar IDs.
+    No other paper IDs are supported.
 
     Args:
         paper_ids (List[str]): The list of paper IDs to base recommendations on.

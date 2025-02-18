@@ -44,7 +44,7 @@ with hydra.initialize(version_base=None, config_path="../../configs"):
     cfg = cfg.tools.search
 
 
-@tool("search_tool", args_schema=SearchInput)
+@tool("search_tool", args_schema=SearchInput, parse_docstring=True)
 def search_tool(
     query: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
@@ -101,7 +101,8 @@ def search_tool(
         for paper in papers
         if paper.get("title") and paper.get("authors")
     }
-    # content = f"Search was successful. Found {len(filtered_papers)} papers."
+    logger.info("Filtered %d papers", len(filtered_papers))
+
     content = "Search was successful."
     content += " Here is a summary of the search results:"
     content += f"Number of papers found: {len(filtered_papers)}\n"

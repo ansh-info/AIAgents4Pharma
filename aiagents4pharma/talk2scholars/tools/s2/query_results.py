@@ -24,8 +24,8 @@ def query_results(
     question: str,
     state: Annotated[dict, InjectedState]) -> str:
     """
-    Query the last displayed papers from the state.
-    If no papers are found, raises an exception
+    Query the last displayed papers from the state. If no papers are found,
+    raises an exception.
 
     Use this also to get the last displayed papers from the state,
     and then use the papers to get recommendations for a single paper or
@@ -39,7 +39,7 @@ def query_results(
         str: A message with the last displayed papers.
     """
     logger.info("Querying last displayed papers with question: %s", question)
-
+    llm_model = state.get("llm_model")
     if not state.get("last_displayed_papers"):
         logger.info("No papers displayed so far, raising NoPapersFoundError")
         raise NoPapersFoundError(
@@ -47,7 +47,6 @@ def query_results(
         )
     context_key = state.get("last_displayed_papers")
     dic_papers = state.get(context_key)
-    llm_model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     df_papers = pd.DataFrame.from_dict(dic_papers, orient='index')
     df_agent = create_pandas_dataframe_agent(
                         llm_model,

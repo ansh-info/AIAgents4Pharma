@@ -17,11 +17,18 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tracers.context import collect_runs
 from langchain.callbacks.tracers import LangChainTracer
 from langsmith import Client
+from utils import streamlit_utils
 
 sys.path.append("./")
 from aiagents4pharma.talk2scholars.agents.main_agent2 import get_app
 
 st.set_page_config(page_title="Talk2Scholars", page_icon="🤖", layout="wide")
+# Set the logo
+st.logo(
+    image='docs/assets/VPE.png',
+    size='large',
+    link='https://github.com/VirtualPatientEngine'
+)
 
 # Initialize configuration
 hydra.core.global_hydra.GlobalHydra.instance().clear()
@@ -37,13 +44,14 @@ if "config" not in st.session_state:
 else:
     cfg = st.session_state.config
 
-# Check if env variable OPENAI_API_KEY exists
+# Check if env variables OPENAI_API_KEY and/or NVIDIA_API_KEY exist
 if "OPENAI_API_KEY" not in os.environ:
-    st.error(
-        "Please set the OPENAI_API_KEY environment \
-        variable in the terminal where you run the app."
-    )
+    st.error("Please set the OPENAI_API_KEY "
+             "environment variables in the terminal where you run "
+             "the app. For more information, please refer to our "
+             "[documentation](https://virtualpatientengine.github.io/AIAgents4Pharma/#option-2-git).")
     st.stop()
+
 
 # Create a chat prompt template
 prompt = ChatPromptTemplate.from_messages(
@@ -72,14 +80,13 @@ if "run_id" not in st.session_state:
 if "unique_id" not in st.session_state:
     st.session_state.unique_id = random.randint(1, 1000)
 if "app" not in st.session_state:
-    # st.session_state.app = get_app(st.session_state.unique_id)
     if "llm_model" not in st.session_state:
         st.session_state.app = get_app(st.session_state.unique_id)
     else:
-        st.session_state.app = get_app(
-            st.session_state.unique_id, llm_model=st.session_state.llm_model
-        )
-
+        print (st.session_state.llm_model)
+        st.session_state.app = get_app(st.session_state.unique_id,
+                            llm_model=streamlit_utils.get_base_chat_model(
+                                st.session_state.llm_model))
 # Get the app
 app = st.session_state.app
 
@@ -97,28 +104,6 @@ def _submit_feedback(user_response):
     )
     st.info("Your feedback is on its way to the developers. Thank you!", icon="🚀")
 
-
-@st.dialog("Warning ⚠️")
-def update_llm_model():
-    """
-    Function to update the LLM model.
-    """
-    llm_model = st.session_state.llm_model
-    st.warning(
-        f"Clicking 'Continue' will reset all agents, \
-            set the selected LLM to {llm_model}. \
-            This action will reset the entire app, \
-            and agents will lose access to the \
-            conversation history. Are you sure \
-            you want to proceed?"
-    )
-    if st.button("Continue"):
-        # Delete all the messages and the app key
-        for key in st.session_state.keys():
-            if key in ["messages", "app"]:
-                del st.session_state[key]
-
-
 # Main layout of the app split into two columns
 main_col1, main_col2 = st.columns([3, 7])
 # First column
@@ -134,20 +119,16 @@ with main_col1:
             unsafe_allow_html=True,
         )
 
-        # LLM panel (Only at the front-end for now)
-        llms = ["gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"]
-        # llm_option = st.selectbox(
-        #     "Pick an LLM to power the agent",
-        #     llms,
-        #     index=0,
-        #     key="st_selectbox_llm"
-        # )
+        # LLM model panel
+        llms = ["OpenAI/gpt-4o-mini"]
+        # llms = ["NVIDIA/llama-3.3-70b-instruct"]
         st.selectbox(
             "Pick an LLM to power the agent",
             llms,
             index=0,
             key="llm_model",
-            on_change=update_llm_model,
+            on_change=streamlit_utils.update_llm_model,
+            help="Used for tool calling and generating responses."
         )
 
         # Upload files (placeholder)
@@ -179,7 +160,7 @@ with main_col2:
                     st.empty()
             elif message["type"] == "dataframe":
                 if 'tool_name' in message:
-                    if message['tool_name'] == 'display_results':
+                    if message['tool_name'] in ['display_results', 'zotero_search_tool']:
                         df_papers = message["content"]
                         st.dataframe(df_papers,
                                     use_container_width=True,
@@ -187,7 +168,7 @@ with main_col2:
                                     hide_index=True,
                                     column_config={
                                         "URL": st.column_config.LinkColumn(
-                                            display_text="Open URL",
+                                            display_text="Open",
                                         ),
                                     }
                                 )
@@ -236,10 +217,14 @@ with main_col2:
 
                     # Create config for the agent
                     config = {"configurable": {"thread_id": st.session_state.unique_id}}
-
+                    # Update the LLM model
+                    app.update_state(
+                        config,
+                        {"llm_model": streamlit_utils.get_base_chat_model(
+                            st.session_state.llm_model)}
+                    )
                     # Update the agent state with the selected LLM model
                     current_state = app.get_state(config)
-                    app.update_state(config, {"llm_model": st.session_state.llm_model})
 
                     # with collect_runs() as cb:
                     #     # Add Langsmith tracer
@@ -252,10 +237,18 @@ with main_col2:
                     #     {"messages": [HumanMessage(content=prompt)]},
                     #     config=config | {"callbacks": [tracer]},
                     # )
+
                     response = app.invoke(
                         {"messages": [HumanMessage(content=prompt)]},
                         config=config,
                     )
+
+                    # response = app.stream(
+                    #     {"messages": [HumanMessage(content=prompt)]},
+                    #     config=config,
+                    #     stream_mode="messages"
+                    # )
+                    # st.write_stream(streamlit_utils.stream_response(response))
                     #######################################################
                         # st.session_state.run_id = cb.traced_runs[-1].id
                     # Print the response
@@ -304,7 +297,7 @@ with main_col2:
                         # if msg.name in ['search_tool',
                         #                 'get_single_paper_recommendations',
                         #                 'get_multi_paper_recommendations']:
-                        if msg.name in ['display_results']:
+                        if msg.name in ['display_results', 'zotero_search_tool']:
                             # Display the results of the tool call
                             # for msg_artifact in msg.artifact:
                             # dic_papers = msg.artifact[msg_artifact]
@@ -312,13 +305,17 @@ with main_col2:
                             if not dic_papers:
                                 continue
                             df_papers = pd.DataFrame.from_dict(dic_papers, orient='index')
+                            # Add index as a column "key"
+                            df_papers['Key'] = df_papers.index
+                            # Drop index
+                            df_papers.reset_index(drop=True, inplace=True)
                             # Drop colum abstract
                             df_papers.drop(columns=['Abstract'], inplace=True)
                             st.dataframe(df_papers,
                                 hide_index=True,
                                 column_config={
                                     "URL": st.column_config.LinkColumn(
-                                        display_text="Open URL",
+                                        display_text="Open",
                                     ),
                                 }
                             )

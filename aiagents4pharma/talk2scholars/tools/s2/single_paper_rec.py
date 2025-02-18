@@ -48,7 +48,7 @@ with hydra.initialize(version_base=None, config_path="../../configs"):
     cfg = cfg.tools.single_paper_recommendation
 
 
-@tool(args_schema=SinglePaperRecInput)
+@tool(args_schema=SinglePaperRecInput, parse_docstring=True)
 def get_single_paper_recommendations(
     paper_id: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
@@ -56,7 +56,8 @@ def get_single_paper_recommendations(
     year: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Get paper recommendations based on a single paper.
+    Get recommendations for on a single paper using its Semantic Scholar ID.
+    No other ID types are supported.
 
     Args:
         paper_id (str): The Semantic Scholar Paper ID to get recommendations for.
@@ -90,6 +91,8 @@ def get_single_paper_recommendations(
         paper_id,
         response.status_code,
     )
+    if response.status_code != 200:
+        raise ValueError("Invalid paper ID or API error.")
     # print(f"Request params: {params}")
     logging.info("Request params: %s", params)
 

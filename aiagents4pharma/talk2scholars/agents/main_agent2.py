@@ -9,7 +9,8 @@ for multi-agent systems and implements proper state management.
 """
 
 import logging
-from typing import Literal, Callable, TypedDict
+from typing import Literal, Callable
+from pydantic import BaseModel, Field
 import hydra
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
@@ -43,40 +44,35 @@ def get_hydra_config():
     return cfg.agents.talk2scholars.main_agent
 
 
-def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
+def make_supervisor_node(llm_model: BaseChatModel,
+                         thread_id: str) -> Callable:
     """Creates supervisor node for routing."""
     logger.info("Loading Hydra configuration for Talk2Scholars main agent.")
     cfg = get_hydra_config()
     logger.info("Hydra configuration loaded with values: %s", cfg)
     members = ["s2_agent", "zotero_agent"]
     options = ["FINISH"] + members
-    system_prompt = cfg.main_agent  # Use existing Hydra config
-    router_prompt = (
-        "You are a supervisor tasked with managing a conversation between the"
-        f" following workers: {members}. Given the following user request,"
-        " respond with the worker to act next. Each worker will perform a"
-        " task and respond with their results and status. When finished,"
-        " respond with FINISH."
-        " The Zotero agent will retrieve papers from the Zotero library."
-        " The S2 agent can search/recommend/display/query papers from Semantic Scholar or from memory."
-    )
+    # Define system prompt for general interactions
+    system_prompt = cfg.system_prompt
+    # Define router prompt for routing to sub-agents
+    router_prompt = cfg.router_prompt
 
-    class Router(TypedDict):
+    class Router(BaseModel):
         """Worker to route to next. If no workers needed, route to FINISH."""
 
         next: Literal[*options]
-        # next: Literal["s2_agent", "zotero_agent", "FINISH"]
 
     def supervisor_node(
         state: Talk2Scholars,
     ) -> Command:
         messages = [SystemMessage(content=router_prompt)] + state["messages"]
-        structured_llm = llm.with_structured_output(Router)
+        structured_llm = llm_model.with_structured_output(Router)
         response = structured_llm.invoke(messages)
-        if "next" in response:
-            goto = response["next"]
-        else:
-            goto = response["properties"]["next"]
+        goto = response.next
+        # if "next" in response:
+        #     goto = response["next"]
+        # else:
+        #     goto = response["properties"]["next"]
         print("GOTO: ", goto)
         if goto == "FINISH":
             print("GOTO: ", goto)
@@ -85,10 +81,8 @@ def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
             # from the user, call the LLM to respond to the user
             # with a slightly different system prompt.
             if isinstance(messages[-1], HumanMessage):
-                response = llm.invoke(
-                    [
-                        SystemMessage(content=system_prompt),
-                    ]
+                response = llm_model.invoke(
+                    [SystemMessage(content=system_prompt),]
                     + messages[1:]
                 )
                 return Command(
@@ -99,8 +93,8 @@ def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
 
     return supervisor_node
 
-
-def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
+def get_app(thread_id: str,
+            llm_model: BaseChatModel = ChatOpenAI(model='gpt-4o-mini', temperature=0)) -> StateGraph:
     """
     Initializes and returns the LangGraph application with a hierarchical agent system.
 
@@ -203,18 +197,18 @@ def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
             update={
                 "messages": response["messages"],
                 "zotero_papers": response.get("zotero_papers", {}),
+                "last_displayed_papers": response.get("last_displayed_papers", {}),
             },
             # Always return to supervisor
             goto="supervisor",
         )
 
     # Initialize LLM
-    logger.info("Using OpenAI model %s with temperature %s", llm_model, cfg.temperature)
-    llm = ChatOpenAI(model=llm_model, temperature=cfg.temperature)
+    logger.info("Using model %s with temperature %s", llm_model, cfg.temperature)
 
     # Build the graph
     workflow = StateGraph(Talk2Scholars)
-    supervisor = make_supervisor_node(llm, thread_id)
+    supervisor = make_supervisor_node(llm_model, thread_id)
     # Add nodes
     workflow.add_node("supervisor", supervisor)
     workflow.add_node("s2_agent", call_s2_agent)

@@ -12,5 +12,5 @@ s2_agent: >
   display them.
   You must strictly rely on retrieved information and avoid
   generating unsupported content. Do not generate hallucinations
-  or fabricate details. Stay focused on accurate, sourced
-  academic insights.
+  or fabricate details of any article. Stay focused on accurate,
+  sourced academic insights.

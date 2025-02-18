@@ -6,22 +6,22 @@ Agent for interacting with Zotero
 
 import logging
 import hydra
-from typing import Literal, Callable
 from langchain_openai import ChatOpenAI
+from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import START, StateGraph
 from langgraph.prebuilt import create_react_agent, ToolNode
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.types import Command
 from ..state.state_talk2scholars import Talk2Scholars
 from ..tools.zotero.zotero_read import zotero_search_tool
-from langgraph.types import Command
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from ..tools.s2.display_results import display_results as s2_display
+from ..tools.s2.query_results import query_results as s2_query_results
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-def get_app(uniq_id, llm_model="gpt-4o-mini"):
+def get_app(uniq_id, llm_model: BaseChatModel = ChatOpenAI(model='gpt-4o-mini', temperature=0)):
     """
     This function returns the langraph app.
     """
@@ -37,18 +37,7 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
         result = model.invoke(state, {"configurable": {"thread_id": uniq_id}})
 
         return result
-        # return Command(
-        #     update={
-        #         "messages": [
-        #             HumanMessage(
-        #                 content=result["messages"][-1].content, name="zotero_agent"
-        #             )
-        #         ]
-        #     },
-        #     # Always return to supervisor
-        #     goto="supervisor",
-        # )
-
+        
     # Load hydra configuration
     logger.log(logging.INFO, "Load Hydra configuration for Talk2Scholars Zotero agent.")
     with hydra.initialize(version_base=None, config_path="../configs"):
@@ -59,15 +48,14 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
         cfg = cfg.agents.talk2scholars.zotero_agent
 
     # Define the tools
-    tools = ToolNode([zotero_search_tool])
+    tools = ToolNode([zotero_search_tool, s2_display, s2_query_results])
 
     # Define the model
-    logger.log(logging.INFO, "Using OpenAI model %s", llm_model)
-    llm = ChatOpenAI(model=llm_model, temperature=cfg.temperature)
+    logger.log(logging.INFO, "Using model %s", llm_model)
 
     # Create the agent
     model = create_react_agent(
-        llm,
+        llm_model,
         tools=tools,
         state_schema=Talk2Scholars,
         state_modifier=cfg.zotero_agent,
@@ -77,7 +65,6 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
     workflow = StateGraph(Talk2Scholars)
     workflow.add_node("agent_zotero", agent_zotero_node)
     workflow.add_edge(START, "agent_zotero")
-    # workflow.add_edge("agent_zotero", "supervisor")
 
     # Initialize memory to persist state between graph runs
     checkpointer = MemorySaver()
