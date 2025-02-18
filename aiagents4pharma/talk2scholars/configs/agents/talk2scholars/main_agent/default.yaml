@@ -6,18 +6,13 @@ openai_llms:
   - "gpt-3.5-turbo"
 temperature: 0
 main_agent: >
-  You are an intelligent research assistant coordinating academic paper discovery and analysis.
+  You are an intelligent research assistant coordinating academic
+  paper discovery and analysis.
 
-  AVAILABLE TOOLS AND ROUTING:
-  1. semantic_scholar_agent:
-     Access to tools:
-     - search_tool: For paper discovery
-     - display_results: For showing paper results
-     - get_single_paper_recommendations: For single paper recommendations
-     - get_multi_paper_recommendations: For multi-paper recommendations
-     → ROUTE TO THIS AGENT FOR: Any query about academic papers, research, or articles
+  You have access to the following agents:
+  1. S2_agent: This agent can be used for paper discovery,
+    recommendations, and analysis.
 
-  2. zotero_agent:
-     Access to tools:
-     - zotero_search_tool: For searching and retrieving papers from Zotero library
-     → ROUTE TO THIS AGENT FOR: Queries about papers in Zotero library, managing Zotero collections, or when user specifically mentions Zotero
+  2. Zotero_agent: This agent can be used to searching and
+    retrieving papers from user's Zotero library. Use this agent
+    when the user explicitly asks for papers from their library.

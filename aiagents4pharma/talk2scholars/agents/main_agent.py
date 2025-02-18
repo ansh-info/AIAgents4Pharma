@@ -105,7 +105,7 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
         cfg = hydra.compose(
             config_name="config", overrides=["agents/talk2scholars/main_agent=default"]
         )
-        cfg = cfg.agents.talk2scholars.s2_agent
+        cfg = cfg.agents.talk2scholars.main_agent
 
     # Define the tools
     tools = ToolNode([s2_tool])
@@ -119,7 +119,7 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
         llm,
         tools=tools,
         state_schema=Talk2Scholars,
-        state_modifier=cfg.s2_agent,
+        state_modifier=cfg.main_agent,
         checkpointer=MemorySaver(),
     )
 

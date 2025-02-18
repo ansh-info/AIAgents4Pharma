@@ -7,7 +7,6 @@ Agent for interacting with Semantic Scholar
 import logging
 import hydra
 
-from typing import Literal, Callable
 from langchain_openai import ChatOpenAI
 from langgraph.graph import START, StateGraph
 from langgraph.prebuilt import create_react_agent, ToolNode
@@ -16,13 +15,14 @@ from langchain_core.tools import tool
 from ..state.state_talk2scholars import Talk2Scholars
 from ..tools.s2.search import search_tool as s2_search
 from ..tools.s2.display_results import display_results as s2_display
-from ..tools.s2.last_displayed_papers import last_displayed_papers as s2_last_displayed_papers
+from ..tools.s2.query_results import query_results as s2_query_results
 from ..tools.s2.single_paper_rec import (
     get_single_paper_recommendations as s2_single_rec,
 )
-from ..tools.s2.multi_paper_rec import get_multi_paper_recommendations as s2_multi_rec
+from ..tools.s2.multi_paper_rec import (
+    get_multi_paper_recommendations as s2_multi_rec
+)
 from langgraph.types import Command
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
@@ -53,7 +53,11 @@ def get_app(uniq_id, llm_model="gpt-4o-mini"):
 
     # Define the tools
     # tools = ToolNode([s2_search, s2_display, s2_single_rec, s2_multi_rec])
-    tools = ToolNode([s2_search, s2_last_displayed_papers, s2_single_rec, s2_multi_rec])
+    tools = ToolNode([s2_search,
+                      s2_display,
+                      s2_query_results,
+                      s2_single_rec,
+                      s2_multi_rec])
 
     # Define the model
     logger.log(logging.INFO, "Using OpenAI model %s", llm_model)

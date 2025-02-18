@@ -19,7 +19,7 @@ from langchain.callbacks.tracers import LangChainTracer
 from langsmith import Client
 
 sys.path.append("./")
-from aiagents4pharma.talk2scholars.agents.main_agent import get_app
+from aiagents4pharma.talk2scholars.agents.main_agent2 import get_app
 
 st.set_page_config(page_title="Talk2Scholars", page_icon="🤖", layout="wide")
 
@@ -179,7 +179,7 @@ with main_col2:
                     st.empty()
             elif message["type"] == "dataframe":
                 if 'tool_name' in message:
-                    if message['tool_name'] == 's2_tool':
+                    if message['tool_name'] == 'display_results':
                         df_papers = message["content"]
                         st.dataframe(df_papers,
                                     use_container_width=True,
@@ -304,31 +304,32 @@ with main_col2:
                         # if msg.name in ['search_tool',
                         #                 'get_single_paper_recommendations',
                         #                 'get_multi_paper_recommendations']:
-                        if msg.name in ['s2_tool']:
+                        if msg.name in ['display_results']:
                             # Display the results of the tool call
-                            for msg_artifact in msg.artifact:
-                                dic_papers = msg.artifact[msg_artifact]
-                                if not dic_papers:
-                                    continue
-                                df_papers = pd.DataFrame.from_dict(dic_papers, orient='index')
-                                # Drop colum abstract
-                                df_papers.drop(columns=['Abstract'], inplace=True)
-                                st.dataframe(df_papers,
-                                    hide_index=True,
-                                    column_config={
-                                        "URL": st.column_config.LinkColumn(
-                                            display_text="Open URL",
-                                        ),
-                                    }
-                                )
-                                # Add data to the chat history
-                                st.session_state.messages.append({
-                                        "type": "dataframe",
-                                        "content": df_papers,
-                                        "key": "dataframe_"+uniq_msg_id,
-                                        "tool_name": msg.name
-                                    })
-                                st.empty()
+                            # for msg_artifact in msg.artifact:
+                            # dic_papers = msg.artifact[msg_artifact]
+                            dic_papers = msg.artifact
+                            if not dic_papers:
+                                continue
+                            df_papers = pd.DataFrame.from_dict(dic_papers, orient='index')
+                            # Drop colum abstract
+                            df_papers.drop(columns=['Abstract'], inplace=True)
+                            st.dataframe(df_papers,
+                                hide_index=True,
+                                column_config={
+                                    "URL": st.column_config.LinkColumn(
+                                        display_text="Open URL",
+                                    ),
+                                }
+                            )
+                            # Add data to the chat history
+                            st.session_state.messages.append({
+                                    "type": "dataframe",
+                                    "content": df_papers,
+                                    "key": "dataframe_"+uniq_msg_id,
+                                    "tool_name": msg.name
+                                })
+                            st.empty()
         # Collect feedback and display the thumbs feedback
         if st.session_state.get("run_id"):
             feedback = streamlit_feedback(

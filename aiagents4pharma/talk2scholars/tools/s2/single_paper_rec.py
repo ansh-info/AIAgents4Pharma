@@ -131,7 +131,7 @@ def get_single_paper_recommendations(
     return Command(
         update={
             "papers": filtered_papers,  # Now sending the dictionary directly
-            "last_displayed_papers": filtered_papers,
+            "last_displayed_papers": "papers",
             "messages": [
                 ToolMessage(
                     content=content,
