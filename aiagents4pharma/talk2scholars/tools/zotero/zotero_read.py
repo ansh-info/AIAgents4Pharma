@@ -57,7 +57,7 @@ def zotero_search_tool(
     logger.info("Starting Zotero paper search...")
 
     # Initialize Zotero client
-    zot = zotero.Zotero(cfg.library_id, cfg.library_type, cfg.api_key)
+    zot = zotero.Zotero(cfg.user_id, cfg.library_type, cfg.api_key)
 
     # Get items matching the query
     items = zot.items(q=query, limit=min(limit, 100))
