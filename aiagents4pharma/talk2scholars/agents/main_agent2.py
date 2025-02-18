@@ -25,6 +25,7 @@ from ..state.state_talk2scholars import Talk2Scholars
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def get_hydra_config():
     """
     Loads and returns the Hydra configuration for the main agent.
@@ -41,12 +42,13 @@ def get_hydra_config():
         )
     return cfg.agents.talk2scholars.main_agent
 
+
 def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
     """Creates supervisor node for routing."""
     logger.info("Loading Hydra configuration for Talk2Scholars main agent.")
     cfg = get_hydra_config()
     logger.info("Hydra configuration loaded with values: %s", cfg)
-    members = ["s2_agent"]
+    members = ["s2_agent", "zotero_agent"]
     options = ["FINISH"] + members
     system_prompt = cfg.main_agent  # Use existing Hydra config
     router_prompt = (
@@ -55,12 +57,8 @@ def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
         " respond with the worker to act next. Each worker will perform a"
         " task and respond with their results and status. When finished,"
         " respond with FINISH."
-        # " The Zotero agent will retrieve papers from the Zotero library."
-        " The S2 agent will search/recommend papers from Semantic Scholar or from memory."
-        # " The Memory agent has access to last displayed papers."
-        # " Use it when the user wants to access the memory. Also, you may use it"
-        # " when you had like to information about a last displayed article so"
-        # " that the S2 agent can use its ID to get more information/recommendations."
+        " The Zotero agent will retrieve papers from the Zotero library."
+        " The S2 agent can search/recommend/display/query papers from Semantic Scholar or from memory."
     )
 
     class Router(TypedDict):
@@ -69,31 +67,38 @@ def make_supervisor_node(llm: BaseChatModel, thread_id: str) -> Callable:
         next: Literal[*options]
         # next: Literal["s2_agent", "zotero_agent", "FINISH"]
 
-    def supervisor_node(state: Talk2Scholars,) -> Command:
-        messages = [SystemMessage(content=router_prompt)]+state["messages"]
+    def supervisor_node(
+        state: Talk2Scholars,
+    ) -> Command:
+        messages = [SystemMessage(content=router_prompt)] + state["messages"]
         structured_llm = llm.with_structured_output(Router)
         response = structured_llm.invoke(messages)
-        if 'next' in response:
+        if "next" in response:
             goto = response["next"]
         else:
             goto = response["properties"]["next"]
-        print ("GOTO: ", goto)
+        print("GOTO: ", goto)
         if goto == "FINISH":
-            print ("GOTO: ", goto)
+            print("GOTO: ", goto)
             goto = END  # Using END from langgraph.graph
             # If no agents were called, and the last message was
             # from the user, call the LLM to respond to the user
             # with a slightly different system prompt.
             if isinstance(messages[-1], HumanMessage):
                 response = llm.invoke(
-                    [SystemMessage(content=system_prompt),] + messages[1:])
-                return Command(goto=goto,
-                       update={"messages": AIMessage(content=response.content)}
-                       )
+                    [
+                        SystemMessage(content=system_prompt),
+                    ]
+                    + messages[1:]
+                )
+                return Command(
+                    goto=goto, update={"messages": AIMessage(content=response.content)}
+                )
         # Go to the requested agent
         return Command(goto=goto)
 
     return supervisor_node
+
 
 def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
     """
@@ -152,15 +157,15 @@ def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
         logger.info("S2 agent completed with response")
         return Command(
             update={
-                    "messages": response["messages"],
-                    "papers": response.get("papers", {}),
-                    "multi_papers": response.get("multi_papers", {}),
-                    "last_displayed_papers": response.get("last_displayed_papers", {}),
-                },
+                "messages": response["messages"],
+                "papers": response.get("papers", {}),
+                "multi_papers": response.get("multi_papers", {}),
+                "last_displayed_papers": response.get("last_displayed_papers", {}),
+            },
             # Always return to supervisor
             goto="supervisor",
         )
-    
+
     def call_zotero_agent(
         state: Talk2Scholars,
     ) -> Command[Literal["supervisor"]]:
@@ -204,9 +209,7 @@ def get_app(thread_id: str, llm_model: str = "gpt-4o-mini") -> StateGraph:
         )
 
     # Initialize LLM
-    logger.info("Using OpenAI model %s with temperature %s",
-                llm_model,
-                cfg.temperature)
+    logger.info("Using OpenAI model %s with temperature %s", llm_model, cfg.temperature)
     llm = ChatOpenAI(model=llm_model, temperature=cfg.temperature)
 
     # Build the graph
