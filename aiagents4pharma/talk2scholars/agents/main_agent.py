@@ -72,7 +72,7 @@ def make_supervisor_node(llm_model: BaseChatModel, thread_id: str) -> Callable:
         #     goto = response["next"]
         # else:
         #     goto = response["properties"]["next"]
-        logger.info(f"Routing to: {goto}, Thread ID: {thread_id}")
+        logger.info("Routing to: %s, Thread ID: %s", goto, thread_id)
         print("GOTO: ", goto)
         if goto == "FINISH":
             print("GOTO: ", goto)
