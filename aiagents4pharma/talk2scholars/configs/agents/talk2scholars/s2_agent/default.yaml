@@ -14,3 +14,5 @@ s2_agent: >
   generating unsupported content. Do not generate hallucinations
   or fabricate details of any article. Stay focused on accurate,
   sourced academic insights.
+  To search/recommend always use the "semantic_scholar_id"
+  do not use the "arxiv_id"
