@@ -16,13 +16,13 @@ from langgraph.prebuilt import InjectedState
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class NoPapersFoundError(Exception):
     """Exception raised when no papers are found in the state."""
 
+
 @tool("query_results", parse_docstring=True)
-def query_results(
-    question: str,
-    state: Annotated[dict, InjectedState]) -> str:
+def query_results(question: str, state: Annotated[dict, InjectedState]) -> str:
     """
     Query the last displayed papers from the state. If no papers are found,
     raises an exception.
@@ -47,15 +47,16 @@ def query_results(
         )
     context_key = state.get("last_displayed_papers")
     dic_papers = state.get(context_key)
-    df_papers = pd.DataFrame.from_dict(dic_papers, orient='index')
+    df_papers = pd.DataFrame.from_dict(dic_papers, orient="index")
     df_agent = create_pandas_dataframe_agent(
-                        llm_model,
-                        allow_dangerous_code=True,
-                        agent_type='tool-calling',
-                        df=df_papers,
-                        max_iterations=5,
-                        include_df_in_prompt=True,
-                        number_of_head_rows=df_papers.shape[0],
-                        verbose=True)
+        llm_model,
+        allow_dangerous_code=True,
+        agent_type="tool-calling",
+        df=df_papers,
+        max_iterations=5,
+        include_df_in_prompt=True,
+        number_of_head_rows=df_papers.shape[0],
+        verbose=True,
+    )
     llm_result = df_agent.invoke(question, stream_mode=None)
     return llm_result["output"]
