@@ -5,12 +5,11 @@ Agent for interacting with Semantic Scholar
 """
 
 import logging
+from typing import Any, Dict
 import hydra
-
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import START, StateGraph
-from langgraph.types import Command
 from langgraph.prebuilt import create_react_agent, ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 from ..state.state_talk2scholars import Talk2Scholars
@@ -18,25 +17,27 @@ from ..tools.s2.search import search_tool as s2_search
 from ..tools.s2.display_results import display_results as s2_display
 from ..tools.s2.query_results import query_results as s2_query_results
 from ..tools.s2.retrieve_semantic_scholar_paper_id import (
-    retrieve_semantic_scholar_paper_id as s2_retrieve_id
+    retrieve_semantic_scholar_paper_id as s2_retrieve_id,
 )
 from ..tools.s2.single_paper_rec import (
     get_single_paper_recommendations as s2_single_rec,
 )
-from ..tools.s2.multi_paper_rec import (
-    get_multi_paper_recommendations as s2_multi_rec
-)
+from ..tools.s2.multi_paper_rec import get_multi_paper_recommendations as s2_multi_rec
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def get_app(uniq_id, llm_model: BaseChatModel = ChatOpenAI(model='gpt-4o-mini', temperature=0)):
+
+def get_app(
+    uniq_id, llm_model: BaseChatModel = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+):
     """
     This function returns the langraph app for the S2 agent.
     """
+
     # def agent_s2_node(state: Talk2Scholars) -> Command[Literal["supervisor"]]:
-    def agent_s2_node(state: Talk2Scholars) -> Command:
+    def agent_s2_node(state: Talk2Scholars) -> Dict[str, Any]:
         """
         This function calls the model and always returns to supervisor.
         """
@@ -56,12 +57,16 @@ def get_app(uniq_id, llm_model: BaseChatModel = ChatOpenAI(model='gpt-4o-mini', 
 
     # Define the tools
     # tools = ToolNode([s2_search, s2_display, s2_single_rec, s2_multi_rec])
-    tools = ToolNode([s2_search,
-                      s2_display,
-                      s2_query_results,
-                      s2_retrieve_id,
-                      s2_single_rec,
-                      s2_multi_rec])
+    tools = ToolNode(
+        [
+            s2_search,
+            s2_display,
+            s2_query_results,
+            s2_retrieve_id,
+            s2_single_rec,
+            s2_multi_rec,
+        ]
+    )
 
     # Define the model
     logger.log(logging.INFO, "Using OpenAI model %s", llm_model)

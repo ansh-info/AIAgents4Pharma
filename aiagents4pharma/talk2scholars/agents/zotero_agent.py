@@ -5,13 +5,13 @@ Agent for interacting with Zotero
 """
 
 import logging
+from typing import Any, Dict
 import hydra
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import START, StateGraph
 from langgraph.prebuilt import create_react_agent, ToolNode
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.types import Command
 from ..state.state_talk2scholars import Talk2Scholars
 from ..tools.zotero.zotero_read import zotero_search_tool
 from ..tools.s2.display_results import display_results as s2_display
@@ -21,13 +21,16 @@ from ..tools.s2.query_results import query_results as s2_query_results
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def get_app(uniq_id, llm_model: BaseChatModel = ChatOpenAI(model='gpt-4o-mini', temperature=0)):
+
+def get_app(
+    uniq_id, llm_model: BaseChatModel = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+):
     """
     This function returns the langraph app.
     """
 
     # def agent_zotero_node(state: Talk2Scholars) -> Command[Literal["supervisor"]]:
-    def agent_zotero_node(state: Talk2Scholars) -> Command:
+    def agent_zotero_node(state: Talk2Scholars) -> Dict[str, Any]:
         """
         This function calls the model and always returns to supervisor.
         """
@@ -37,7 +40,7 @@ def get_app(uniq_id, llm_model: BaseChatModel = ChatOpenAI(model='gpt-4o-mini', 
         result = model.invoke(state, {"configurable": {"thread_id": uniq_id}})
 
         return result
-        
+
     # Load hydra configuration
     logger.log(logging.INFO, "Load Hydra configuration for Talk2Scholars Zotero agent.")
     with hydra.initialize(version_base=None, config_path="../configs"):
