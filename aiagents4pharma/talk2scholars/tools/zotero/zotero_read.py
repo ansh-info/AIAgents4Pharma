@@ -5,7 +5,7 @@ This tool is used to search for papers in Zotero library.
 """
 
 import logging
-from typing import Annotated, Any, Dict
+from typing import Annotated, Any
 import hydra
 from pyzotero import zotero
 from langchain_core.messages import ToolMessage
@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class ZoteroSearchInput(BaseModel):
     """Input schema for the Zotero search tool."""
 
@@ -25,8 +26,8 @@ class ZoteroSearchInput(BaseModel):
         description="Search query string to find papers in Zotero library."
     )
     only_articles: bool = Field(
-        default=True, description="Whether to only search for journal articles/"
-        "conference papers."
+        default=True,
+        description="Whether to only search for journal articles/" "conference papers.",
     )
     limit: int = Field(
         default=2, description="Maximum number of results to return", ge=1, le=100
@@ -39,13 +40,14 @@ with hydra.initialize(version_base=None, config_path="../../configs"):
     cfg = hydra.compose(config_name="config", overrides=["tools/zotero=default"])
     cfg = cfg.tools.zotero
 
+
 @tool(args_schema=ZoteroSearchInput, parse_docstring=True)
 def zotero_search_tool(
     query: str,
     only_articles: bool,
     tool_call_id: Annotated[str, InjectedToolCallId],
     limit: int = 2,
-) -> Dict[str, Any]:
+) -> Command[Any]:
     """
     Use this tool to search and retrieve papers from Zotero library.
 
@@ -57,9 +59,12 @@ def zotero_search_tool(
     Returns:
         Dict[str, Any]: The search results and related information.
     """
-    logger.info("Starting Zotero search with query and filter: %s, %s",
-                query,
-                only_articles)
+    logger.info(
+        "Searching Zotero for query: '%s' (only_articles: %s, limit: %d)",
+        query,
+        only_articles,
+        limit,
+    )
 
     # Initialize Zotero client
     zot = zotero.Zotero(cfg.user_id, cfg.library_type, cfg.api_key)
@@ -68,29 +73,44 @@ def zotero_search_tool(
     items = zot.items(q=query, limit=min(limit, 100))
     logger.info("Received %d items from Zotero", len(items))
 
-    # Filter only articles
-    filter_item_types = None
-    if only_articles:
-        filter_item_types = ["journalArticle", "conferencePaper", "preprint"]
+    # Define filter criteria
+    filter_item_types = (
+        ["journalArticle", "conferencePaper", "preprint"] if only_articles else []
+    )
 
     # Filter and format papers
     filtered_papers = {}
+
     for item in items:
-        data = item.get("data", {})
-        # Filter only articles
-        if only_articles:
-            if data.get("itemType") not in filter_item_types:
-                continue
-        # Add to filtered papers
-        item_key = data.get("key")
-        if item_key:
-            filtered_papers[item_key] = {
-                "Title": data.get("title", "N/A"),
-                "Abstract": data.get("abstractNote", "N/A"),
-                "Date": data.get("date", "N/A"),
-                "URL": data.get("url", "N/A"),
-                "Type": data.get("itemType", "N/A"),
-            }
+        if not isinstance(item, dict):
+            continue
+
+        data = item.get("data")
+        if not isinstance(data, dict):
+            continue
+
+        item_type = data.get("itemType")
+        if only_articles and (
+            not item_type
+            or not isinstance(item_type, str)
+            or item_type not in filter_item_types
+        ):
+            continue
+
+        key = data.get("key")
+        if not key:
+            continue
+
+        filtered_papers[key] = {
+            "Title": data.get("title", "N/A"),
+            "Abstract": data.get("abstractNote", "N/A"),
+            "Date": data.get("date", "N/A"),
+            "URL": data.get("url", "N/A"),
+            "Type": item_type if isinstance(item_type, str) else "N/A",
+        }
+
+    if not filtered_papers:
+        logger.warning("No matching papers found for query: '%s'", query)
 
     logger.info("Filtered %d items", len(filtered_papers))
 
