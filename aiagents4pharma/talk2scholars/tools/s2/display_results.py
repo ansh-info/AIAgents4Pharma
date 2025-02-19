@@ -20,10 +20,12 @@ logger = logging.getLogger(__name__)
 class NoPapersFoundError(Exception):
     """Exception raised when no papers are found in the state."""
 
+
 @tool("display_results", parse_docstring=True)
 def display_results(
     tool_call_id: Annotated[str, InjectedToolCallId],
-    state: Annotated[dict, InjectedState]) -> str:
+    state: Annotated[dict, InjectedState],
+) -> Command:
     """
     Display results after a search or recommendation.
 
@@ -50,13 +52,13 @@ def display_results(
         )
     content = f"{len(artifact)} papers found. Papers are attached as an artifact."
     return Command(
-            update={
-                "messages": [
-                    ToolMessage(
-                        content=content,
-                        tool_call_id=tool_call_id,
-                        artifact=artifact,
-                    )
-                ],
-            }
-        )
+        update={
+            "messages": [
+                ToolMessage(
+                    content=content,
+                    tool_call_id=tool_call_id,
+                    artifact=artifact,
+                )
+            ],
+        }
+    )
