@@ -4,13 +4,16 @@
 This tool is used to display the table of studies.
 """
 
+
 import logging
+
 from typing import Annotated
-from langchain_core.tools import tool
-from langgraph.prebuilt import InjectedState
-from langchain_core.tools.base import InjectedToolCallId
 from langchain_core.messages import ToolMessage
+from langchain_core.tools import tool
+from langchain_core.tools.base import InjectedToolCallId
+from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
