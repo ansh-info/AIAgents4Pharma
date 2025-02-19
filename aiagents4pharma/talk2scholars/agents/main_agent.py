@@ -157,8 +157,8 @@ def get_app(
         return Command(
             update={
                 "messages": response["messages"],
-                "papers": response.get("papers", {}),
-                "multi_papers": response.get("multi_papers", {}),
+                # "papers": response.get("papers", {}),
+                # "multi_papers": response.get("multi_papers", {}),
                 "last_displayed_papers": response.get("last_displayed_papers", {}),
             },
             # Always return to supervisor
@@ -201,7 +201,7 @@ def get_app(
         return Command(
             update={
                 "messages": response["messages"],
-                "zotero_papers": response.get("zotero_papers", {}),
+                # "zotero_papers": response.get("zotero_papers", {}),
                 "last_displayed_papers": response.get("last_displayed_papers", {}),
             },
             # Always return to supervisor
