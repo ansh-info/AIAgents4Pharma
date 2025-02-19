@@ -20,14 +20,14 @@ from langsmith import Client
 from utils import streamlit_utils
 
 sys.path.append("./")
-from aiagents4pharma.talk2scholars.agents.main_agent2 import get_app
+from aiagents4pharma.talk2scholars.agents.main_agent import get_app
 
 st.set_page_config(page_title="Talk2Scholars", page_icon="🤖", layout="wide")
 # Set the logo
 st.logo(
-    image='docs/assets/VPE.png',
-    size='large',
-    link='https://github.com/VirtualPatientEngine'
+    image="docs/assets/VPE.png",
+    size="large",
+    link="https://github.com/VirtualPatientEngine",
 )
 
 # Initialize configuration
@@ -46,10 +46,12 @@ else:
 
 # Check if env variables OPENAI_API_KEY and/or NVIDIA_API_KEY exist
 if "OPENAI_API_KEY" not in os.environ:
-    st.error("Please set the OPENAI_API_KEY "
-             "environment variables in the terminal where you run "
-             "the app. For more information, please refer to our "
-             "[documentation](https://virtualpatientengine.github.io/AIAgents4Pharma/#option-2-git).")
+    st.error(
+        "Please set the OPENAI_API_KEY "
+        "environment variables in the terminal where you run "
+        "the app. For more information, please refer to our "
+        "[documentation](https://virtualpatientengine.github.io/AIAgents4Pharma/#option-2-git)."
+    )
     st.stop()
 
 
@@ -83,10 +85,11 @@ if "app" not in st.session_state:
     if "llm_model" not in st.session_state:
         st.session_state.app = get_app(st.session_state.unique_id)
     else:
-        print (st.session_state.llm_model)
-        st.session_state.app = get_app(st.session_state.unique_id,
-                            llm_model=streamlit_utils.get_base_chat_model(
-                                st.session_state.llm_model))
+        print(st.session_state.llm_model)
+        st.session_state.app = get_app(
+            st.session_state.unique_id,
+            llm_model=streamlit_utils.get_base_chat_model(st.session_state.llm_model),
+        )
 # Get the app
 app = st.session_state.app
 
@@ -103,6 +106,7 @@ def _submit_feedback(user_response):
         comment=user_response["text"],
     )
     st.info("Your feedback is on its way to the developers. Thank you!", icon="🚀")
+
 
 # Main layout of the app split into two columns
 main_col1, main_col2 = st.columns([3, 7])
@@ -128,7 +132,7 @@ with main_col1:
             index=0,
             key="llm_model",
             on_change=streamlit_utils.update_llm_model,
-            help="Used for tool calling and generating responses."
+            help="Used for tool calling and generating responses.",
         )
 
         # Upload files (placeholder)
@@ -159,19 +163,23 @@ with main_col2:
                     st.markdown(message["content"].content)
                     st.empty()
             elif message["type"] == "dataframe":
-                if 'tool_name' in message:
-                    if message['tool_name'] in ['display_results', 'zotero_search_tool']:
+                if "tool_name" in message:
+                    if message["tool_name"] in [
+                        "display_results",
+                        "zotero_search_tool",
+                    ]:
                         df_papers = message["content"]
-                        st.dataframe(df_papers,
-                                    use_container_width=True,
-                                    key=message["key"],
-                                    hide_index=True,
-                                    column_config={
-                                        "URL": st.column_config.LinkColumn(
-                                            display_text="Open",
-                                        ),
-                                    }
-                                )
+                        st.dataframe(
+                            df_papers,
+                            use_container_width=True,
+                            key=message["key"],
+                            hide_index=True,
+                            column_config={
+                                "URL": st.column_config.LinkColumn(
+                                    display_text="Open",
+                                ),
+                            },
+                        )
                 # else:
                 #     streamlit_utils.render_table(message["content"],
                 #                     key=message["key"],
@@ -220,8 +228,11 @@ with main_col2:
                     # Update the LLM model
                     app.update_state(
                         config,
-                        {"llm_model": streamlit_utils.get_base_chat_model(
-                            st.session_state.llm_model)}
+                        {
+                            "llm_model": streamlit_utils.get_base_chat_model(
+                                st.session_state.llm_model
+                            )
+                        },
                     )
                     # Update the agent state with the selected LLM model
                     current_state = app.get_state(config)
@@ -250,7 +261,7 @@ with main_col2:
                     # )
                     # st.write_stream(streamlit_utils.stream_response(response))
                     #######################################################
-                        # st.session_state.run_id = cb.traced_runs[-1].id
+                    # st.session_state.run_id = cb.traced_runs[-1].id
                     # Print the response
                     # print (response["messages"][-1])
                     current_state = app.get_state(config)
@@ -267,8 +278,8 @@ with main_col2:
                     st.markdown(response["messages"][-1].content)
                     st.empty()
                     reversed_messages = current_state.values["messages"][::-1]
-                    # Loop through the reversed messages until a 
-                    # HumanMessage is found i.e. the last message 
+                    # Loop through the reversed messages until a
+                    # HumanMessage is found i.e. the last message
                     # from the user. This is to display the results
                     # of the tool calls made by the agent since the
                     # last message from the user.
@@ -293,39 +304,46 @@ with main_col2:
                         if msg.status == "error":
                             continue
                         # print("ToolMessage", msg)
-                        uniq_msg_id = '_'.join([msg.name, msg.tool_call_id, str(st.session_state.run_id)])
+                        uniq_msg_id = "_".join(
+                            [msg.name, msg.tool_call_id, str(st.session_state.run_id)]
+                        )
                         # if msg.name in ['search_tool',
                         #                 'get_single_paper_recommendations',
                         #                 'get_multi_paper_recommendations']:
-                        if msg.name in ['display_results', 'zotero_search_tool']:
+                        if msg.name in ["display_results", "zotero_search_tool"]:
                             # Display the results of the tool call
                             # for msg_artifact in msg.artifact:
                             # dic_papers = msg.artifact[msg_artifact]
                             dic_papers = msg.artifact
                             if not dic_papers:
                                 continue
-                            df_papers = pd.DataFrame.from_dict(dic_papers, orient='index')
+                            df_papers = pd.DataFrame.from_dict(
+                                dic_papers, orient="index"
+                            )
                             # Add index as a column "key"
-                            df_papers['Key'] = df_papers.index
+                            df_papers["Key"] = df_papers.index
                             # Drop index
                             df_papers.reset_index(drop=True, inplace=True)
                             # Drop colum abstract
-                            df_papers.drop(columns=['Abstract'], inplace=True)
-                            st.dataframe(df_papers,
+                            df_papers.drop(columns=["Abstract"], inplace=True)
+                            st.dataframe(
+                                df_papers,
                                 hide_index=True,
                                 column_config={
                                     "URL": st.column_config.LinkColumn(
                                         display_text="Open",
                                     ),
-                                }
+                                },
                             )
                             # Add data to the chat history
-                            st.session_state.messages.append({
+                            st.session_state.messages.append(
+                                {
                                     "type": "dataframe",
                                     "content": df_papers,
-                                    "key": "dataframe_"+uniq_msg_id,
-                                    "tool_name": msg.name
-                                })
+                                    "key": "dataframe_" + uniq_msg_id,
+                                    "tool_name": msg.name,
+                                }
+                            )
                             st.empty()
         # Collect feedback and display the thumbs feedback
         if st.session_state.get("run_id"):
