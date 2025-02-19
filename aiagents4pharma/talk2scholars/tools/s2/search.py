@@ -81,12 +81,14 @@ def search_tool(
     logger.info("Received %d papers", len(papers))
     if not papers:
         return Command(
-            messages=[
-                ToolMessage(
-                    content="No papers found. Please try a different search query.",
-                    tool_call_id=tool_call_id,
-                )
-            ]
+            update={  # Place 'messages' inside 'update'
+                "messages": [
+                    ToolMessage(
+                        content="No papers found. Please try a different search query.",
+                        tool_call_id=tool_call_id,
+                    )
+                ]
+            }
         )
     # Create a dictionary to store the papers
     filtered_papers = {

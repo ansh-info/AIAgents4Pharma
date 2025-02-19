@@ -7,7 +7,7 @@ multi_paper_rec: Tool for getting recommendations
 
 import json
 import logging
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, List, Optional
 import hydra
 import requests
 from langchain_core.messages import ToolMessage
@@ -106,12 +106,14 @@ def get_multi_paper_recommendations(
 
     if not recommendations:
         return Command(
-            messages=[
-                ToolMessage(
-                    content="No recommendations found based on multiple papers.",
-                    tool_call_id=tool_call_id,
-                )
-            ]
+            update={  # Place 'messages' inside 'update'
+                "messages": [
+                    ToolMessage(
+                        content="No recommendations found based on multiple papers.",
+                        tool_call_id=tool_call_id,
+                    )
+                ]
+            }
         )
 
     # Create a dictionary to store the papers
