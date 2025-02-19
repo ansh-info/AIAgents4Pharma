@@ -58,7 +58,7 @@ def get_multi_paper_recommendations(
     tool_call_id: Annotated[str, InjectedToolCallId],
     limit: int = 2,
     year: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> Command[Any]:
     """
     Get recommendations for a group of multiple papers using the Semantic Scholar IDs.
     No other paper IDs are supported.
@@ -73,7 +73,9 @@ def get_multi_paper_recommendations(
     Returns:
         Dict[str, Any]: The recommendations and related information.
     """
-    logging.info("Starting multi-paper recommendations search with paper IDs: %s", paper_ids)
+    logging.info(
+        "Starting multi-paper recommendations search with paper IDs: %s", paper_ids
+    )
 
     endpoint = cfg.api_endpoint
     headers = cfg.headers
@@ -115,14 +117,18 @@ def get_multi_paper_recommendations(
     # Create a dictionary to store the papers
     filtered_papers = {
         paper["paperId"]: {
+            # "semantic_scholar_id": paper["paperId"],  # Store Semantic Scholar ID
             "Title": paper.get("title", "N/A"),
             "Abstract": paper.get("abstract", "N/A"),
             "Year": paper.get("year", "N/A"),
             "Citation Count": paper.get("citationCount", "N/A"),
             "URL": paper.get("url", "N/A"),
+            # "arXiv_ID": paper.get("externalIds", {}).get(
+            #     "ArXiv", "N/A"
+            # ),  # Extract arXiv ID
         }
         for paper in recommendations
-        if paper.get("title") and paper.get("paperId")
+        if paper.get("title") and paper.get("authors")
     }
 
     content = "Recommendations based on multiple papers was successful."

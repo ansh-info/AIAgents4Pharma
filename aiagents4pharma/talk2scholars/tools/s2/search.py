@@ -5,7 +5,7 @@ This tool is used to search for academic papers on Semantic Scholar.
 """
 
 import logging
-from typing import Annotated, Any, Dict, Optional
+from typing import Annotated, Any, Optional
 import hydra
 import requests
 from langchain_core.messages import ToolMessage
@@ -13,7 +13,6 @@ from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.types import Command
 from pydantic import BaseModel, Field
-
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -50,7 +49,7 @@ def search_tool(
     tool_call_id: Annotated[str, InjectedToolCallId],
     limit: int = 5,
     year: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> Command[Any]:
     """
     Search for academic papers on Semantic Scholar.
 
@@ -92,15 +91,20 @@ def search_tool(
     # Create a dictionary to store the papers
     filtered_papers = {
         paper["paperId"]: {
+            # "semantic_scholar_id": paper["paperId"],  # Store Semantic Scholar ID
             "Title": paper.get("title", "N/A"),
             "Abstract": paper.get("abstract", "N/A"),
             "Year": paper.get("year", "N/A"),
             "Citation Count": paper.get("citationCount", "N/A"),
             "URL": paper.get("url", "N/A"),
+            # "arXiv_ID": paper.get("externalIds", {}).get(
+            #     "ArXiv", "N/A"
+            # ),  # Extract arXiv ID
         }
         for paper in papers
         if paper.get("title") and paper.get("authors")
     }
+
     logger.info("Filtered %d papers", len(filtered_papers))
 
     content = "Search was successful."

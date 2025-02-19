@@ -5,7 +5,7 @@ This tool is used to return recommendations for a single paper.
 """
 
 import logging
-from typing import Annotated, Any, Dict, Optional
+from typing import Annotated, Any, Optional
 import hydra
 import requests
 from langchain_core.messages import ToolMessage
@@ -54,7 +54,7 @@ def get_single_paper_recommendations(
     tool_call_id: Annotated[str, InjectedToolCallId],
     limit: int = 5,
     year: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> Command[Any]:
     """
     Get recommendations for on a single paper using its Semantic Scholar ID.
     No other ID types are supported.
@@ -69,7 +69,9 @@ def get_single_paper_recommendations(
     Returns:
         Dict[str, Any]: The recommendations and related information.
     """
-    logger.info("Starting single paper recommendations search with paper ID: %s", paper_id)
+    logger.info(
+        "Starting single paper recommendations search with paper ID: %s", paper_id
+    )
 
     endpoint = f"{cfg.api_endpoint}/{paper_id}"
     params = {
@@ -115,11 +117,15 @@ def get_single_paper_recommendations(
     # Extract paper ID and title from recommendations
     filtered_papers = {
         paper["paperId"]: {
+            # "semantic_scholar_id": paper["paperId"],  # Store Semantic Scholar ID
             "Title": paper.get("title", "N/A"),
             "Abstract": paper.get("abstract", "N/A"),
             "Year": paper.get("year", "N/A"),
             "Citation Count": paper.get("citationCount", "N/A"),
             "URL": paper.get("url", "N/A"),
+            # "arXiv_ID": paper.get("externalIds", {}).get(
+            #     "ArXiv", "N/A"
+            # ),  # Extract arXiv ID
         }
         for paper in recommendations
         if paper.get("title") and paper.get("authors")
