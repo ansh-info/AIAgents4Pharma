@@ -5,7 +5,7 @@ This tool is used to search for academic papers on Semantic Scholar.
 """
 
 import logging
-from typing import Annotated, Any, Dict
+from typing import Annotated, Any
 import hydra
 import requests
 from langchain_core.messages import ToolMessage
@@ -21,15 +21,20 @@ logger = logging.getLogger(__name__)
 
 # Load hydra configuration
 with hydra.initialize(version_base=None, config_path="../../configs"):
-    cfg = hydra.compose(config_name="config", overrides=["tools/retrieve_semantic_scholar_paper_id=default"])
+    cfg = hydra.compose(
+        config_name="config",
+        overrides=["tools/retrieve_semantic_scholar_paper_id=default"],
+    )
     cfg = cfg.tools.retrieve_semantic_scholar_paper_id
+
 
 @tool("retrieve_semantic_scholar_paper_id", parse_docstring=True)
 def retrieve_semantic_scholar_paper_id(
     tool_call_id: Annotated[str, InjectedToolCallId],
     paper_title: str = Field(
-        description="The title of the paper to search for on Semantic Scholar.")
-) -> Dict[str, Any]:
+        description="The title of the paper to search for on Semantic Scholar."
+    ),
+) -> Command[Any]:
     """
     This tool can be used to search for a paper on Semantic Scholar
     and retrieve the paper Semantic Scholar ID.
