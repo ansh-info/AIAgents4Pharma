@@ -116,6 +116,7 @@ def check_id_mapping_results_ready(job_id):
 
 def get_id_mapping_results_link(job_id):
     """Get the link to the ID mapping results."""
+    """Get the link to the ID mapping results."""
     url = f"{API_URL}/idmapping/details/{job_id}"
     request = requests.get(url)
     try:
