@@ -12,20 +12,18 @@ import traceback
 import requests
 import time
 from pathlib import Path
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-# Disable httpx logging
-logging.getLogger("httpx").setLevel(logging.WARNING)
-
-# Import necessary packages for RAG
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_openai import OpenAIEmbeddings
 from langchain.llms import OpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+# Disable httpx logging
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # Add the project root to the path
 # Get the current file's directory
