@@ -181,6 +181,7 @@ def search_ols_term(ontology, term):
     response = requests.get(
         base_url, params=params, headers={"Accept": "application/json"}, timeout=10
     )
+    logger.info("OLS search response: %s", response.text)
     if response.status_code == 200:
         data = response.json()
         results = data.get("response", {}).get("docs", [])
