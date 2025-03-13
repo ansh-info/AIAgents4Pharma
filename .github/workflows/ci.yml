@@ -159,9 +159,9 @@ jobs:
           file: aiagents4pharma/talk2scholars/Dockerfile
           push: true
           tags: |
-            virtualpatientengine/talk2scholars:${{ needs.version.outputs.version }}
-            virtualpatientengine/talk2scholars:${{ needs.version.outputs.short_sha }}
-            virtualpatientengine/talk2scholars:latest
+            # anshinfo/talk2scholars:${{ needs.version.outputs.version }}
+            # anshinfo/talk2scholars:${{ needs.version.outputs.short_sha }}
+            anshinfo/talk2scholars:latest
 
   # # Separate job for talk2knowledgegraphs
   # build-talk2knowledgegraphs:
