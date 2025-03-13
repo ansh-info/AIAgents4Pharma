@@ -72,10 +72,10 @@ jobs:
             # For other triggers (PR, push, etc.), create a development version
             # Strip the 'v' prefix
             VERSION=${LATEST_TAG#v}
-            # Get count of commits since latest tag
-            COMMIT_COUNT=$(git rev-list ${LATEST_TAG}..HEAD --count)
-            # Create dev version: latest tag + dev + commit count
-            VERSION="v${VERSION}-dev.${COMMIT_COUNT}"
+            # # Get count of commits since latest tag
+            # COMMIT_COUNT=$(git rev-list ${LATEST_TAG}..HEAD --count)
+            # # Create dev version: latest tag + dev + commit count
+            # VERSION="v${VERSION}-dev.${COMMIT_COUNT}"
           fi
 
           echo "Using version: $VERSION"
