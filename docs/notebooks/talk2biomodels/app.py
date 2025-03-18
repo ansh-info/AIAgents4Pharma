@@ -393,6 +393,7 @@ def get_species_node_mapping(species_list, embeddings, pyg_data):
 
 
 def main():
+    """main function for Streamlit app"""
     st.title("BioModel Analysis with Knowledge Graph")
 
     st.sidebar.title("Settings")
