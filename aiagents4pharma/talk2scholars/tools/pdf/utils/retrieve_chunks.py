@@ -1,14 +1,12 @@
 """
-Retrieve relevant chunks from a vector store using MMR (Maximal Marginal Relevance).
+Retrieve relevant chunks from a Milvus vector store using MMR (Maximal Marginal Relevance).
 """
 
 import logging
 import os
 from typing import List, Optional
 
-import numpy as np
 from langchain_core.documents import Document
-from langchain_core.vectorstores.utils import maximal_marginal_relevance
 
 
 # Set up logging with configurable level
@@ -19,7 +17,7 @@ logger.setLevel(getattr(logging, log_level))
 
 
 def retrieve_relevant_chunks(
-    self,
+    vector_store,
     query: str,
     paper_ids: Optional[List[str]] = None,
     top_k: int = 25,
@@ -29,55 +27,67 @@ def retrieve_relevant_chunks(
     Retrieve the most relevant chunks for a query using maximal marginal relevance.
 
     Args:
+        vector_store: The Milvus vector store instance
         query: Query string
         paper_ids: Optional list of paper IDs to filter by
         top_k: Number of chunks to retrieve
-        mmr_diversity: Diversity parameter for MMR (higher = more diverse)
+        mmr_diversity: Diversity parameter for MMR (0=max diversity, 1=max relevance)
 
     Returns:
         List of document chunks
     """
-    if not self.vector_store:
-        logger.error("Failed to build vector store")
+    if not vector_store:
+        logger.error("Vector store is not initialized")
         return []
 
+    # Prepare filter for paper_ids if provided
+    filter_dict = None
     if paper_ids:
         logger.info("Filtering retrieval to papers: %s", paper_ids)
+        filter_dict = {"paper_id": paper_ids}
 
-    # Step 1: Embed the query
-    logger.info("Embedding query using model: %s", type(self.embedding_model).__name__)
-    query_embedding = np.array(self.embedding_model.embed_query(query))
+    try:
+        # Use Milvus's built-in MMR search
+        logger.info(
+            "Performing MMR search with query: '%s', k=%d, diversity=%.2f",
+            query[:50] + "..." if len(query) > 50 else query,
+            top_k,
+            mmr_diversity,
+        )
 
-    # Step 2: Filter relevant documents
-    all_docs = [
-        doc
-        for doc in self.documents.values()
-        if not paper_ids or doc.metadata["paper_id"] in paper_ids
-    ]
+        # Perform MMR search using the Milvus vector store
+        results = vector_store.max_marginal_relevance_search(
+            query=query,
+            k=top_k,
+            fetch_k=top_k * 4,  # Fetch more candidates for better MMR results
+            lambda_mult=mmr_diversity,
+            filter=filter_dict,
+        )
 
-    if not all_docs:
-        logger.warning("No documents found after filtering by paper_ids.")
-        return []
+        logger.info("Retrieved %d chunks using MMR from Milvus", len(results))
 
-    # Step 3: Retrieve or compute embeddings for all documents using cache
-    logger.info("Retrieving embeddings for %d chunks...", len(all_docs))
-    all_embeddings = []
-    for doc in all_docs:
-        doc_id = f"{doc.metadata['paper_id']}_{doc.metadata['chunk_id']}"
-        if doc_id not in self.embeddings:
-            logger.info("Embedding missing chunk %s", doc_id)
-            emb = self.embedding_model.embed_documents([doc.page_content])[0]
-            self.embeddings[doc_id] = emb
-        all_embeddings.append(self.embeddings[doc_id])
+        # Log some details about retrieved chunks for debugging
+        if results and logger.isEnabledFor(logging.DEBUG):
+            paper_counts = {}
+            for doc in results:
+                paper_id = doc.metadata.get("paper_id", "unknown")
+                paper_counts[paper_id] = paper_counts.get(paper_id, 0) + 1
+            logger.debug("Chunks per paper: %s", paper_counts)
 
-    # Step 4: Apply MMR
-    mmr_indices = maximal_marginal_relevance(
-        query_embedding,
-        all_embeddings,
-        k=top_k,
-        lambda_mult=mmr_diversity,
-    )
+        return results
 
-    results = [all_docs[i] for i in mmr_indices]
-    logger.info("Retrieved %d chunks using MMR", len(results))
-    return results
+    except Exception as e:
+        logger.error("Error during MMR search: %s", e)
+        # Fallback to regular similarity search if MMR fails
+        try:
+            logger.info("Falling back to regular similarity search")
+            results = vector_store.similarity_search(
+                query=query,
+                k=top_k,
+                filter=filter_dict,
+            )
+            logger.info("Retrieved %d chunks using similarity search", len(results))
+            return results
+        except Exception as fallback_error:
+            logger.error("Fallback search also failed: %s", fallback_error)
+            return []
