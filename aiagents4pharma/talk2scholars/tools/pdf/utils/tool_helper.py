@@ -10,6 +10,7 @@ from .generate_answer import generate_answer
 from .nvidia_nim_reranker import rank_papers_by_query
 from .retrieve_chunks import retrieve_relevant_chunks
 from .vector_store import Vectorstore
+from .vector_store_manager import vector_store_manager
 
 logger = logging.getLogger(__name__)
 
@@ -50,15 +51,20 @@ class QAToolHelper:
 
     def init_vector_store(self, emb_model: Any) -> Vectorstore:
         """Initialize or return existing Milvus vector store instance."""
-        # With the singleton pattern in Vectorstore, this will automatically
-        # reuse existing connections and vector stores
-        if self.vector_store is not None:
-            logger.info("%s: Using existing Milvus vector store instance", self.call_id)
-        else:
-            logger.info("%s: Creating new Milvus vector store instance", self.call_id)
-            self.vector_store = Vectorstore(
+        # First check if we have an existing instance
+        self.vector_store = vector_store_manager.get_instance()
+
+        if self.vector_store is None:
+            # Initialize if not already done
+            logger.info(
+                "%s: No existing vector store found, initializing new instance",
+                self.call_id,
+            )
+            self.vector_store = vector_store_manager.initialize(
                 embedding_model=emb_model, config=self.config
             )
+        else:
+            logger.info("%s: Using existing shared vector store instance", self.call_id)
 
         # Get current stats
         stats = self.vector_store.get_collection_stats()
@@ -68,6 +74,7 @@ class QAToolHelper:
             stats.get("num_loaded_papers", 0),
             stats.get("num_entities", "unknown"),
         )
+
         return self.vector_store
 
     def load_candidate_papers(
