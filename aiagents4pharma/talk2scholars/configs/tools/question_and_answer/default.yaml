@@ -1,4 +1,28 @@
 # Default configuration for the PDF question_and_answer Tool
+
+# Milvus vector database settings
+milvus:
+  # Connection settings
+  host: ${oc.env:MILVUS_HOST,127.0.0.1}
+  port: ${oc.env:MILVUS_PORT,19530}
+
+  # Database and collection settings
+  db_name: ${oc.env:MILVUS_DB_NAME,pdf_rag_db}
+  collection_name: ${oc.env:MILVUS_COLLECTION_NAME,pdf_rag_documents}
+
+  # Index settings for vector search
+  index_params:
+    metric_type: "COSINE" # Can be L2, IP (Inner Product), or COSINE
+    index_type: "IVF_FLAT" # Good balance of speed and accuracy
+    params:
+      nlist: 1024 # Number of cluster units
+
+  # Search parameters
+  search_params:
+    metric_type: "COSINE"
+    params:
+      nprobe: 10 # Number of units to query
+
 chunk_size: 1200 # Number of characters per text chunk
 chunk_overlap: 200 # Overlap between adjacent chunks
 top_k_papers: 5 # Number of papers to rank and retrieve
