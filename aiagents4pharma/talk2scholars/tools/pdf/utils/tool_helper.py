@@ -50,22 +50,24 @@ class QAToolHelper:
 
     def init_vector_store(self, emb_model: Any) -> Vectorstore:
         """Initialize or return existing Milvus vector store instance."""
-        # Check if we already have a vector store initialized
+        # With the singleton pattern in Vectorstore, this will automatically
+        # reuse existing connections and vector stores
         if self.vector_store is not None:
-            logger.info("%s: Using existing Milvus vector store", self.call_id)
-            # Get current stats
-            stats = self.vector_store.get_collection_stats()
-            logger.info(
-                "%s: Vector store stats - Papers: %d, Entities: %s",
-                self.call_id,
-                stats.get("num_loaded_papers", 0),
-                stats.get("num_entities", "unknown"),
+            logger.info("%s: Using existing Milvus vector store instance", self.call_id)
+        else:
+            logger.info("%s: Creating new Milvus vector store instance", self.call_id)
+            self.vector_store = Vectorstore(
+                embedding_model=emb_model, config=self.config
             )
-            return self.vector_store
 
-        # Create new vector store with Milvus
-        logger.info("%s: Initializing new Milvus vector store", self.call_id)
-        self.vector_store = Vectorstore(embedding_model=emb_model, config=self.config)
+        # Get current stats
+        stats = self.vector_store.get_collection_stats()
+        logger.info(
+            "%s: Vector store stats - Papers: %d, Entities: %s",
+            self.call_id,
+            stats.get("num_loaded_papers", 0),
+            stats.get("num_entities", "unknown"),
+        )
         return self.vector_store
 
     def load_candidate_papers(
@@ -111,8 +113,6 @@ class QAToolHelper:
                 logger.info("%s: Successfully loaded paper %s", self.call_id, pid)
             except (IOError, ValueError) as exc:
                 logger.warning("%s: Error loading paper %s: %s", self.call_id, pid, exc)
-
-        # No need to call build_vector_store() with Milvus as it's built incrementally
 
     def run_reranker(
         self,
