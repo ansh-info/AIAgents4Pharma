@@ -1,9 +1,12 @@
 """
 Vectorstore class for managing document embeddings and retrieval using Milvus.
+Implements singleton pattern for connection reuse across Streamlit sessions.
 """
 
+import asyncio
 import logging
 import os
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -23,10 +26,109 @@ logger = logging.getLogger(__name__)
 logger.setLevel(getattr(logging, log_level))
 
 
+class VectorstoreSingleton:
+    """Singleton manager for Milvus connections and vector stores."""
+
+    _instance = None
+    _lock = threading.Lock()
+    _connections = {}  # Store connections by connection string
+    _vector_stores = {}  # Store vector stores by collection name
+    _event_loops = {}  # Store event loops by thread ID
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def get_event_loop(self) -> asyncio.AbstractEventLoop:
+        """Get or create event loop for current thread."""
+        thread_id = threading.get_ident()
+
+        if thread_id not in self._event_loops:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    raise RuntimeError("Event loop is closed")
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            self._event_loops[thread_id] = loop
+            logger.info("Created new event loop for thread %s", thread_id)
+
+        return self._event_loops[thread_id]
+
+    def get_connection(self, host: str, port: int, db_name: str) -> str:
+        """Get or create a Milvus connection."""
+        conn_key = f"{host}:{port}/{db_name}"
+
+        if conn_key not in self._connections:
+            try:
+                # Check if already connected
+                if connections.has_connection("default"):
+                    connections.remove_connection("default")
+
+                # Connect to Milvus
+                connections.connect(
+                    alias="default",
+                    host=host,
+                    port=port,
+                )
+                logger.info("Connected to Milvus at %s:%s", host, port)
+
+                # Check if database exists, create if not
+                from pymilvus import db
+
+                existing_dbs = db.list_database()
+                if db_name not in existing_dbs:
+                    db.create_database(db_name)
+                    logger.info("Created database: %s", db_name)
+
+                # Use the database
+                db.using_database(db_name)
+                logger.info("Using database: %s", db_name)
+
+                self._connections[conn_key] = "default"
+
+            except MilvusException as e:
+                logger.error("Failed to connect to Milvus: %s", e)
+                raise
+
+        return self._connections[conn_key]
+
+    def get_vector_store(
+        self,
+        collection_name: str,
+        embedding_model: Embeddings,
+        connection_args: Dict[str, Any],
+    ) -> Milvus:
+        """Get or create a vector store for a collection."""
+        if collection_name not in self._vector_stores:
+            # Ensure event loop exists for this thread
+            self.get_event_loop()
+
+            # Create LangChain Milvus instance
+            vector_store = Milvus(
+                embedding_function=embedding_model,
+                collection_name=collection_name,
+                connection_args=connection_args,
+                text_field="text",
+                auto_id=False,
+                drop_old=False,
+                consistency_level="Strong",
+            )
+
+            self._vector_stores[collection_name] = vector_store
+            logger.info("Created new vector store for collection: %s", collection_name)
+
+        return self._vector_stores[collection_name]
+
+
 class Vectorstore:
     """
     A class for managing document embeddings and retrieval using Milvus.
-    Provides unified access to documents across multiple papers.
+    Uses singleton pattern to reuse connections across instances.
     """
 
     def __init__(
@@ -67,73 +169,71 @@ class Vectorstore:
         )
         self.db_name = config.milvus.db_name if config else "pdf_rag_db"
 
-        # Connect to Milvus
+        # Get singleton instance
+        self._singleton = VectorstoreSingleton()
+
+        # Connect to Milvus (reuses existing connection if available)
         self._connect_milvus()
 
-        # Initialize the LangChain Milvus vector store
+        # Initialize the LangChain Milvus vector store (reuses existing if available)
         self.vector_store = self._initialize_vector_store()
 
         # Store for document metadata (keeping for compatibility)
         self.documents: Dict[str, Document] = {}
         self.paper_metadata: Dict[str, Dict[str, Any]] = {}
 
+        # Sync loaded papers from existing collection
+        self._sync_loaded_papers()
+
         logger.info(
             "Milvus vector store initialized with collection: %s", self.collection_name
         )
 
     def _connect_milvus(self) -> None:
-        """Establish connection to Milvus server."""
-        try:
-            # Connect to Milvus
-            connections.connect(
-                alias="default",
-                host=self.connection_args["host"],
-                port=self.connection_args["port"],
-            )
-            logger.info(
-                "Connected to Milvus at %s:%s",
-                self.connection_args["host"],
-                self.connection_args["port"],
-            )
-
-            # Check if database exists, create if not
-            from pymilvus import db
-
-            existing_dbs = db.list_database()
-            if self.db_name not in existing_dbs:
-                db.create_database(self.db_name)
-                logger.info("Created database: %s", self.db_name)
-
-            # Use the database
-            db.using_database(self.db_name)
-            logger.info("Using database: %s", self.db_name)
-
-        except MilvusException as e:
-            logger.error("Failed to connect to Milvus: %s", e)
-            raise
+        """Establish connection to Milvus server using singleton."""
+        self._singleton.get_connection(
+            self.connection_args["host"], self.connection_args["port"], self.db_name
+        )
 
     def _initialize_vector_store(self) -> Milvus:
-        """Initialize or load the Milvus vector store."""
+        """Initialize or load the Milvus vector store using singleton."""
+        return self._singleton.get_vector_store(
+            self.collection_name, self.embedding_model, self.connection_args
+        )
+
+    def _sync_loaded_papers(self) -> None:
+        """Sync loaded papers from existing collection."""
         try:
-            # Create LangChain Milvus instance
-            vector_store = Milvus(
-                embedding_function=self.embedding_model,
-                collection_name=self.collection_name,
-                connection_args=self.connection_args,
-                # Define text field for storing document content
-                text_field="text",
-                # Auto-create collection with proper schema
-                auto_id=False,  # We'll provide our own IDs
-                drop_old=False,  # Don't drop existing collection
-                consistency_level="Strong",
-            )
+            if utility.has_collection(self.collection_name):
+                collection = Collection(self.collection_name)
 
-            logger.info("Milvus vector store initialized/loaded successfully")
-            return vector_store
+                # Load collection to memory if not already loaded
+                collection.load()
 
+                # Query to get unique paper_ids
+                # Note: This is a simplified approach. For large collections,
+                # you might want to implement pagination or use a more efficient method
+                if collection.num_entities > 0:
+                    # Query a sample to get paper IDs
+                    results = collection.query(
+                        expr="paper_id != ''",
+                        output_fields=["paper_id"],
+                        limit=10000,  # Adjust based on your needs
+                    )
+
+                    # Extract unique paper IDs
+                    paper_ids = set()
+                    for result in results:
+                        if "paper_id" in result:
+                            paper_ids.add(result["paper_id"])
+
+                    self.loaded_papers = paper_ids
+                    logger.info(
+                        "Synced %d loaded papers from existing collection",
+                        len(self.loaded_papers),
+                    )
         except Exception as e:
-            logger.error("Failed to initialize Milvus vector store: %s", e)
-            raise
+            logger.warning("Could not sync loaded papers: %s", e)
 
     def add_paper(
         self,
@@ -338,6 +438,13 @@ class Vectorstore:
                 collection = Collection(self.collection_name)
                 collection.drop()
                 logger.info("Dropped collection: %s", self.collection_name)
+
+                # Clear from singleton cache
+                if self.collection_name in self._singleton._vector_stores:
+                    del self._singleton._vector_stores[self.collection_name]
+
+                # Clear loaded papers
+                self.loaded_papers.clear()
             else:
                 logger.info("Collection %s does not exist", self.collection_name)
         except MilvusException as e:
