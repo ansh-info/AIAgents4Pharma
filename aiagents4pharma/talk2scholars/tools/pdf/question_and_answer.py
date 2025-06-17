@@ -6,7 +6,7 @@ and invoking an LLM to generate a concise, source-attributed response. It suppor
 single or multiple PDF sources—such as Zotero libraries, arXiv papers, or direct uploads.
 
 Workflow:
-  1. (Optional) Load PDFs from diverse sources into a FAISS vector store of embeddings.
+  1. (Optional) Load PDFs from diverse sources into a Milvus vector store of embeddings.
   2. Rerank candidate papers using NVIDIA NIM semantic re-ranker.
   3. Retrieve top-K diverse text chunks via Maximal Marginal Relevance (MMR).
   4. Build a context-rich prompt combining retrieved chunks and the user question.
@@ -27,7 +27,6 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from .utils.generate_answer import load_hydra_config
-from .utils.retrieve_chunks import retrieve_relevant_chunks
 from .utils.tool_helper import QAToolHelper
 
 # Helper for managing state, vectorstore, reranking, and formatting
@@ -70,11 +69,11 @@ def question_and_answer(
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command[Any]:
     """
-    LangGraph tool for Retrieval-Augmented Generation over PDFs.
+    LangGraph tool for Retrieval-Augmented Generation over PDFs using Milvus.
 
     Given a user question, this tool applies the following pipeline:
       1. Validates that embedding and LLM models, plus article metadata, are in state.
-      2. Initializes or reuses a FAISS-based Vectorstore for PDF embeddings.
+      2. Initializes or reuses a Milvus-based Vectorstore for PDF embeddings.
       3. Loads one or more PDFs (from Zotero, arXiv, uploads) as text chunks into the store.
       4. Uses NVIDIA NIM semantic re-ranker to select top candidate papers.
       5. Retrieves the most relevant and diverse text chunks via Maximal Marginal Relevance.
@@ -108,7 +107,7 @@ def question_and_answer(
     # Extract models and article metadata
     text_emb, llm_model, article_data = helper.get_state_models_and_data(state)
 
-    # Initialize or reuse vector store, then load candidate papers
+    # Initialize or reuse Milvus vector store, then load candidate papers
     vs = helper.init_vector_store(text_emb)
     candidate_ids = list(article_data.keys())
     logger.info("%s: Candidate paper IDs for reranking: %s", call_id, candidate_ids)
@@ -116,9 +115,10 @@ def question_and_answer(
 
     # Rerank papers and retrieve top chunks
     selected_ids = helper.run_reranker(vs, question, candidate_ids)
-    relevant_chunks = retrieve_relevant_chunks(
-        vs, query=question, paper_ids=selected_ids, top_k=config.top_k_chunks
-    )
+
+    # Use the helper's retrieve_chunks method instead of calling retrieve_relevant_chunks directly
+    relevant_chunks = helper.retrieve_chunks(vs, question, selected_ids)
+
     if not relevant_chunks:
         msg = f"No relevant chunks found for question: '{question}'"
         logger.warning("%s: %s", call_id, msg)
@@ -128,6 +128,13 @@ def question_and_answer(
     response_text = helper.format_answer(
         question, relevant_chunks, llm_model, article_data
     )
+
+    logger.info(
+        "%s: Successfully generated answer with %d chunks",
+        call_id,
+        len(relevant_chunks),
+    )
+
     return Command(
         update={
             "messages": [
