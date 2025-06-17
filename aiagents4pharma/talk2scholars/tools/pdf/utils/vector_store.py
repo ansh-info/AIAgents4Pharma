@@ -204,36 +204,103 @@ class Vectorstore:
     def _sync_loaded_papers(self) -> None:
         """Sync loaded papers from existing collection."""
         try:
-            if utility.has_collection(self.collection_name):
-                collection = Collection(self.collection_name)
+            # Check if collection exists
+            if not utility.has_collection(self.collection_name):
+                logger.info("Collection %s does not exist yet", self.collection_name)
+                return
 
-                # Load collection to memory if not already loaded
-                collection.load()
+            # Get collection
+            collection = Collection(self.collection_name)
 
-                # Query to get unique paper_ids
-                # Note: This is a simplified approach. For large collections,
-                # you might want to implement pagination or use a more efficient method
-                if collection.num_entities > 0:
-                    # Query a sample to get paper IDs
+            # Check if collection has data
+            if collection.num_entities == 0:
+                logger.info("Collection %s is empty", self.collection_name)
+                return
+
+            # Load collection to memory
+            collection.load()
+
+            # Wait a bit for collection to be ready
+            import time
+
+            time.sleep(0.5)
+
+            # Query all unique paper IDs using batch querying for large collections
+            batch_size = 1000
+            all_paper_ids = set()
+            offset = 0
+
+            logger.info(
+                "Starting to sync paper IDs from collection %s", self.collection_name
+            )
+
+            while True:
+                try:
+                    # Query with pagination
+                    # Use a more specific expression to ensure paper_id field exists
                     results = collection.query(
-                        expr="paper_id != ''",
+                        expr="paper_id >= ''",  # This ensures paper_id exists and is not null
                         output_fields=["paper_id"],
-                        limit=10000,  # Adjust based on your needs
+                        offset=offset,
+                        limit=batch_size,
                     )
 
-                    # Extract unique paper IDs
-                    paper_ids = set()
+                    if not results:
+                        break
+
+                    # Extract paper IDs from this batch
                     for result in results:
-                        if "paper_id" in result:
-                            paper_ids.add(result["paper_id"])
+                        paper_id = result.get("paper_id")
+                        if paper_id:
+                            all_paper_ids.add(paper_id)
 
-                    self.loaded_papers = paper_ids
-                    logger.info(
-                        "Synced %d loaded papers from existing collection",
-                        len(self.loaded_papers),
+                    # If we got fewer results than batch_size, we've reached the end
+                    if len(results) < batch_size:
+                        break
+
+                    offset += batch_size
+
+                    # Log progress for large collections
+                    if offset % 5000 == 0:
+                        logger.info(
+                            "Processed %d entities, found %d unique papers so far",
+                            offset,
+                            len(all_paper_ids),
+                        )
+
+                except Exception as batch_error:
+                    logger.warning(
+                        "Error in batch %d: %s", offset // batch_size, batch_error
                     )
+                    break
+
+            self.loaded_papers = all_paper_ids
+            logger.info(
+                "Successfully synced %d loaded papers from collection %s",
+                len(self.loaded_papers),
+                self.collection_name,
+            )
+
+            # Log first few paper IDs for debugging
+            if self.loaded_papers:
+                sample_ids = list(self.loaded_papers)[:5]
+                logger.debug("Sample paper IDs: %s", sample_ids)
+
         except Exception as e:
-            logger.warning("Could not sync loaded papers: %s", e)
+            logger.error("Failed to sync loaded papers: %s", e)
+            logger.info("Starting with empty loaded_papers set")
+
+    def has_paper(self, paper_id: str) -> bool:
+        """
+        Check if a paper is already loaded in the vector store.
+
+        Args:
+            paper_id: The ID of the paper to check
+
+        Returns:
+            bool: True if paper exists in vector store, False otherwise
+        """
+        return paper_id in self.loaded_papers
 
     def add_paper(
         self,
@@ -249,9 +316,16 @@ class Vectorstore:
             pdf_url: URL to the PDF
             paper_metadata: Metadata about the paper
         """
-        # Skip if already loaded
+        # Skip if already loaded (check in-memory set first)
         if paper_id in self.loaded_papers:
-            logger.info("Paper %s already loaded, skipping", paper_id)
+            logger.info("Paper %s already loaded (found in memory), skipping", paper_id)
+            return
+
+        # Double-check by querying Milvus directly
+        if self._is_paper_in_milvus(paper_id):
+            # Update our in-memory set
+            self.loaded_papers.add(paper_id)
+            logger.info("Paper %s already exists in Milvus, skipping", paper_id)
             return
 
         logger.info("Loading paper %s from %s", paper_id, pdf_url)
@@ -326,6 +400,23 @@ class Vectorstore:
         except Exception as e:
             logger.error("Failed to add paper %s to Milvus: %s", paper_id, e)
             raise
+
+    def _is_paper_in_milvus(self, paper_id: str) -> bool:
+        """Check if a paper exists in Milvus by querying for its chunks."""
+        try:
+            if not utility.has_collection(self.collection_name):
+                return False
+
+            # Query for any chunk from this paper
+            results = self.vector_store.similarity_search(
+                query="", k=1, expr=f'paper_id == "{paper_id}"'  # Empty query
+            )
+
+            return len(results) > 0
+
+        except Exception as e:
+            logger.debug("Error checking paper %s in Milvus: %s", paper_id, e)
+            return False
 
     def build_vector_store(self) -> None:
         """
@@ -456,11 +547,31 @@ class Vectorstore:
         try:
             if utility.has_collection(self.collection_name):
                 collection = Collection(self.collection_name)
+
+                # Get unique paper count by sampling
+                sample_papers = set()
+                if collection.num_entities > 0:
+                    try:
+                        results = collection.query(
+                            expr="paper_id >= ''",
+                            output_fields=["paper_id"],
+                            limit=min(1000, collection.num_entities),
+                        )
+                        for result in results:
+                            if "paper_id" in result:
+                                sample_papers.add(result["paper_id"])
+                    except:
+                        pass
+
                 stats = {
                     "name": self.collection_name,
                     "num_entities": collection.num_entities,
-                    "loaded_papers": list(self.loaded_papers),
-                    "num_loaded_papers": len(self.loaded_papers),
+                    "loaded_papers_in_memory": list(self.loaded_papers)[
+                        :10
+                    ],  # First 10 for brevity
+                    "num_loaded_papers_in_memory": len(self.loaded_papers),
+                    "sample_papers_in_milvus": list(sample_papers)[:10],
+                    "estimated_papers_in_milvus": len(sample_papers),
                 }
                 return stats
             else:
