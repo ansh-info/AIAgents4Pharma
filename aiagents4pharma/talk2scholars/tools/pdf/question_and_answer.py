@@ -1,17 +1,16 @@
 """
 LangGraph PDF Retrieval-Augmented Generation (RAG) Tool
 
-This tool answers user questions by retrieving and ranking relevant text chunks from PDFs
-and invoking an LLM to generate a concise, source-attributed response. It supports
-single or multiple PDF sources—such as Zotero libraries, arXiv papers, or direct uploads.
+This tool answers user questions using the traditional RAG pipeline:
+1. Retrieve relevant chunks from ALL papers in the vector store
+2. Rerank chunks using NVIDIA NIM reranker to find the most relevant ones
+3. Generate answer using the top reranked chunks
 
-Workflow:
-  1. (Optional) Load PDFs from diverse sources into a Milvus vector store of embeddings.
-  2. Rerank candidate papers using NVIDIA NIM semantic re-ranker.
-  3. Retrieve top-K diverse text chunks via Maximal Marginal Relevance (MMR).
-  4. Build a context-rich prompt combining retrieved chunks and the user question.
-  5. Invoke the LLM to craft a clear answer with source citations.
-  6. Return the answer in a ToolMessage for LangGraph to dispatch.
+Traditional RAG Pipeline Flow:
+  Query → Retrieve chunks from ALL papers → Rerank chunks → Generate answer
+
+This ensures the best possible chunks are selected across all available papers,
+not just from pre-selected papers.
 """
 
 import logging
@@ -52,7 +51,6 @@ class QuestionAndAnswerInput(BaseModel):
         - article_data: metadata mapping of paper IDs to info (e.g., 'pdf_url', title).
         - text_embedding_model: embedding model instance for chunk indexing.
         - llm_model: chat/LLM instance for answer generation.
-        - vector_store: optional pre-built Vectorstore for retrieval.
     """
 
     question: str = Field(
@@ -69,17 +67,16 @@ def question_and_answer(
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command[Any]:
     """
-    LangGraph tool for Retrieval-Augmented Generation over PDFs using Milvus.
+    LangGraph tool for Retrieval-Augmented Generation over PDFs using traditional RAG pipeline.
 
-    Given a user question, this tool applies the following pipeline:
-      1. Validates that embedding and LLM models, plus article metadata, are in state.
-      2. Initializes or reuses a Milvus-based Vectorstore for PDF embeddings.
-      3. Loads one or more PDFs (from Zotero, arXiv, uploads) as text chunks into the store.
-      4. Uses NVIDIA NIM semantic re-ranker to select top candidate papers.
-      5. Retrieves the most relevant and diverse text chunks via Maximal Marginal Relevance.
-      6. Constructs an LLM prompt combining contextual chunks and the query.
-      7. Invokes the LLM to generate an answer, appending source attributions.
-      8. Returns a LangGraph Command with a ToolMessage containing the answer.
+    Traditional RAG Pipeline Implementation:
+      1. Load ALL available PDFs into Milvus vector store (if not already loaded)
+      2. Retrieve relevant chunks from ALL papers using vector similarity search
+      3. Rerank retrieved chunks using NVIDIA NIM semantic reranker
+      4. Generate answer using top reranked chunks with source attribution
+
+    This approach ensures the best chunks are selected across all available papers,
+    rather than pre-selecting papers and potentially missing relevant information.
 
     Args:
       question (str): The free-text question to answer.
@@ -98,41 +95,65 @@ def question_and_answer(
     """
     call_id = f"qa_call_{time.time()}"
     logger.info(
-        "Starting PDF Question and Answer tool call %s for question: %s",
+        "Starting PDF Question and Answer tool (Traditional RAG Pipeline) - Call %s",
         call_id,
-        question,
     )
+    logger.info("%s: Question: '%s'", call_id, question)
+
     helper.start_call(config, call_id)
 
     # Extract models and article metadata
     text_emb, llm_model, article_data = helper.get_state_models_and_data(state)
 
-    # Initialize or reuse Milvus vector store, then load candidate papers
+    # Initialize or reuse Milvus vector store
+    logger.info("%s: Initializing vector store", call_id)
     vs = helper.init_vector_store(text_emb)
-    candidate_ids = list(article_data.keys())
-    logger.info("%s: Candidate paper IDs for reranking: %s", call_id, candidate_ids)
-    helper.load_candidate_papers(vs, article_data, candidate_ids)
 
-    # Rerank papers and retrieve top chunks
-    selected_ids = helper.run_reranker(vs, question, candidate_ids)
+    # Load ALL papers (traditional RAG approach)
+    logger.info(
+        "%s: Loading all %d papers into vector store (traditional RAG approach)",
+        call_id,
+        len(article_data),
+    )
+    helper.load_all_papers(vs, article_data)
 
-    # Use the helper's retrieve_chunks method instead of calling retrieve_relevant_chunks directly
-    relevant_chunks = helper.retrieve_chunks(vs, question, selected_ids)
+    # Traditional RAG Pipeline: Retrieve from ALL papers, then rerank
+    logger.info(
+        "%s: Starting traditional RAG pipeline: retrieve → rerank → generate",
+        call_id,
+    )
 
-    if not relevant_chunks:
+    # Retrieve and rerank chunks in one step
+    reranked_chunks = helper.retrieve_and_rerank_chunks(vs, question)
+
+    if not reranked_chunks:
         msg = f"No relevant chunks found for question: '{question}'"
         logger.warning("%s: %s", call_id, msg)
-        raise RuntimeError(msg)
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content="I couldn't find any relevant information to answer your question. "
+                        "Please ensure the relevant documents are loaded or try rephrasing your question.",
+                        tool_call_id=tool_call_id,
+                    )
+                ],
+            }
+        )
 
-    # Generate answer and format with sources
+    # Generate answer using reranked chunks
+    logger.info(
+        "%s: Generating answer using %d reranked chunks",
+        call_id,
+        len(reranked_chunks),
+    )
     response_text = helper.format_answer(
-        question, relevant_chunks, llm_model, article_data
+        question, reranked_chunks, llm_model, article_data
     )
 
     logger.info(
-        "%s: Successfully generated answer with %d chunks",
+        "%s: Successfully completed RAG pipeline",
         call_id,
-        len(relevant_chunks),
     )
 
     return Command(
