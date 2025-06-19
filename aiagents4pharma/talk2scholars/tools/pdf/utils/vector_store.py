@@ -1,14 +1,16 @@
 """
 Vectorstore class for managing document embeddings and retrieval using Milvus.
 Implements singleton pattern for connection reuse across Streamlit sessions.
+Enhanced with parallel PDF processing and batch embedding.
 """
 
 import asyncio
+import concurrent.futures
 import logging
 import os
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
@@ -129,6 +131,7 @@ class Vectorstore:
     """
     A class for managing document embeddings and retrieval using Milvus.
     Uses singleton pattern to reuse connections across instances.
+    Enhanced with parallel PDF processing and batch embedding.
     """
 
     def __init__(
@@ -302,41 +305,26 @@ class Vectorstore:
         """
         return paper_id in self.loaded_papers
 
-    def add_paper(
-        self,
-        paper_id: str,
-        pdf_url: str,
-        paper_metadata: Dict[str, Any],
-    ) -> None:
+    def _load_and_split_pdf(
+        self, paper_id: str, pdf_url: str, paper_metadata: Dict[str, Any]
+    ) -> List[Document]:
         """
-        Add a paper to the document store.
+        Load a PDF and split it into chunks.
 
         Args:
             paper_id: Unique identifier for the paper
             pdf_url: URL to the PDF
             paper_metadata: Metadata about the paper
+
+        Returns:
+            List of document chunks with metadata
         """
-        # Skip if already loaded (check in-memory set first)
-        if paper_id in self.loaded_papers:
-            logger.info("Paper %s already loaded (found in memory), skipping", paper_id)
-            return
+        logger.info("Loading PDF for paper %s from %s", paper_id, pdf_url)
 
-        # Double-check by querying Milvus directly
-        if self._is_paper_in_milvus(paper_id):
-            # Update our in-memory set
-            self.loaded_papers.add(paper_id)
-            logger.info("Paper %s already exists in Milvus, skipping", paper_id)
-            return
-
-        logger.info("Loading paper %s from %s", paper_id, pdf_url)
-
-        # Store paper metadata
-        self.paper_metadata[paper_id] = paper_metadata
-
-        # Load the PDF and split into chunks according to Hydra config
+        # Load the PDF
         loader = PyPDFLoader(pdf_url)
         documents = loader.load()
-        logger.info("Loaded %d pages from %s", len(documents), paper_id)
+        logger.info("Loaded %d pages from paper %s", len(documents), paper_id)
 
         # Create text splitter according to provided configuration
         if self.config is None:
@@ -349,12 +337,11 @@ class Vectorstore:
             separators=["\n\n", "\n", ". ", " ", ""],
         )
 
-        # Split documents and add metadata for each chunk
+        # Split documents
         chunks = splitter.split_documents(documents)
-        logger.info("Split %s into %d chunks", paper_id, len(chunks))
+        logger.info("Split paper %s into %d chunks", paper_id, len(chunks))
 
-        # Prepare documents for Milvus with enhanced metadata
-        milvus_docs = []
+        # Add metadata to each chunk
         for i, chunk in enumerate(chunks):
             # Create unique ID for each chunk
             chunk_id = f"{paper_id}_{i}"
@@ -377,29 +364,208 @@ class Vectorstore:
 
             # Store in local dict for compatibility
             self.documents[chunk_id] = chunk
-            milvus_docs.append(chunk)
 
-        # Add documents to Milvus vector store
-        try:
-            # Generate IDs for documents
-            ids = [f"{paper_id}_{i}" for i in range(len(milvus_docs))]
+        return chunks
 
-            # Add to Milvus
-            self.vector_store.add_documents(
-                documents=milvus_docs,
-                ids=ids,
-            )
+    def add_papers_batch(
+        self,
+        papers_to_add: List[Tuple[str, str, Dict[str, Any]]],
+        max_workers: int = 5,
+        batch_size: int = 100,
+    ) -> None:
+        """
+        Add multiple papers to the document store in parallel with batch embedding.
+
+        Args:
+            papers_to_add: List of tuples (paper_id, pdf_url, paper_metadata)
+            max_workers: Maximum number of parallel PDF loading workers
+            batch_size: Number of chunks to embed in a single batch
+        """
+        if not papers_to_add:
+            logger.info("No papers to add")
+            return
+
+        # Filter out already loaded papers BEFORE processing
+        papers_to_process = []
+        for paper_id, pdf_url, metadata in papers_to_add:
+            if paper_id in self.loaded_papers:
+                logger.debug("Paper %s already loaded, skipping", paper_id)
+            else:
+                papers_to_process.append((paper_id, pdf_url, metadata))
+
+        if not papers_to_process:
+            logger.info("All %d papers are already loaded", len(papers_to_add))
+            return
+
+        logger.info(
+            "Starting PARALLEL batch processing of %d papers with %d workers",
+            len(papers_to_process),
+            max_workers,
+        )
+        start_time = time.time()
+
+        # Step 1: Load and split PDFs in parallel
+        all_chunks = []
+        all_ids = []
+        successful_papers = []
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all PDF loading tasks AT ONCE
+            future_to_paper = {
+                executor.submit(
+                    self._load_and_split_pdf, paper_id, pdf_url, metadata
+                ): (paper_id, metadata)
+                for paper_id, pdf_url, metadata in papers_to_process
+            }
 
             logger.info(
-                "Added %d chunks from paper %s to Milvus", len(chunks), paper_id
+                "Submitted %d PDF loading tasks to thread pool", len(future_to_paper)
             )
 
-            # Mark as loaded
-            self.loaded_papers.add(paper_id)
+            # Collect results as they complete
+            completed = 0
+            for future in concurrent.futures.as_completed(future_to_paper):
+                paper_id, metadata = future_to_paper[future]
+                completed += 1
+                try:
+                    chunks = future.result()
+
+                    # Generate IDs for these chunks
+                    chunk_ids = [f"{paper_id}_{i}" for i in range(len(chunks))]
+
+                    all_chunks.extend(chunks)
+                    all_ids.extend(chunk_ids)
+                    successful_papers.append(paper_id)
+
+                    # Store paper metadata
+                    self.paper_metadata[paper_id] = metadata
+
+                    logger.info(
+                        "Progress: %d/%d - Loaded paper %s (%d chunks)",
+                        completed,
+                        len(papers_to_process),
+                        paper_id,
+                        len(chunks),
+                    )
+
+                except Exception as e:
+                    logger.error(
+                        "Progress: %d/%d - Failed to load paper %s: %s",
+                        completed,
+                        len(papers_to_process),
+                        paper_id,
+                        e,
+                    )
+
+        load_time = time.time() - start_time
+        logger.info(
+            "PARALLEL LOADING COMPLETE: Processed %d/%d papers into %d chunks in %.2f seconds (%.2f papers/sec)",
+            len(successful_papers),
+            len(papers_to_process),
+            len(all_chunks),
+            load_time,
+            len(successful_papers) / load_time if load_time > 0 else 0,
+        )
+
+        if not all_chunks:
+            logger.warning("No chunks to add to vector store")
+            return
+
+        # Step 2: Add chunks to Milvus in batches
+        try:
+            embed_start = time.time()
+            total_chunks = len(all_chunks)
+
+            logger.info(
+                "Starting BATCH EMBEDDING of %d chunks in batches of %d",
+                total_chunks,
+                batch_size,
+            )
+
+            # Process in batches
+            for i in range(0, total_chunks, batch_size):
+                batch_end = min(i + batch_size, total_chunks)
+                batch_chunks = all_chunks[i:batch_end]
+                batch_ids = all_ids[i:batch_end]
+
+                logger.info(
+                    "Processing embedding batch %d/%d (chunks %d-%d of %d)",
+                    (i // batch_size) + 1,
+                    (total_chunks + batch_size - 1) // batch_size,
+                    i + 1,
+                    batch_end,
+                    total_chunks,
+                )
+
+                # Extract texts for embedding
+                texts = [chunk.page_content for chunk in batch_chunks]
+
+                # Log embedding API call
+                logger.info(
+                    "Calling embedding API for batch of %d texts (avg length: %d chars)",
+                    len(texts),
+                    sum(len(t) for t in texts) // len(texts) if texts else 0,
+                )
+
+                # Add to Milvus (this will trigger embedding)
+                self.vector_store.add_documents(
+                    documents=batch_chunks,
+                    ids=batch_ids,
+                )
+
+                logger.info(
+                    "Successfully embedded and stored batch %d/%d",
+                    (i // batch_size) + 1,
+                    (total_chunks + batch_size - 1) // batch_size,
+                )
+
+            embed_time = time.time() - embed_start
+            logger.info(
+                "BATCH EMBEDDING COMPLETE: Embedded %d chunks in %.2f seconds (%.2f chunks/sec)",
+                total_chunks,
+                embed_time,
+                total_chunks / embed_time if embed_time > 0 else 0,
+            )
+
+            # Update loaded papers
+            for paper_id in successful_papers:
+                self.loaded_papers.add(paper_id)
+
+            total_time = time.time() - start_time
+            logger.info(
+                "FULL BATCH PROCESSING COMPLETE: %d papers, %d chunks in %.2f seconds total (%.2f sec/paper)",
+                len(successful_papers),
+                total_chunks,
+                total_time,
+                total_time / len(successful_papers) if successful_papers else 0,
+            )
 
         except Exception as e:
-            logger.error("Failed to add paper %s to Milvus: %s", paper_id, e)
+            logger.error("Failed to add chunks to Milvus: %s", e)
             raise
+
+    def add_paper(
+        self,
+        paper_id: str,
+        pdf_url: str,
+        paper_metadata: Dict[str, Any],
+    ) -> None:
+        """
+        Add a single paper to the document store.
+        For backward compatibility - internally uses batch method.
+
+        Args:
+            paper_id: Unique identifier for the paper
+            pdf_url: URL to the PDF
+            paper_metadata: Metadata about the paper
+        """
+        # Skip if already loaded
+        if paper_id in self.loaded_papers:
+            logger.info("Paper %s already loaded (found in memory), skipping", paper_id)
+            return
+
+        # Use batch method for single paper
+        self.add_papers_batch([(paper_id, pdf_url, paper_metadata)], max_workers=1)
 
     def _is_paper_in_milvus(self, paper_id: str) -> bool:
         """Check if a paper exists in Milvus by querying for its chunks."""
