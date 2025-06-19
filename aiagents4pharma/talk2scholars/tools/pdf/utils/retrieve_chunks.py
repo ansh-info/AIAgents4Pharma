@@ -1,5 +1,6 @@
 """
 Retrieve relevant chunks from a Milvus vector store using MMR (Maximal Marginal Relevance).
+Updated to follow traditional RAG pipeline - retrieve first, then rerank.
 """
 
 import logging
@@ -20,17 +21,20 @@ def retrieve_relevant_chunks(
     vector_store,
     query: str,
     paper_ids: Optional[List[str]] = None,
-    top_k: int = 25,
-    mmr_diversity: float = 1.00,
+    top_k: int = 100,  # Increased default to cast wider net before reranking
+    mmr_diversity: float = 0.8,  # Slightly reduced for better diversity
 ) -> List[Document]:
     """
     Retrieve the most relevant chunks for a query using maximal marginal relevance.
 
+    In the traditional RAG pipeline, this should retrieve chunks from ALL available papers,
+    not just pre-selected ones. The reranker will then select the best chunks.
+
     Args:
         vector_store: The Milvus vector store instance
         query: Query string
-        paper_ids: Optional list of paper IDs to filter by
-        top_k: Number of chunks to retrieve
+        paper_ids: Optional list of paper IDs to filter by (default: None - search all papers)
+        top_k: Number of chunks to retrieve (default: 100 for reranking pipeline)
         mmr_diversity: Diversity parameter for MMR (0=max diversity, 1=max relevance)
 
     Returns:
@@ -43,8 +47,14 @@ def retrieve_relevant_chunks(
     # Prepare filter for paper_ids if provided
     filter_dict = None
     if paper_ids:
+        logger.warning(
+            "Paper IDs filter provided. Traditional RAG pipeline typically retrieves from ALL papers first. "
+            "Consider removing paper_ids filter for better results."
+        )
         logger.info("Filtering retrieval to papers: %s", paper_ids)
         filter_dict = {"paper_id": paper_ids}
+    else:
+        logger.info("Retrieving chunks from ALL papers (traditional RAG approach)")
 
     try:
         # Use Milvus's built-in MMR search
@@ -56,10 +66,13 @@ def retrieve_relevant_chunks(
         )
 
         # Perform MMR search using the Milvus vector store
+        # Fetch more candidates for better MMR results
+        fetch_k = min(top_k * 4, 500)  # Cap at 500 to avoid memory issues
+
         results = vector_store.max_marginal_relevance_search(
             query=query,
             k=top_k,
-            fetch_k=top_k * 4,  # Fetch more candidates for better MMR results
+            fetch_k=fetch_k,
             lambda_mult=mmr_diversity,
             filter=filter_dict,
         )
@@ -72,7 +85,13 @@ def retrieve_relevant_chunks(
             for doc in results:
                 paper_id = doc.metadata.get("paper_id", "unknown")
                 paper_counts[paper_id] = paper_counts.get(paper_id, 0) + 1
-            logger.debug("Chunks per paper: %s", paper_counts)
+            logger.debug(
+                "Initial retrieval - chunks per paper: %s",
+                dict(
+                    sorted(paper_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+                ),
+            )
+            logger.debug("Total papers represented: %d", len(paper_counts))
 
         return results
 
