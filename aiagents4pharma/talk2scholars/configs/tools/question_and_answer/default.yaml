@@ -1,4 +1,4 @@
-# Default configuration for the PDF question_and_answer Tool
+# Configuration for the PDF question_and_answer Tool - RAG Pipeline
 
 # Milvus vector database settings
 milvus:
@@ -9,6 +9,9 @@ milvus:
   # Database and collection settings
   db_name: ${oc.env:MILVUS_DB_NAME,pdf_rag_db}
   collection_name: ${oc.env:MILVUS_COLLECTION_NAME,pdf_rag_documents}
+
+  # Ensure collection persists across restarts
+  consistency_level: "Strong"
 
   # Index settings for vector search
   index_params:
@@ -23,19 +26,28 @@ milvus:
     params:
       nprobe: 10 # Number of units to query
 
+# Document processing settings
 chunk_size: 1200 # Number of characters per text chunk
 chunk_overlap: 200 # Overlap between adjacent chunks
-top_k_papers: 5 # Number of papers to rank and retrieve
-top_k_chunks: 25 # Number of chunks to retrieve
+
+# Traditional RAG Pipeline Settings
+# Step 1: Initial retrieval (cast wide net)
+initial_retrieval_k: 100 # Number of chunks to retrieve before reranking
+mmr_diversity: 0.8 # MMR diversity parameter (0=max diversity, 1=max relevance)
+
+# Step 2: Reranking settings
+top_k_chunks: 25 # Final number of chunks after reranking
 reranker:
   model: "nvidia/nv-rerankqa-mistral-4b-v3"
   api_key: ${oc.env:NVIDIA_API_KEY}
+
+# Answer generation settings
 prompt_template: |
   You are a scientific research assistant specialized in reading and extracting information from research papers.
   Your role is to answer questions by retrieving relevant information from the provided context.
 
   - Provide detailed, structured, and well-argued explanations—not just brief summaries.
-  - Cite specific sources using onky the title of the paper.
+  - Cite specific sources using only the title of the paper.
   - If the context is insufficient, clearly state that more information is needed.
 
   Context:
