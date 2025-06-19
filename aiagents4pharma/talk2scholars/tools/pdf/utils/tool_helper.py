@@ -85,41 +85,80 @@ class QAToolHelper:
     ) -> None:
         """Ensure all papers from article_data are loaded into the Milvus vector store."""
         papers_to_load = []
+        skipped_papers = []
+        already_loaded = []
 
         # Check which papers need to be loaded
         for pid, article_info in articles.items():
             if pid not in vs.loaded_papers:
                 pdf_url = article_info.get("pdf_url")
                 if pdf_url:
-                    papers_to_load.append(pid)
+                    # Prepare tuple for batch loading
+                    papers_to_load.append((pid, pdf_url, article_info))
                 else:
-                    logger.warning(
-                        "%s: No PDF URL found for paper %s", self.call_id, pid
-                    )
+                    skipped_papers.append(pid)
+            else:
+                already_loaded.append(pid)
+
+        # Log summary of papers status
+        logger.info(
+            "%s: Paper loading summary - Total: %d, Already loaded: %d, To load: %d, No PDF: %d",
+            self.call_id,
+            len(articles),
+            len(already_loaded),
+            len(papers_to_load),
+            len(skipped_papers),
+        )
+
+        if skipped_papers:
+            logger.warning(
+                "%s: Skipping %d papers without PDF URLs: %s%s",
+                self.call_id,
+                len(skipped_papers),
+                skipped_papers[:5],  # Show first 5
+                "..." if len(skipped_papers) > 5 else "",
+            )
 
         if not papers_to_load:
             logger.info(
-                "%s: All %d papers already loaded in Milvus",
-                self.call_id,
-                len(articles),
+                "%s: All papers with PDFs are already loaded in Milvus", self.call_id
             )
             return
 
-        logger.info(
-            "%s: Loading %d new papers into Milvus (already loaded: %d)",
-            self.call_id,
-            len(papers_to_load),
-            len(articles) - len(papers_to_load),
-        )
+        # Use batch loading with parallel processing for ALL papers at once
+        try:
+            # Configure parallel workers - use more workers for better parallelism
+            max_workers = min(10, max(3, len(papers_to_load)))  # Increased workers
+            batch_size = self.config.get("embedding_batch_size", 100)
 
-        # Load each paper
-        for pid in papers_to_load:
-            pdf_url = articles[pid]["pdf_url"]
-            try:
-                vs.add_paper(pid, pdf_url, articles[pid])
-                logger.info("%s: Successfully loaded paper %s", self.call_id, pid)
-            except (IOError, ValueError) as exc:
-                logger.warning("%s: Error loading paper %s: %s", self.call_id, pid, exc)
+            logger.info(
+                "%s: Loading %d papers in ONE BATCH using %d parallel workers (batch size: %d)",
+                self.call_id,
+                len(papers_to_load),
+                max_workers,
+                batch_size,
+            )
+
+            # This should process ALL papers at once
+            vs.add_papers_batch(
+                papers_to_add=papers_to_load,
+                max_workers=max_workers,
+                batch_size=batch_size,
+            )
+
+            logger.info(
+                "%s: Successfully completed batch loading of all %d papers",
+                self.call_id,
+                len(papers_to_load),
+            )
+
+        except Exception as exc:
+            logger.error(
+                "%s: Error during batch paper loading: %s",
+                self.call_id,
+                exc,
+                exc_info=True,
+            )
 
     def retrieve_and_rerank_chunks(
         self,
