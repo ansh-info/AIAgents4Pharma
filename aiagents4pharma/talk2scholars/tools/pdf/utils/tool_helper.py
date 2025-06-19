@@ -1,13 +1,14 @@
 """
 Helper class for PDF Q&A tool orchestration: state validation, vectorstore init,
-paper loading, reranking, and answer formatting.
+paper loading, chunk retrieval, reranking, and answer formatting.
+Updated to follow traditional RAG pipeline: retrieve -> rerank -> generate
 """
 
 import logging
 from typing import Any, Dict, List, Optional
 
 from .generate_answer import generate_answer
-from .nvidia_nim_reranker import rank_papers_by_query
+from .nvidia_nim_reranker import rerank_chunks
 from .retrieve_chunks import retrieve_relevant_chunks
 from .vector_store import Vectorstore
 from .vector_store_manager import vector_store_manager
@@ -77,19 +78,18 @@ class QAToolHelper:
 
         return self.vector_store
 
-    def load_candidate_papers(
+    def load_all_papers(
         self,
         vs: Vectorstore,
         articles: Dict[str, Any],
-        candidates: List[str],
     ) -> None:
-        """Ensure each candidate paper is loaded into the Milvus vector store."""
+        """Ensure all papers from article_data are loaded into the Milvus vector store."""
         papers_to_load = []
 
         # Check which papers need to be loaded
-        for pid in candidates:
+        for pid, article_info in articles.items():
             if pid not in vs.loaded_papers:
-                pdf_url = articles.get(pid, {}).get("pdf_url")
+                pdf_url = article_info.get("pdf_url")
                 if pdf_url:
                     papers_to_load.append(pid)
                 else:
@@ -99,9 +99,9 @@ class QAToolHelper:
 
         if not papers_to_load:
             logger.info(
-                "%s: All %d candidate papers already loaded in Milvus",
+                "%s: All %d papers already loaded in Milvus",
                 self.call_id,
-                len(candidates),
+                len(articles),
             )
             return
 
@@ -109,7 +109,7 @@ class QAToolHelper:
             "%s: Loading %d new papers into Milvus (already loaded: %d)",
             self.call_id,
             len(papers_to_load),
-            len(candidates) - len(papers_to_load),
+            len(articles) - len(papers_to_load),
         )
 
         # Load each paper
@@ -121,70 +121,86 @@ class QAToolHelper:
             except (IOError, ValueError) as exc:
                 logger.warning("%s: Error loading paper %s: %s", self.call_id, pid, exc)
 
-    def run_reranker(
+    def retrieve_and_rerank_chunks(
         self,
         vs: Vectorstore,
         query: str,
-        candidates: List[str],
-    ) -> List[str]:
-        """Rank papers by relevance and return filtered paper IDs."""
-        try:
-            # Filter candidates to only include loaded papers
-            loaded_candidates = [pid for pid in candidates if pid in vs.loaded_papers]
-
-            if not loaded_candidates:
-                logger.warning(
-                    "%s: No candidates are loaded in vector store", self.call_id
-                )
-                return []
-
-            if len(loaded_candidates) < len(candidates):
-                logger.info(
-                    "%s: Reranking %d loaded papers out of %d candidates",
-                    self.call_id,
-                    len(loaded_candidates),
-                    len(candidates),
-                )
-
-            # Call the updated reranker function with paper_ids
-            ranked = rank_papers_by_query(
-                vs,
-                query,
-                self.config,
-                paper_ids=loaded_candidates,
-                top_k=self.config.top_k_papers,
-            )
-
-            logger.info("%s: Papers after NVIDIA reranking: %s", self.call_id, ranked)
-            return ranked
-
-        except (ValueError, RuntimeError) as exc:
-            logger.error("%s: NVIDIA reranker failed: %s", self.call_id, exc)
-            logger.info(
-                "%s: Falling back to first %d loaded papers",
-                self.call_id,
-                self.config.top_k_papers,
-            )
-            # Return first k loaded papers as fallback
-            loaded = [pid for pid in candidates if pid in vs.loaded_papers]
-            return loaded[: self.config.top_k_papers]
-
-    def retrieve_chunks(
-        self,
-        vs: Vectorstore,
-        query: str,
-        paper_ids: List[str],
     ) -> List[Any]:
-        """Retrieve relevant chunks using the updated retrieve function."""
-        # Call the updated retrieve_relevant_chunks function
-        chunks = retrieve_relevant_chunks(
+        """
+        Traditional RAG pipeline: retrieve chunks from all papers, then rerank.
+
+        Args:
+            vs: Vector store instance
+            query: User query
+
+        Returns:
+            List of reranked chunks
+        """
+        logger.info(
+            "%s: Starting traditional RAG pipeline - retrieve then rerank", self.call_id
+        )
+
+        # Step 1: Retrieve chunks from ALL papers (cast wide net)
+        initial_chunks_count = self.config.get("initial_retrieval_k", 100)
+
+        logger.info(
+            "%s: Step 1 - Retrieving top %d chunks from ALL papers",
+            self.call_id,
+            initial_chunks_count,
+        )
+
+        retrieved_chunks = retrieve_relevant_chunks(
             vs,
             query=query,
-            paper_ids=paper_ids,
-            top_k=self.config.top_k_chunks,
-            mmr_diversity=1.0,  # Can be made configurable if needed
+            paper_ids=None,  # No filter - retrieve from all papers
+            top_k=initial_chunks_count,
+            mmr_diversity=self.config.get("mmr_diversity", 0.8),
         )
-        return chunks
+
+        if not retrieved_chunks:
+            logger.warning("%s: No chunks retrieved from vector store", self.call_id)
+            return []
+
+        logger.info(
+            "%s: Retrieved %d chunks from %d unique papers",
+            self.call_id,
+            len(retrieved_chunks),
+            len(
+                set(
+                    chunk.metadata.get("paper_id", "unknown")
+                    for chunk in retrieved_chunks
+                )
+            ),
+        )
+
+        # Step 2: Rerank the retrieved chunks
+        logger.info(
+            "%s: Step 2 - Reranking %d chunks to get top %d",
+            self.call_id,
+            len(retrieved_chunks),
+            self.config.top_k_chunks,
+        )
+
+        reranked_chunks = rerank_chunks(
+            chunks=retrieved_chunks,
+            query=query,
+            config=self.config,
+            top_k=self.config.top_k_chunks,
+        )
+
+        logger.info(
+            "%s: Reranking complete. Final %d chunks from %d unique papers",
+            self.call_id,
+            len(reranked_chunks),
+            len(
+                set(
+                    chunk.metadata.get("paper_id", "unknown")
+                    for chunk in reranked_chunks
+                )
+            ),
+        )
+
+        return reranked_chunks
 
     def format_answer(
         self,
