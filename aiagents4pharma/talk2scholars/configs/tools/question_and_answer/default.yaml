@@ -1,4 +1,4 @@
-# Configuration for the PDF question_and_answer Tool - RAG Pipeline
+# Configuration for the PDF question_and_answer Tool - Traditional RAG Pipeline
 
 # Milvus vector database settings
 milvus:
@@ -29,6 +29,10 @@ milvus:
 # Document processing settings
 chunk_size: 1200 # Number of characters per text chunk
 chunk_overlap: 200 # Overlap between adjacent chunks
+
+# Parallel processing settings
+embedding_batch_size: 100 # Number of chunks to embed in a single API call
+max_parallel_pdfs: 5 # Maximum number of PDFs to process in parallel
 
 # Traditional RAG Pipeline Settings
 # Step 1: Initial retrieval (cast wide net)
