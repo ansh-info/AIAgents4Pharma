@@ -152,7 +152,7 @@ def question_and_answer(
     )
 
     logger.info(
-        "%s: Successfully completed RAG pipeline",
+        "%s: Successfully traditional completed RAG pipeline",
         call_id,
     )
 
