@@ -209,39 +209,115 @@ def process_pdf_upload():
 
 def initialize_zotero_and_build_store():
     """
-    Download all PDFs from the user's Zotero library and build a RAG vector store.
+    Download all PDFs from the user's Zotero library and build a RAG vector store using Milvus.
+    Uses the new parallel batch processing and shared vector store manager.
     """
-    # Retrieve the agent app from session state
-    app = st.session_state.app
-    # Fetch Zotero items and download PDFs
-    search_data = ZoteroSearchData(
-        query="",
-        only_articles=True,
-        limit=1,
-        tool_call_id="startup",
-        download_pdfs=True,
+    import logging
+    from aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store_manager import (
+        vector_store_manager,
     )
-    search_data.process_search()
-    results = search_data.get_search_results()
-    # Save article metadata and PDF paths
-    st.session_state.article_data = results.get("article_data", {})
-    # Update agent state with article data
-    config = {"configurable": {"thread_id": st.session_state.unique_id}}
-    app.update_state(config, {"article_data": st.session_state.article_data})
-    # Build RAG vector store
-    pdf_config = load_hydra_config()
-    embedding_model = get_text_embedding_model(st.session_state.text_embedding_model)
-    vector_store = Vectorstore(embedding_model=embedding_model, config=pdf_config)
-    for paper_id, meta in st.session_state.article_data.items():
-        pdf_url = meta.get("pdf_url")
-        if pdf_url:
-            vector_store.add_paper(paper_id, pdf_url, meta)
-    vector_store.build_vector_store()
-    # Expose the vector store for use by the Q&A tool helper
-    # (helper.prebuilt_vector_store caches the shared store)
-    qa_module.helper.prebuilt_vector_store = vector_store
-    # Mark as initialized to prevent rerunning
-    st.session_state.zotero_initialized = True
+    from aiagents4pharma.talk2scholars.tools.pdf.utils.generate_answer import (
+        load_hydra_config,
+    )
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Retrieve the agent app from session state
+        app = st.session_state.app
+
+        # Fetch Zotero items and download PDFs
+        logger.info("Initializing Zotero library and downloading PDFs...")
+        search_data = ZoteroSearchData(
+            query="",
+            only_articles=True,
+            limit=1,  # This gets all articles
+            tool_call_id="streamlit_startup",
+            download_pdfs=True,
+        )
+        search_data.process_search()
+        results = search_data.get_search_results()
+
+        # Save article metadata and PDF paths
+        st.session_state.article_data = results.get("article_data", {})
+        logger.info(
+            f"Found {len(st.session_state.article_data)} articles in Zotero library"
+        )
+
+        # Update agent state with article data
+        config = {"configurable": {"thread_id": st.session_state.unique_id}}
+        app.update_state(config, {"article_data": st.session_state.article_data})
+
+        # Initialize or get the shared vector store using the manager
+        pdf_config = load_hydra_config()
+        embedding_model = get_text_embedding_model(
+            st.session_state.text_embedding_model
+        )
+
+        # Use the vector store manager to ensure we use the same instance everywhere
+        logger.info("Initializing shared Milvus vector store...")
+        vector_store = vector_store_manager.initialize(
+            embedding_model=embedding_model,
+            config=pdf_config,
+            force_reinit=False,  # Don't reinitialize if already exists
+        )
+
+        # Prepare papers for batch loading
+        papers_to_load = []
+        skipped_papers = []
+
+        for paper_id, meta in st.session_state.article_data.items():
+            pdf_url = meta.get("pdf_url")
+            if pdf_url:
+                # Check if paper is already loaded
+                if paper_id not in vector_store.loaded_papers:
+                    papers_to_load.append((paper_id, pdf_url, meta))
+            else:
+                skipped_papers.append(paper_id)
+
+        logger.info(
+            f"Paper status - Total: {len(st.session_state.article_data)}, "
+            f"Already loaded: {len(st.session_state.article_data) - len(papers_to_load) - len(skipped_papers)}, "
+            f"To load: {len(papers_to_load)}, No PDF: {len(skipped_papers)}"
+        )
+
+        if papers_to_load:
+            # Use batch loading with parallel processing
+            logger.info(
+                f"Starting parallel batch loading of {len(papers_to_load)} papers..."
+            )
+
+            # Configure parallel processing
+            max_workers = min(10, max(3, len(papers_to_load)))
+            batch_size = pdf_config.get("embedding_batch_size", 100)
+
+            # Load all papers in one batch
+            try:
+                vector_store.add_papers_batch(
+                    papers_to_add=papers_to_load,
+                    max_workers=max_workers,
+                    batch_size=batch_size,
+                )
+
+                logger.info(
+                    f"Successfully loaded all {len(papers_to_load)} papers in parallel"
+                )
+
+            except Exception as e:
+                logger.error(f"Error during batch loading: {e}")
+                raise
+
+        else:
+            logger.info("All papers are already loaded in the vector store")
+
+        # Mark as initialized to prevent rerunning
+        st.session_state.zotero_initialized = True
+
+    except Exception as e:
+        logger.error(
+            f"Failed to initialize Zotero and build vector store: {e}", exc_info=True
+        )
+        raise
 
 
 # Main layout of the app split into two columns
