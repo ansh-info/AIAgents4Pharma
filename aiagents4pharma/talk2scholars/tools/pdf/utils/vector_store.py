@@ -17,7 +17,15 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_milvus import Milvus
-from pymilvus import Collection, connections, db, utility
+from pymilvus import (
+    Collection,
+    CollectionSchema,
+    DataType,
+    FieldSchema,
+    connections,
+    db,
+    utility,
+)
 from pymilvus.exceptions import MilvusException
 
 # Set up logging with configurable level
@@ -139,6 +147,11 @@ class VectorstoreSingleton:
                 # Use the database
                 db.using_database(db_name)
                 logger.info("Using database: %s", db_name)
+                logger.debug(
+                    "Milvus DB switched to: %s, available collections: %s",
+                    db_name,
+                    utility.list_collections(),
+                )
 
                 self._connections[conn_key] = "default"
 
@@ -226,10 +239,10 @@ class Vectorstore:
 
         # Connect to Milvus (reuses existing connection if available)
         self._connect_milvus()
+        self._ensure_collection_exists()
 
         # Initialize the LangChain Milvus vector store (reuses existing if available)
         self.vector_store = self._initialize_vector_store()
-
         # Store for document metadata (keeping for compatibility)
         self.documents: Dict[str, Document] = {}
         self.paper_metadata: Dict[str, Dict[str, Any]] = {}
@@ -246,6 +259,7 @@ class Vectorstore:
 
     def _initialize_vector_store(self) -> Milvus:
         """Initialize or load the Milvus vector store using singleton."""
+        self._ensure_collection_exists()  # Ensure collection exists before use
         return self._singleton.get_vector_store(
             self.collection_name, self.embedding_model, self.connection_args
         )
@@ -339,6 +353,10 @@ class Vectorstore:
                 papers_to_process.append((paper_id, pdf_url, metadata))
 
         if not papers_to_process:
+            logger.info(
+                "Skipping %d already-loaded papers",
+                len(papers_to_add) - len(papers_to_process),
+            )
             logger.info("All %d papers are already loaded", len(papers_to_add))
             return
 
@@ -578,3 +596,75 @@ class Vectorstore:
         )
 
         return results
+
+    def _ensure_collection_exists(self):
+        """Ensure the Milvus collection exists before trying to sync or add documents."""
+        try:
+            existing_collections = utility.list_collections()
+            if self.collection_name not in existing_collections:
+                logger.info(
+                    "Collection %s does not exist. Creating schema...",
+                    self.collection_name,
+                )
+
+                # Define schema that matches document chunk metadata
+                fields = [
+                    FieldSchema(
+                        name="id",
+                        dtype=DataType.VARCHAR,
+                        is_primary=True,
+                        auto_id=False,
+                        max_length=100,
+                    ),
+                    FieldSchema(
+                        name="embedding",
+                        dtype=DataType.FLOAT_VECTOR,
+                        dim=self.config.milvus.embedding_dim if self.config else 768,
+                    ),
+                    FieldSchema(
+                        name="text",
+                        dtype=DataType.VARCHAR,
+                        max_length=65535,
+                    ),
+                    FieldSchema(
+                        name="paper_id",
+                        dtype=DataType.VARCHAR,
+                        max_length=100,
+                    ),
+                    FieldSchema(
+                        name="title",
+                        dtype=DataType.VARCHAR,
+                        max_length=512,
+                    ),
+                    FieldSchema(
+                        name="chunk_id",
+                        dtype=DataType.INT64,
+                    ),
+                    FieldSchema(
+                        name="page",
+                        dtype=DataType.INT64,
+                    ),
+                    FieldSchema(
+                        name="source",
+                        dtype=DataType.VARCHAR,
+                        max_length=512,
+                    ),
+                ]
+
+                schema = CollectionSchema(
+                    fields=fields,
+                    description="RAG collection for embedded PDF chunks",
+                    enable_dynamic_field=True,  # allows extra fields if needed
+                )
+
+                Collection(
+                    name=self.collection_name,
+                    schema=schema,
+                    using="default",
+                    shards_num=2,
+                )
+                logger.info("Created collection: %s", self.collection_name)
+
+        except Exception as e:
+            logger.error("Failed to ensure collection exists: %s", e)
+            raise

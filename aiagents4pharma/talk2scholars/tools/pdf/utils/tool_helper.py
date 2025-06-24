@@ -5,7 +5,7 @@ Updated to follow traditional RAG pipeline: retrieve -> rerank -> generate
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from .generate_answer import generate_answer
 from .nvidia_nim_reranker import rerank_chunks
@@ -19,7 +19,6 @@ class QAToolHelper:
     """Encapsulates helper routines for the PDF Question & Answer tool."""
 
     def __init__(self) -> None:
-        self.vector_store: Optional[Any] = None
         self.config: Any = None
         self.call_id: str = ""
         logger.debug("Initialized QAToolHelper")
@@ -51,16 +50,18 @@ class QAToolHelper:
 
     def init_vector_store(self, emb_model: Any) -> Any:
         """Get the singleton Milvus vector store instance."""
-        # Use factory to get singleton instance
         logger.info(
             "%s: Getting singleton vector store instance",
             self.call_id,
         )
-        self.vector_store = get_vectorstore(
-            embedding_model=emb_model, config=self.config
+        vs = get_vectorstore(embedding_model=emb_model, config=self.config)
+
+        logger.info(
+            "%s: Vector store initialized (collection stats skipped)",
+            self.call_id,
         )
 
-        return self.vector_store
+        return vs
 
     def load_all_papers(
         self,

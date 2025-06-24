@@ -21,12 +21,14 @@ from utils.streamlit_utils import get_text_embedding_model
 
 sys.path.append("./")
 # import get_app from main_agent
-import aiagents4pharma.talk2scholars.tools.pdf.question_and_answer as qa_module
+
 from aiagents4pharma.talk2scholars.agents.main_agent import get_app
 from aiagents4pharma.talk2scholars.tools.pdf.utils.generate_answer import (
     load_hydra_config,
 )
-from aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store import Vectorstore
+from aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store import (
+    get_vectorstore,
+)
 from aiagents4pharma.talk2scholars.tools.zotero.utils.read_helper import (
     ZoteroSearchData,
 )
@@ -209,114 +211,85 @@ def process_pdf_upload():
 
 def initialize_zotero_and_build_store():
     """
-    Download all PDFs from the user's Zotero library and build a RAG vector store using Milvus.
-    Uses the factory pattern to ensure singleton instance.
+    Initializes the Zotero library, downloads PDFs, and builds the Milvus-based vector store.
+    Uses a singleton factory pattern to avoid redundant vector store creation.
     """
-    import logging
-    from aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store import (
-        get_vectorstore,
-    )
-    from aiagents4pharma.talk2scholars.tools.pdf.utils.generate_answer import (
-        load_hydra_config,
-    )
 
     logger = logging.getLogger(__name__)
 
     try:
-        # Retrieve the agent app from session state
+        # Initialize Zotero and fetch articles
         app = st.session_state.app
 
-        # Fetch Zotero items and download PDFs
-        logger.info("Initializing Zotero library and downloading PDFs...")
+        logger.info("Fetching Zotero articles and downloading PDFs...")
         search_data = ZoteroSearchData(
             query="",
             only_articles=True,
-            limit=1,  # This gets all articles
+            limit=1,  # get all
             tool_call_id="streamlit_startup",
             download_pdfs=True,
         )
         search_data.process_search()
-        results = search_data.get_search_results()
+        article_data = search_data.get_search_results().get("article_data", {})
+        st.session_state.article_data = article_data
 
-        # Save article metadata and PDF paths
-        st.session_state.article_data = results.get("article_data", {})
-        logger.info(
-            f"Found {len(st.session_state.article_data)} articles in Zotero library"
+        logger.info(f"Found {len(article_data)} articles in Zotero library")
+
+        # Update state
+        app.update_state(
+            {"configurable": {"thread_id": st.session_state.unique_id}},
+            {"article_data": article_data},
         )
 
-        # Update agent state with article data
-        config = {"configurable": {"thread_id": st.session_state.unique_id}}
-        app.update_state(config, {"article_data": st.session_state.article_data})
-
-        # Initialize the vector store using factory
+        # Initialize vector store
         pdf_config = load_hydra_config()
         embedding_model = get_text_embedding_model(
             st.session_state.text_embedding_model
         )
-
-        # Use factory to get singleton instance
-        logger.info("Getting Milvus vector store instance...")
+        logger.info("Initializing Milvus vector store...")
         vector_store = get_vectorstore(
             embedding_model=embedding_model, config=pdf_config
         )
-
-        # Store reference in session state (optional, for debugging)
         st.session_state.vector_store = vector_store
 
-        # Prepare papers for batch loading
-        papers_to_load = []
-        skipped_papers = []
+        # Prepare papers for loading
+        papers_to_load = [
+            (paper_id, meta["pdf_url"], meta)
+            for paper_id, meta in article_data.items()
+            if meta.get("pdf_url")
+        ]
 
-        for paper_id, meta in st.session_state.article_data.items():
-            pdf_url = meta.get("pdf_url")
-            if pdf_url:
-                # Check if paper is already loaded
-                if paper_id not in vector_store.loaded_papers:
-                    papers_to_load.append((paper_id, pdf_url, meta))
-            else:
-                skipped_papers.append(paper_id)
+        skipped_papers = [
+            paper_id
+            for paper_id, meta in article_data.items()
+            if not meta.get("pdf_url")
+        ]
 
         logger.info(
-            f"Paper status - Total: {len(st.session_state.article_data)}, "
-            f"Already loaded: {len(st.session_state.article_data) - len(papers_to_load) - len(skipped_papers)}, "
-            f"To load: {len(papers_to_load)}, No PDF: {len(skipped_papers)}"
+            f"Paper status — Total: {len(article_data)}, "
+            f"To load (deduped internally): {len(papers_to_load)}, "
+            f"No PDF: {len(skipped_papers)}"
         )
 
         if papers_to_load:
-            # Use batch loading with parallel processing
-            logger.info(
-                f"Starting parallel batch loading of {len(papers_to_load)} papers..."
-            )
-
-            # Configure parallel processing
             max_workers = min(10, max(3, len(papers_to_load)))
             batch_size = pdf_config.get("embedding_batch_size", 100)
 
-            # Load all papers in one batch
-            try:
-                vector_store.add_papers_batch(
-                    papers_to_add=papers_to_load,
-                    max_workers=max_workers,
-                    batch_size=batch_size,
-                )
-
-                logger.info(
-                    f"Successfully loaded all {len(papers_to_load)} papers in parallel"
-                )
-
-            except Exception as e:
-                logger.error(f"Error during batch loading: {e}")
-                raise
-
+            logger.info(f"Starting batch loading of {len(papers_to_load)} papers...")
+            vector_store.add_papers_batch(
+                papers_to_add=papers_to_load,
+                max_workers=max_workers,
+                batch_size=batch_size,
+            )
+            logger.info("Successfully loaded all papers into vector store.")
         else:
-            logger.info("All papers are already loaded in the vector store")
+            logger.info("All papers are already embedded or skipped.")
 
-        # Mark as initialized to prevent rerunning
         st.session_state.zotero_initialized = True
 
-    except Exception as e:
+    except Exception:
         logger.error(
-            f"Failed to initialize Zotero and build vector store: {e}", exc_info=True
+            "Failed to initialize Zotero and build vector store", exc_info=True
         )
         raise
 

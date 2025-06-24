@@ -12,6 +12,7 @@ milvus:
 
   # Ensure collection persists across restarts
   consistency_level: "Strong"
+  embedding_dim: 768
 
   # Index settings for vector search
   index_params:
