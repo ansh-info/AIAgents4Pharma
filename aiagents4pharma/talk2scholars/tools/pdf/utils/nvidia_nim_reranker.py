@@ -80,6 +80,11 @@ def rerank_chunks(
         logger.info("Calling NVIDIA reranker API with %d chunks...", len(chunks))
         reranked_chunks = reranker.compress_documents(query=query, documents=chunks)
 
+        for i, doc in enumerate(reranked_chunks[:top_k]):
+            score = doc.metadata.get("relevance_score", "N/A")
+            source = doc.metadata.get("paper_id", "unknown")
+            logger.info("Rank %d | Score: %.4f | Source: %s", i + 1, score, source)
+
         logger.info(
             "Successfully reranked chunks. Returning top %d chunks",
             min(top_k, len(reranked_chunks)),
