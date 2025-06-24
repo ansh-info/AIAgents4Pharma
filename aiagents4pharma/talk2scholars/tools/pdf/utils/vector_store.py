@@ -607,7 +607,7 @@ class Vectorstore:
                     self.collection_name,
                 )
 
-                # Define schema that matches document chunk metadata
+                # Define schema
                 fields = [
                     FieldSchema(
                         name="id",
@@ -654,10 +654,11 @@ class Vectorstore:
                 schema = CollectionSchema(
                     fields=fields,
                     description="RAG collection for embedded PDF chunks",
-                    enable_dynamic_field=True,  # allows extra fields if needed
+                    enable_dynamic_field=True,
                 )
 
-                Collection(
+                # Create collection
+                self.collection = Collection(
                     name=self.collection_name,
                     schema=schema,
                     using="default",
@@ -665,6 +666,29 @@ class Vectorstore:
                 )
                 logger.info("Created collection: %s", self.collection_name)
 
+                # Create index on the embedding field (REQUIRED)
+                index_params = {
+                    "index_type": self.config.milvus.index_params.index_type,
+                    "metric_type": self.config.milvus.index_params.metric_type,
+                    "params": dict(self.config.milvus.index_params.params),
+                }
+                self.collection.create_index(
+                    field_name="embedding", index_params=index_params
+                )
+                logger.info(
+                    "Created index on 'embedding' field for collection: %s",
+                    self.collection_name,
+                )
+
+            else:
+                logger.info(
+                    "Collection %s already exists. Loading it.", self.collection_name
+                )
+                self.collection = Collection(name=self.collection_name, using="default")
+
+            self.collection.load()
+            logger.info("Collection %s is loaded and ready.", self.collection_name)
+
         except Exception as e:
-            logger.error("Failed to ensure collection exists: %s", e)
+            logger.error("Failed to ensure collection exists: %s", e, exc_info=True)
             raise
