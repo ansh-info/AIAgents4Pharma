@@ -129,17 +129,6 @@ def question_and_answer(
     if not reranked_chunks:
         msg = f"No relevant chunks found for question: '{question}'"
         logger.warning("%s: %s", call_id, msg)
-        return Command(
-            update={
-                "messages": [
-                    ToolMessage(
-                        content="I couldn't find any relevant information to answer your question. "
-                        "Please ensure the relevant documents are loaded or try rephrasing your question.",
-                        tool_call_id=tool_call_id,
-                    )
-                ],
-            }
-        )
 
     # Generate answer using reranked chunks
     logger.info(

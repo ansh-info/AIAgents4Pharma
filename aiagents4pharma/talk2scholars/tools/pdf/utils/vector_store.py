@@ -17,9 +17,8 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_milvus import Milvus
-from pymilvus import connections, utility, Collection
+from pymilvus import Collection, connections, db, utility
 from pymilvus.exceptions import MilvusException
-
 
 # Set up logging with configurable level
 log_level = os.environ.get("LOG_LEVEL", "INFO")
@@ -131,7 +130,6 @@ class VectorstoreSingleton:
                 logger.info("Connected to Milvus at %s:%s", host, port)
 
                 # Check if database exists, create if not
-                from pymilvus import db
 
                 existing_dbs = db.list_database()
                 if db_name not in existing_dbs:
@@ -236,9 +234,6 @@ class Vectorstore:
         self.documents: Dict[str, Document] = {}
         self.paper_metadata: Dict[str, Dict[str, Any]] = {}
 
-        # Sync loaded papers from existing collection
-        self._sync_loaded_papers()
-
         logger.info(
             "Milvus vector store initialized with collection: %s", self.collection_name
         )
@@ -254,107 +249,6 @@ class Vectorstore:
         return self._singleton.get_vector_store(
             self.collection_name, self.embedding_model, self.connection_args
         )
-
-    def _sync_loaded_papers(self) -> None:
-        """Sync loaded papers from existing collection."""
-        try:
-            # Check if collection exists
-            if not utility.has_collection(self.collection_name):
-                logger.info("Collection %s does not exist yet", self.collection_name)
-                return
-
-            # Get collection
-            collection = Collection(self.collection_name)
-
-            # Check if collection has data
-            if collection.num_entities == 0:
-                logger.info("Collection %s is empty", self.collection_name)
-                return
-
-            # Load collection to memory
-            collection.load()
-
-            # Wait a bit for collection to be ready
-            import time
-
-            time.sleep(0.5)
-
-            # Query all unique paper IDs using batch querying for large collections
-            batch_size = 1000
-            all_paper_ids = set()
-            offset = 0
-
-            logger.info(
-                "Starting to sync paper IDs from collection %s", self.collection_name
-            )
-
-            while True:
-                try:
-                    # Query with pagination
-                    # Use a more specific expression to ensure paper_id field exists
-                    results = collection.query(
-                        expr="paper_id >= ''",  # This ensures paper_id exists and is not null
-                        output_fields=["paper_id"],
-                        offset=offset,
-                        limit=batch_size,
-                    )
-
-                    if not results:
-                        break
-
-                    # Extract paper IDs from this batch
-                    for result in results:
-                        paper_id = result.get("paper_id")
-                        if paper_id:
-                            all_paper_ids.add(paper_id)
-
-                    # If we got fewer results than batch_size, we've reached the end
-                    if len(results) < batch_size:
-                        break
-
-                    offset += batch_size
-
-                    # Log progress for large collections
-                    if offset % 5000 == 0:
-                        logger.info(
-                            "Processed %d entities, found %d unique papers so far",
-                            offset,
-                            len(all_paper_ids),
-                        )
-
-                except Exception as batch_error:
-                    logger.warning(
-                        "Error in batch %d: %s", offset // batch_size, batch_error
-                    )
-                    break
-
-            self.loaded_papers = all_paper_ids
-            logger.info(
-                "Successfully synced %d loaded papers from collection %s",
-                len(self.loaded_papers),
-                self.collection_name,
-            )
-
-            # Log first few paper IDs for debugging
-            if self.loaded_papers:
-                sample_ids = list(self.loaded_papers)[:5]
-                logger.debug("Sample paper IDs: %s", sample_ids)
-
-        except Exception as e:
-            logger.error("Failed to sync loaded papers: %s", e)
-            logger.info("Starting with empty loaded_papers set")
-
-    def has_paper(self, paper_id: str) -> bool:
-        """
-        Check if a paper is already loaded in the vector store.
-
-        Args:
-            paper_id: The ID of the paper to check
-
-        Returns:
-            bool: True if paper exists in vector store, False otherwise
-        """
-        return paper_id in self.loaded_papers
 
     def _load_and_split_pdf(
         self, paper_id: str, pdf_url: str, paper_metadata: Dict[str, Any]
@@ -595,60 +489,6 @@ class Vectorstore:
             logger.error("Failed to add chunks to Milvus: %s", e)
             raise
 
-    def add_paper(
-        self,
-        paper_id: str,
-        pdf_url: str,
-        paper_metadata: Dict[str, Any],
-    ) -> None:
-        """
-        Add a single paper to the document store.
-        For backward compatibility - internally uses batch method.
-
-        Args:
-            paper_id: Unique identifier for the paper
-            pdf_url: URL to the PDF
-            paper_metadata: Metadata about the paper
-        """
-        # Skip if already loaded
-        if paper_id in self.loaded_papers:
-            logger.info("Paper %s already loaded (found in memory), skipping", paper_id)
-            return
-
-        # Use batch method for single paper
-        self.add_papers_batch([(paper_id, pdf_url, paper_metadata)], max_workers=1)
-
-    def _is_paper_in_milvus(self, paper_id: str) -> bool:
-        """Check if a paper exists in Milvus by querying for its chunks."""
-        try:
-            if not utility.has_collection(self.collection_name):
-                return False
-
-            # Query for any chunk from this paper
-            results = self.vector_store.similarity_search(
-                query="", k=1, expr=f'paper_id == "{paper_id}"'  # Empty query
-            )
-
-            return len(results) > 0
-
-        except Exception as e:
-            logger.debug("Error checking paper %s in Milvus: %s", paper_id, e)
-            return False
-
-    def build_vector_store(self) -> None:
-        """
-        For compatibility with existing code.
-        With Milvus, the vector store is built incrementally as documents are added.
-        """
-        if not self.documents:
-            logger.warning("No documents added to build vector store")
-            return
-
-        logger.info(
-            "Vector store already built with %d documents in Milvus",
-            len(self.documents),
-        )
-
     def similarity_search(
         self, query: str, k: int = 4, filter: Optional[Dict[str, Any]] = None, **kwargs
     ) -> List[Document]:
@@ -738,61 +578,3 @@ class Vectorstore:
         )
 
         return results
-
-    def delete_collection(self) -> None:
-        """Delete the entire collection. Use with caution!"""
-        try:
-            if utility.has_collection(self.collection_name):
-                collection = Collection(self.collection_name)
-                collection.drop()
-                logger.info("Dropped collection: %s", self.collection_name)
-
-                # Clear from singleton cache
-                if self.collection_name in self._singleton._vector_stores:
-                    del self._singleton._vector_stores[self.collection_name]
-
-                # Clear loaded papers
-                self.loaded_papers.clear()
-            else:
-                logger.info("Collection %s does not exist", self.collection_name)
-        except MilvusException as e:
-            logger.error("Failed to drop collection: %s", e)
-            raise
-
-    def get_collection_stats(self) -> Dict[str, Any]:
-        """Get statistics about the collection."""
-        try:
-            if utility.has_collection(self.collection_name):
-                collection = Collection(self.collection_name)
-
-                # Get unique paper count by sampling
-                sample_papers = set()
-                if collection.num_entities > 0:
-                    try:
-                        results = collection.query(
-                            expr="paper_id >= ''",
-                            output_fields=["paper_id"],
-                            limit=min(1000, collection.num_entities),
-                        )
-                        for result in results:
-                            if "paper_id" in result:
-                                sample_papers.add(result["paper_id"])
-                    except:
-                        pass
-
-                stats = {
-                    "name": self.collection_name,
-                    "num_entities": collection.num_entities,
-                    "loaded_papers_in_memory": list(self.loaded_papers)[
-                        :10
-                    ],  # First 10 for brevity
-                    "num_loaded_papers_in_memory": len(self.loaded_papers),
-                    "sample_papers_in_milvus": list(sample_papers)[:10],
-                    "estimated_papers_in_milvus": len(sample_papers),
-                }
-                return stats
-            else:
-                return {"error": f"Collection {self.collection_name} does not exist"}
-        except MilvusException as e:
-            logger.error("Failed to get collection stats: %s", e)
-            return {"error": str(e)}

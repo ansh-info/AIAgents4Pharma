@@ -60,15 +60,6 @@ class QAToolHelper:
             embedding_model=emb_model, config=self.config
         )
 
-        # Get current stats
-        stats = self.vector_store.get_collection_stats()
-        logger.info(
-            "%s: Vector store stats - Papers: %d, Entities: %s",
-            self.call_id,
-            stats.get("num_loaded_papers_in_memory", 0),
-            stats.get("num_entities", "unknown"),
-        )
-
         return self.vector_store
 
     def load_all_papers(

@@ -56,57 +56,38 @@ def retrieve_relevant_chunks(
     else:
         logger.info("Retrieving chunks from ALL papers (traditional RAG approach)")
 
-    try:
-        # Use Milvus's built-in MMR search
-        logger.info(
-            "Performing MMR search with query: '%s', k=%d, diversity=%.2f",
-            query[:50] + "..." if len(query) > 50 else query,
-            top_k,
-            mmr_diversity,
+    # Use Milvus's built-in MMR search
+    logger.info(
+        "Performing MMR search with query: '%s', k=%d, diversity=%.2f",
+        query[:50] + "..." if len(query) > 50 else query,
+        top_k,
+        mmr_diversity,
+    )
+
+    # Perform MMR search using the Milvus vector store
+    # Fetch more candidates for better MMR results
+    fetch_k = min(top_k * 4, 500)  # Cap at 500 to avoid memory issues
+
+    results = vector_store.max_marginal_relevance_search(
+        query=query,
+        k=top_k,
+        fetch_k=fetch_k,
+        lambda_mult=mmr_diversity,
+        filter=filter_dict,
+    )
+
+    logger.info("Retrieved %d chunks using MMR from Milvus", len(results))
+
+    # Log some details about retrieved chunks for debugging
+    if results and logger.isEnabledFor(logging.DEBUG):
+        paper_counts = {}
+        for doc in results:
+            paper_id = doc.metadata.get("paper_id", "unknown")
+            paper_counts[paper_id] = paper_counts.get(paper_id, 0) + 1
+        logger.debug(
+            "Initial retrieval - chunks per paper: %s",
+            dict(sorted(paper_counts.items(), key=lambda x: x[1], reverse=True)[:10]),
         )
+        logger.debug("Total papers represented: %d", len(paper_counts))
 
-        # Perform MMR search using the Milvus vector store
-        # Fetch more candidates for better MMR results
-        fetch_k = min(top_k * 4, 500)  # Cap at 500 to avoid memory issues
-
-        results = vector_store.max_marginal_relevance_search(
-            query=query,
-            k=top_k,
-            fetch_k=fetch_k,
-            lambda_mult=mmr_diversity,
-            filter=filter_dict,
-        )
-
-        logger.info("Retrieved %d chunks using MMR from Milvus", len(results))
-
-        # Log some details about retrieved chunks for debugging
-        if results and logger.isEnabledFor(logging.DEBUG):
-            paper_counts = {}
-            for doc in results:
-                paper_id = doc.metadata.get("paper_id", "unknown")
-                paper_counts[paper_id] = paper_counts.get(paper_id, 0) + 1
-            logger.debug(
-                "Initial retrieval - chunks per paper: %s",
-                dict(
-                    sorted(paper_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-                ),
-            )
-            logger.debug("Total papers represented: %d", len(paper_counts))
-
-        return results
-
-    except Exception as e:
-        logger.error("Error during MMR search: %s", e)
-        # Fallback to regular similarity search if MMR fails
-        try:
-            logger.info("Falling back to regular similarity search")
-            results = vector_store.similarity_search(
-                query=query,
-                k=top_k,
-                filter=filter_dict,
-            )
-            logger.info("Retrieved %d chunks using similarity search", len(results))
-            return results
-        except Exception as fallback_error:
-            logger.error("Fallback search also failed: %s", fallback_error)
-            return []
+    return results
