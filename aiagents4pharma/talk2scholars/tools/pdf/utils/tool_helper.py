@@ -10,8 +10,7 @@ from typing import Any, Dict, List, Optional
 from .generate_answer import generate_answer
 from .nvidia_nim_reranker import rerank_chunks
 from .retrieve_chunks import retrieve_relevant_chunks
-from .vector_store import Vectorstore
-from .vector_store_manager import vector_store_manager
+from .vector_store import get_vectorstore
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +19,7 @@ class QAToolHelper:
     """Encapsulates helper routines for the PDF Question & Answer tool."""
 
     def __init__(self) -> None:
-        self.vector_store: Optional[Vectorstore] = None
+        self.vector_store: Optional[Any] = None
         self.config: Any = None
         self.call_id: str = ""
         logger.debug("Initialized QAToolHelper")
@@ -50,29 +49,23 @@ class QAToolHelper:
             raise ValueError(msg)
         return text_emb, llm, articles
 
-    def init_vector_store(self, emb_model: Any) -> Vectorstore:
-        """Initialize or return existing Milvus vector store instance."""
-        # First check if we have an existing instance
-        self.vector_store = vector_store_manager.get_instance()
-
-        if self.vector_store is None:
-            # Initialize if not already done
-            logger.info(
-                "%s: No existing vector store found, initializing new instance",
-                self.call_id,
-            )
-            self.vector_store = vector_store_manager.initialize(
-                embedding_model=emb_model, config=self.config
-            )
-        else:
-            logger.info("%s: Using existing shared vector store instance", self.call_id)
+    def init_vector_store(self, emb_model: Any) -> Any:
+        """Get the singleton Milvus vector store instance."""
+        # Use factory to get singleton instance
+        logger.info(
+            "%s: Getting singleton vector store instance",
+            self.call_id,
+        )
+        self.vector_store = get_vectorstore(
+            embedding_model=emb_model, config=self.config
+        )
 
         # Get current stats
         stats = self.vector_store.get_collection_stats()
         logger.info(
             "%s: Vector store stats - Papers: %d, Entities: %s",
             self.call_id,
-            stats.get("num_loaded_papers", 0),
+            stats.get("num_loaded_papers_in_memory", 0),
             stats.get("num_entities", "unknown"),
         )
 
@@ -80,7 +73,7 @@ class QAToolHelper:
 
     def load_all_papers(
         self,
-        vs: Vectorstore,
+        vs: Any,
         articles: Dict[str, Any],
     ) -> None:
         """Ensure all papers from article_data are loaded into the Milvus vector store."""
@@ -162,7 +155,7 @@ class QAToolHelper:
 
     def retrieve_and_rerank_chunks(
         self,
-        vs: Vectorstore,
+        vs: Any,
         query: str,
     ) -> List[Any]:
         """

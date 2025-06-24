@@ -210,11 +210,11 @@ def process_pdf_upload():
 def initialize_zotero_and_build_store():
     """
     Download all PDFs from the user's Zotero library and build a RAG vector store using Milvus.
-    Uses the new parallel batch processing and shared vector store manager.
+    Uses the factory pattern to ensure singleton instance.
     """
     import logging
-    from aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store_manager import (
-        vector_store_manager,
+    from aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store import (
+        get_vectorstore,
     )
     from aiagents4pharma.talk2scholars.tools.pdf.utils.generate_answer import (
         load_hydra_config,
@@ -248,19 +248,20 @@ def initialize_zotero_and_build_store():
         config = {"configurable": {"thread_id": st.session_state.unique_id}}
         app.update_state(config, {"article_data": st.session_state.article_data})
 
-        # Initialize or get the shared vector store using the manager
+        # Initialize the vector store using factory
         pdf_config = load_hydra_config()
         embedding_model = get_text_embedding_model(
             st.session_state.text_embedding_model
         )
 
-        # Use the vector store manager to ensure we use the same instance everywhere
-        logger.info("Initializing shared Milvus vector store...")
-        vector_store = vector_store_manager.initialize(
-            embedding_model=embedding_model,
-            config=pdf_config,
-            force_reinit=False,  # Don't reinitialize if already exists
+        # Use factory to get singleton instance
+        logger.info("Getting Milvus vector store instance...")
+        vector_store = get_vectorstore(
+            embedding_model=embedding_model, config=pdf_config
         )
+
+        # Store reference in session state (optional, for debugging)
+        st.session_state.vector_store = vector_store
 
         # Prepare papers for batch loading
         papers_to_load = []
