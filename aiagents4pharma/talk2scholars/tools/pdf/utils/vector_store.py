@@ -1,7 +1,7 @@
 """
 Vectorstore class for managing document embeddings and retrieval using Milvus.
 Implements singleton pattern for connection reuse across Streamlit sessions.
-Enhanced with parallel PDF processing and batch embedding.
+Enhanced with parallel PDF processing, batch embedding, and automatic GPU/CPU detection.
 """
 
 import asyncio
@@ -27,6 +27,13 @@ from pymilvus import (
     utility,
 )
 from pymilvus.exceptions import MilvusException
+
+# Import our GPU detection utility
+from .gpu_detection import (
+    detect_nvidia_gpu,
+    get_optimal_index_config,
+    log_index_configuration,
+)
 
 # Set up logging with configurable level
 log_level = os.environ.get("LOG_LEVEL", "INFO")
@@ -94,6 +101,7 @@ class VectorstoreSingleton:
     _connections = {}  # Store connections by connection string
     _vector_stores = {}  # Store vector stores by collection name
     _event_loops = {}  # Store event loops by thread ID
+    _gpu_detected = None  # Cache GPU detection result
 
     def __new__(cls):
         if cls._instance is None:
@@ -119,6 +127,14 @@ class VectorstoreSingleton:
 
         return self._event_loops[thread_id]
 
+    def detect_gpu_once(self) -> bool:
+        """Detect GPU availability once and cache the result."""
+        if self._gpu_detected is None:
+            self._gpu_detected = detect_nvidia_gpu()
+            gpu_status = "available" if self._gpu_detected else "not available"
+            logger.info("GPU detection completed: NVIDIA GPU %s", gpu_status)
+        return self._gpu_detected
+
     def get_connection(self, host: str, port: int, db_name: str) -> str:
         """Get or create a Milvus connection."""
         conn_key = f"{host}:{port}/{db_name}"
@@ -138,7 +154,6 @@ class VectorstoreSingleton:
                 logger.info("Connected to Milvus at %s:%s", host, port)
 
                 # Check if database exists, create if not
-
                 existing_dbs = db.list_database()
                 if db_name not in existing_dbs:
                     db.create_database(db_name)
@@ -193,7 +208,7 @@ class Vectorstore:
     """
     A class for managing document embeddings and retrieval using Milvus.
     Uses singleton pattern to reuse connections across instances.
-    Enhanced with parallel PDF processing and batch embedding.
+    Enhanced with parallel PDF processing, batch embedding, and automatic GPU/CPU detection.
     """
 
     def __init__(
@@ -237,6 +252,16 @@ class Vectorstore:
         # Get singleton instance
         self._singleton = VectorstoreSingleton()
 
+        # Detect GPU and configure index parameters
+        self.has_gpu = self._singleton.detect_gpu_once()
+        embedding_dim = config.milvus.embedding_dim if config else 768
+        self.index_params, self.search_params = get_optimal_index_config(
+            self.has_gpu, embedding_dim
+        )
+
+        # Log the configuration
+        log_index_configuration(self.index_params, self.search_params)
+
         # Connect to Milvus (reuses existing connection if available)
         self._connect_milvus()
         self._ensure_collection_exists()
@@ -248,7 +273,9 @@ class Vectorstore:
         self.paper_metadata: Dict[str, Dict[str, Any]] = {}
 
         logger.info(
-            "Milvus vector store initialized with collection: %s", self.collection_name
+            "Milvus vector store initialized with collection: %s (GPU: %s)",
+            self.collection_name,
+            "enabled" if self.has_gpu else "disabled",
         )
 
     def _connect_milvus(self) -> None:
@@ -360,10 +387,13 @@ class Vectorstore:
             logger.info("All %d papers are already loaded", len(papers_to_add))
             return
 
+        # Log GPU status for this batch
+        gpu_status = "GPU acceleration" if self.has_gpu else "CPU processing"
         logger.info(
-            "Starting PARALLEL batch processing of %d papers with %d workers",
+            "Starting PARALLEL batch processing of %d papers with %d workers (%s)",
             len(papers_to_process),
             max_workers,
+            gpu_status,
         )
         start_time = time.time()
 
@@ -440,9 +470,10 @@ class Vectorstore:
             total_chunks = len(all_chunks)
 
             logger.info(
-                "Starting BATCH EMBEDDING of %d chunks in batches of %d",
+                "Starting BATCH EMBEDDING of %d chunks in batches of %d (%s)",
                 total_chunks,
                 batch_size,
+                gpu_status,
             )
 
             # Process in batches
@@ -452,12 +483,13 @@ class Vectorstore:
                 batch_ids = all_ids[i:batch_end]
 
                 logger.info(
-                    "Processing embedding batch %d/%d (chunks %d-%d of %d)",
+                    "Processing embedding batch %d/%d (chunks %d-%d of %d) - %s",
                     (i // batch_size) + 1,
                     (total_chunks + batch_size - 1) // batch_size,
                     i + 1,
                     batch_end,
                     total_chunks,
+                    gpu_status,
                 )
 
                 # Extract texts for embedding
@@ -465,29 +497,32 @@ class Vectorstore:
 
                 # Log embedding API call
                 logger.info(
-                    "Calling embedding API for batch of %d texts (avg length: %d chars)",
+                    "Calling embedding API for batch of %d texts (avg length: %d chars) - %s",
                     len(texts),
                     sum(len(t) for t in texts) // len(texts) if texts else 0,
+                    gpu_status,
                 )
 
-                # Add to Milvus (this will trigger embedding)
+                # Add to Milvus (this will trigger embedding and use GPU/CPU index)
                 self.vector_store.add_documents(
                     documents=batch_chunks,
                     ids=batch_ids,
                 )
 
                 logger.info(
-                    "Successfully embedded and stored batch %d/%d",
+                    "Successfully embedded and stored batch %d/%d with %s",
                     (i // batch_size) + 1,
                     (total_chunks + batch_size - 1) // batch_size,
+                    gpu_status,
                 )
 
             embed_time = time.time() - embed_start
             logger.info(
-                "BATCH EMBEDDING COMPLETE: Embedded %d chunks in %.2f seconds (%.2f chunks/sec)",
+                "BATCH EMBEDDING COMPLETE: Embedded %d chunks in %.2f seconds (%.2f chunks/sec) - %s",
                 total_chunks,
                 embed_time,
                 total_chunks / embed_time if embed_time > 0 else 0,
+                gpu_status,
             )
 
             # Update loaded papers
@@ -496,11 +531,12 @@ class Vectorstore:
 
             total_time = time.time() - start_time
             logger.info(
-                "FULL BATCH PROCESSING COMPLETE: %d papers, %d chunks in %.2f seconds total (%.2f sec/paper)",
+                "FULL BATCH PROCESSING COMPLETE: %d papers, %d chunks in %.2f seconds total (%.2f sec/paper) - %s",
                 len(successful_papers),
                 total_chunks,
                 total_time,
                 total_time / len(successful_papers) if successful_papers else 0,
+                gpu_status,
             )
 
         except Exception as e:
@@ -539,9 +575,12 @@ class Vectorstore:
                     conditions.append(f"{key} == {value}")
             expr = " and ".join(conditions) if conditions else None
 
+        # Use GPU-optimized search parameters if available
+        search_params = kwargs.get("search_params", self.search_params)
+
         # Perform search
         results = self.vector_store.similarity_search(
-            query=query, k=k, expr=expr, **kwargs
+            query=query, k=k, expr=expr, search_params=search_params, **kwargs
         )
 
         return results
@@ -585,6 +624,9 @@ class Vectorstore:
                     conditions.append(f"{key} == {value}")
             expr = " and ".join(conditions) if conditions else None
 
+        # Use GPU-optimized search parameters if available
+        search_params = kwargs.get("search_params", self.search_params)
+
         # Perform MMR search
         results = self.vector_store.max_marginal_relevance_search(
             query=query,
@@ -592,6 +634,7 @@ class Vectorstore:
             fetch_k=fetch_k,
             lambda_mult=lambda_mult,
             expr=expr,
+            search_params=search_params,
             **kwargs,
         )
 
@@ -666,17 +709,21 @@ class Vectorstore:
                 )
                 logger.info("Created collection: %s", self.collection_name)
 
-                # Create index on the embedding field (REQUIRED)
-                index_params = {
-                    "index_type": self.config.milvus.index_params.index_type,
-                    "metric_type": self.config.milvus.index_params.metric_type,
-                    "params": dict(self.config.milvus.index_params.params),
-                }
-                self.collection.create_index(
-                    field_name="embedding", index_params=index_params
-                )
+                # Create index on the embedding field with GPU/CPU optimization
                 logger.info(
-                    "Created index on 'embedding' field for collection: %s",
+                    "Creating %s index on 'embedding' field for collection: %s",
+                    self.index_params["index_type"],
+                    self.collection_name,
+                )
+
+                self.collection.create_index(
+                    field_name="embedding", index_params=self.index_params
+                )
+
+                index_type = self.index_params["index_type"]
+                logger.info(
+                    "Successfully created %s index on 'embedding' field for collection: %s",
+                    index_type,
                     self.collection_name,
                 )
 
@@ -687,7 +734,16 @@ class Vectorstore:
                 self.collection = Collection(name=self.collection_name, using="default")
 
             self.collection.load()
-            logger.info("Collection %s is loaded and ready.", self.collection_name)
+
+            # Log collection statistics with GPU/CPU info
+            num_entities = self.collection.num_entities
+            gpu_info = " (GPU accelerated)" if self.has_gpu else " (CPU only)"
+            logger.info(
+                "Collection %s is loaded and ready with %d entities%s",
+                self.collection_name,
+                num_entities,
+                gpu_info,
+            )
 
         except Exception as e:
             logger.error("Failed to ensure collection exists: %s", e, exc_info=True)
