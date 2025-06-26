@@ -193,8 +193,13 @@ def retrieve_relevant_chunks_with_scores(
     )
 
     try:
-        # Get search parameters if available but don't pass them directly
-        search_params = getattr(vector_store, "search_params", None)
+        # Check hardware optimization status instead of unused search_params
+        has_optimization = hasattr(vector_store, "has_gpu") and vector_store.has_gpu
+
+        if has_optimization:
+            logger.debug("GPU-accelerated similarity search enabled")
+        else:
+            logger.debug("Standard CPU similarity search")
 
         if hasattr(vector_store, "similarity_search_with_score"):
             # Don't pass search_params to avoid conflicts
