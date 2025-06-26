@@ -93,26 +93,18 @@ def retrieve_relevant_chunks(
             logger.debug(
                 "Using hardware-optimized search parameters: %s", search_params
             )
-
-            # Perform MMR search with optimized parameters
-            results = vector_store.max_marginal_relevance_search(
-                query=query,
-                k=top_k,
-                fetch_k=fetch_k,
-                lambda_mult=mmr_diversity,
-                filter=filter_dict,
-                search_params=search_params,
-            )
         else:
-            # Fallback to default parameters
             logger.debug("Using default search parameters (no hardware optimization)")
-            results = vector_store.max_marginal_relevance_search(
-                query=query,
-                k=top_k,
-                fetch_k=fetch_k,
-                lambda_mult=mmr_diversity,
-                filter=filter_dict,
-            )
+
+        # Perform MMR search - let the vector store handle search_params internally
+        # Don't pass search_params explicitly to avoid conflicts
+        results = vector_store.max_marginal_relevance_search(
+            query=query,
+            k=top_k,
+            fetch_k=fetch_k,
+            lambda_mult=mmr_diversity,
+            filter=filter_dict,
+        )
 
         logger.info(
             "Retrieved %d chunks using %s MMR from Milvus", len(results), search_mode
@@ -146,6 +138,7 @@ def retrieve_relevant_chunks(
         # Fallback to basic similarity search if MMR fails
         logger.warning("Falling back to basic similarity search")
         try:
+            # Don't pass search_params to avoid conflicts
             results = vector_store.similarity_search(
                 query=query,
                 k=top_k,
@@ -200,23 +193,16 @@ def retrieve_relevant_chunks_with_scores(
     )
 
     try:
-        # Get search parameters if available
+        # Get search parameters if available but don't pass them directly
         search_params = getattr(vector_store, "search_params", None)
 
         if hasattr(vector_store, "similarity_search_with_score"):
-            if search_params:
-                results = vector_store.similarity_search_with_score(
-                    query=query,
-                    k=top_k,
-                    filter=filter_dict,
-                    search_params=search_params,
-                )
-            else:
-                results = vector_store.similarity_search_with_score(
-                    query=query,
-                    k=top_k,
-                    filter=filter_dict,
-                )
+            # Don't pass search_params to avoid conflicts
+            results = vector_store.similarity_search_with_score(
+                query=query,
+                k=top_k,
+                filter=filter_dict,
+            )
 
             # Filter by score threshold
             filtered_results = [

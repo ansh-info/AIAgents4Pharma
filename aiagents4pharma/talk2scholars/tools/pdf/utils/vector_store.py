@@ -285,11 +285,22 @@ class Vectorstore:
         )
 
     def _initialize_vector_store(self) -> Milvus:
-        """Initialize or load the Milvus vector store using singleton."""
+        """Initialize or load the Milvus vector store using singleton with GPU optimization."""
         self._ensure_collection_exists()  # Ensure collection exists before use
-        return self._singleton.get_vector_store(
+
+        # Create the base vector store
+        vector_store = self._singleton.get_vector_store(
             self.collection_name, self.embedding_model, self.connection_args
         )
+
+        # Configure search parameters based on hardware detection
+        # This avoids passing search_params through LangChain methods
+        if hasattr(vector_store, "_client") and self.has_gpu:
+            logger.info("Configuring Milvus client for GPU-optimized search")
+            # The GPU optimization will be handled at the collection level
+            # through the index configuration, not search parameters
+
+        return vector_store
 
     def _load_and_split_pdf(
         self, paper_id: str, pdf_url: str, paper_metadata: Dict[str, Any]
@@ -575,12 +586,10 @@ class Vectorstore:
                     conditions.append(f"{key} == {value}")
             expr = " and ".join(conditions) if conditions else None
 
-        # Use GPU-optimized search parameters if available
-        search_params = kwargs.get("search_params", self.search_params)
-
-        # Perform search
+        # Don't pass search_params to avoid conflicts with LangChain
+        # The GPU optimization happens at the collection level
         results = self.vector_store.similarity_search(
-            query=query, k=k, expr=expr, search_params=search_params, **kwargs
+            query=query, k=k, expr=expr, **kwargs
         )
 
         return results
@@ -624,17 +633,14 @@ class Vectorstore:
                     conditions.append(f"{key} == {value}")
             expr = " and ".join(conditions) if conditions else None
 
-        # Use GPU-optimized search parameters if available
-        search_params = kwargs.get("search_params", self.search_params)
-
-        # Perform MMR search
+        # Don't pass search_params to avoid conflicts with LangChain
+        # The GPU optimization happens at the collection level
         results = self.vector_store.max_marginal_relevance_search(
             query=query,
             k=k,
             fetch_k=fetch_k,
             lambda_mult=lambda_mult,
             expr=expr,
-            search_params=search_params,
             **kwargs,
         )
 

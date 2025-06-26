@@ -14,44 +14,6 @@ milvus:
   consistency_level: "Strong"
   embedding_dim: 768
 
-  # GPU Configuration (automatically detected)
-  # When GPU is detected, uses GPU_CAGRA index for better performance
-  # When no GPU, falls back to CPU IVF_FLAT index
-  gpu:
-    # GPU_CAGRA index settings (used when NVIDIA GPU detected)
-    index_params:
-      metric_type: "COSINE"
-      index_type: "GPU_CAGRA"
-      params:
-        intermediate_graph_degree: 64 # Higher for better recall
-        graph_degree: 32 # Balanced performance/recall
-        build_algo: "IVF_PQ" # Higher quality build
-        cache_dataset_on_device: "true" # Cache for better recall
-        adapt_for_cpu: "false" # Pure GPU mode
-
-    # GPU_CAGRA search parameters
-    search_params:
-      metric_type: "COSINE"
-      params:
-        itopk_size: 128 # Power of 2, good for intermediate results
-        search_width: 16 # Balanced entry points
-        team_size: 16 # Optimize for typical vector dimensions
-
-  # CPU Configuration (fallback when no GPU detected)
-  cpu:
-    # CPU IVF_FLAT index settings (fallback)
-    index_params:
-      metric_type: "COSINE"
-      index_type: "IVF_FLAT"
-      params:
-        nlist: 1024 # Number of cluster units
-
-    # CPU search parameters
-    search_params:
-      metric_type: "COSINE"
-      params:
-        nprobe: 16 # Slightly higher than original for better recall
-
 # Document processing settings
 chunk_size: 1200 # Number of characters per text chunk
 chunk_overlap: 200 # Overlap between adjacent chunks
@@ -94,6 +56,3 @@ gpu_detection:
 
   # Log GPU detection results
   log_detection: true
-
-  # Performance tuning based on hardware
-  auto_tune_params: true # Automatically adjust parameters based on detected hardware

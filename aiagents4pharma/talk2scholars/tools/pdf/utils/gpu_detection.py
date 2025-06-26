@@ -5,6 +5,7 @@ Detects NVIDIA GPU availability and determines appropriate index configuration
 
 import logging
 import subprocess
+import os
 from typing import Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
