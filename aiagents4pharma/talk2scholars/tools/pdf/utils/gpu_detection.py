@@ -10,15 +10,28 @@ from typing import Dict, Any, Tuple
 logger = logging.getLogger(__name__)
 
 
-def detect_nvidia_gpu() -> bool:
+def detect_nvidia_gpu(config=None) -> bool:
     """
-    Detect if NVIDIA GPU is available and accessible.
+    Detect if NVIDIA GPU is available and should be used.
+
+    Args:
+        config: Hydra config object that may contain force_cpu_mode flag
 
     Returns:
-        bool: True if NVIDIA GPU is detected and accessible, False otherwise
+        bool: True if GPU should be used, False if CPU should be used
     """
+
+    # Check for force CPU mode in config
+    if config and hasattr(config, "gpu_detection"):
+        force_cpu = getattr(config.gpu_detection, "force_cpu_mode", False)
+        if force_cpu:
+            logger.info(
+                "🔧 Force CPU mode enabled in config - using CPU even though GPU may be available"
+            )
+            return False
+
+    # Normal GPU detection logic
     try:
-        # Check if nvidia-smi command is available
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
             capture_output=True,
@@ -29,20 +42,14 @@ def detect_nvidia_gpu() -> bool:
         if result.returncode == 0 and result.stdout.strip():
             gpu_names = result.stdout.strip().split("\n")
             logger.info("Detected NVIDIA GPU(s): %s", gpu_names)
+            logger.info("💡 To force CPU mode, set 'force_cpu_mode: true' in config")
             return True
         else:
             logger.info("nvidia-smi command failed or no GPUs detected")
             return False
 
-    except (
-        subprocess.TimeoutExpired,
-        subprocess.CalledProcessError,
-        FileNotFoundError,
-    ) as e:
-        logger.info("NVIDIA GPU detection failed: %s", e)
-        return False
     except Exception as e:
-        logger.warning("Unexpected error during GPU detection: %s", e)
+        logger.info("NVIDIA GPU detection failed: %s", e)
         return False
 
 

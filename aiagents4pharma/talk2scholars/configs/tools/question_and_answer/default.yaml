@@ -56,3 +56,7 @@ gpu_detection:
 
   # Log GPU detection results
   log_detection: true
+
+  # Force CPU mode even if GPU is detected (for testing CPU Milvus)
+  # Uncomment the line below to force CPU mode:
+  # force_cpu_mode: true

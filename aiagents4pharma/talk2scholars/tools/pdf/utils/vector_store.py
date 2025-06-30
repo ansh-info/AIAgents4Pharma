@@ -252,8 +252,19 @@ class Vectorstore:
         # Get singleton instance
         self._singleton = VectorstoreSingleton()
 
-        # Detect GPU and configure index parameters
-        self.has_gpu = self._singleton.detect_gpu_once()
+        # GPU detection with config override (SINGLE CALL)
+        self.has_gpu = detect_nvidia_gpu(config)
+
+        # Additional check for force CPU mode
+        if (
+            config
+            and hasattr(config, "gpu_detection")
+            and getattr(config.gpu_detection, "force_cpu_mode", False)
+        ):
+            logger.info("🔧 Running in forced CPU mode (config override)")
+            self.has_gpu = False
+
+        # Configure index parameters AFTER determining GPU usage
         embedding_dim = config.milvus.embedding_dim if config else 768
         self.index_params, self.search_params = get_optimal_index_config(
             self.has_gpu, embedding_dim
