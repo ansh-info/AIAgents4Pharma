@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from .utils.generate_answer import load_hydra_config
 from .utils.tool_helper import QAToolHelper
 from .utils.paper_loader import load_all_papers
+from .utils.rag_pipeline import retrieve_and_rerank_chunks
 
 # Helper for managing state, vectorstore, reranking, and formatting
 helper = QAToolHelper()
@@ -131,7 +132,9 @@ def question_and_answer(
     )
 
     # Retrieve and rerank chunks in one step
-    reranked_chunks = helper.retrieve_and_rerank_chunks(vs, question)
+    reranked_chunks = retrieve_and_rerank_chunks(
+        vs, question, config, call_id, helper.has_gpu
+    )
 
     if not reranked_chunks:
         msg = f"No relevant chunks found for question: '{question}'"
