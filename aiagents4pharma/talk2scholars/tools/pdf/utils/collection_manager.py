@@ -4,6 +4,7 @@ Collection Manager for Milvus
 
 import logging
 import os
+import threading
 from typing import Any, Dict
 
 from pymilvus import (
@@ -20,11 +21,22 @@ logging.basicConfig(level=getattr(logging, log_level))
 logger = logging.getLogger(__name__)
 logger.setLevel(getattr(logging, log_level))
 
+# Global cache for collections to avoid repeated creation checks
+_collection_cache = {}
+_cache_lock = threading.Lock()
+
 
 def ensure_collection_exists(
     collection_name: str, config: Any, index_params: Dict[str, Any], has_gpu: bool
 ) -> Collection:
     """Ensure the Milvus collection exists before trying to sync or add documents."""
+
+    # Check cache first
+    with _cache_lock:
+        if collection_name in _collection_cache:
+            logger.debug("Returning cached collection: %s", collection_name)
+            return _collection_cache[collection_name]
+
     try:
         existing_collections = utility.list_collections()
         if collection_name not in existing_collections:
@@ -114,6 +126,39 @@ def ensure_collection_exists(
 
         collection.load()
 
+        def debug_collection_state(collection, collection_name):
+            """Debug collection state for troubleshooting."""
+            try:
+                logger.info("=== DEBUG COLLECTION STATE ===")
+                logger.info("Collection name: %s", collection_name)
+                logger.info("Collection schema: %s", collection.schema)
+                logger.info("Collection num_entities: %d", collection.num_entities)
+
+                # Check if collection is actually loaded
+                logger.info("Is collection loaded: %s", collection.is_loaded)
+
+                # Check available indexes
+                indexes = collection.indexes
+                logger.info(
+                    "Collection indexes: %s", [idx.field_name for idx in indexes]
+                )
+
+                # Try to get collection stats
+                logger.info("Collection statistics: %s", collection.num_entities)
+
+                # Check connection status
+                from pymilvus import connections
+
+                logger.info("Active connections: %s", connections.list_connections())
+
+                logger.info("=== END DEBUG ===")
+
+            except Exception as e:
+                logger.error("Debug collection state failed: %s", e)
+
+        # Add this call in ensure_collection_exists() after collection.load():
+        debug_collection_state(collection, collection_name)
+
         # Log collection statistics with GPU/CPU info
         num_entities = collection.num_entities
         gpu_info = " (GPU accelerated)" if has_gpu else " (CPU only)"
@@ -123,6 +168,11 @@ def ensure_collection_exists(
             num_entities,
             gpu_info,
         )
+
+        # Cache the collection
+        with _cache_lock:
+            _collection_cache[collection_name] = collection
+            logger.debug("Cached collection: %s", collection_name)
 
         return collection  # Return the collection object
 

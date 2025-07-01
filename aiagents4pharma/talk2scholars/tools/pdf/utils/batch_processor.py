@@ -189,6 +189,45 @@ def add_papers_batch(
                 ids=batch_ids,
             )
 
+            def verify_insert_success(vector_store, batch_size, batch_num):
+                """Verify that documents were actually inserted."""
+                try:
+                    # Get the underlying Milvus collection
+                    collection = (
+                        vector_store.col
+                    )  # LangChain Milvus stores collection in .col
+
+                    # Force flush to ensure data is persisted
+                    collection.flush()
+
+                    # Check entity count after flush
+                    entity_count = collection.num_entities
+                    logger.info(
+                        "POST-INSERT verification batch %d: Collection now has %d entities",
+                        batch_num,
+                        entity_count,
+                    )
+
+                    # If we have entities, sample a few to verify structure
+                    if entity_count > 0:
+                        sample_results = collection.query(
+                            expr="", output_fields=["paper_id"], limit=3
+                        )
+                        sample_papers = [
+                            r.get("paper_id", "unknown") for r in sample_results
+                        ]
+                        logger.info("Sample paper IDs in collection: %s", sample_papers)
+
+                except Exception as e:
+                    logger.error("Insert verification failed: %s", e)
+
+            # Add this call in batch_processor.py after:
+            # vector_store.add_documents(documents=batch_chunks, ids=batch_ids)
+
+            verify_insert_success(
+                vector_store, len(batch_chunks), (i // batch_size) + 1
+            )
+
             logger.info(
                 "Successfully embedded and stored batch %d/%d with %s",
                 (i // batch_size) + 1,

@@ -101,12 +101,18 @@ class Vectorstore:
 
         # Connect to Milvus (reuses existing connection if available)
         self._connect_milvus()
+
+        # Create collection ONCE
         self.collection = ensure_collection_exists(
             self.collection_name, self.config, self.index_params, self.has_gpu
         )
 
         # Initialize the LangChain Milvus vector store (reuses existing if available)
         self.vector_store = self._initialize_vector_store()
+
+        # Load existing papers AFTER vector store is ready
+        self._load_existing_paper_ids()
+
         # Store for document metadata (keeping for compatibility)
         self.documents: Dict[str, Document] = {}
         self.paper_metadata: Dict[str, Dict[str, Any]] = {}
@@ -125,9 +131,6 @@ class Vectorstore:
 
     def _initialize_vector_store(self) -> Milvus:
         """Initialize or load the Milvus vector store using singleton with GPU optimization."""
-        self.collection = ensure_collection_exists(
-            self.collection_name, self.config, self.index_params, self.has_gpu
-        )
 
         # Create the base vector store
         vector_store = self._singleton.get_vector_store(
@@ -142,6 +145,68 @@ class Vectorstore:
             # through the index configuration, not search parameters
 
         return vector_store
+
+    def _load_existing_paper_ids(self):
+        """Load already embedded paper IDs using LangChain's collection access."""
+        try:
+            logger.info("Checking for existing papers via LangChain collection...")
+
+            # Access the collection through LangChain's wrapper with type checking
+            langchain_collection = getattr(self.vector_store, "col", None)
+
+            # Check if collection exists and is properly initialized
+            if langchain_collection is None:
+                logger.warning(
+                    "LangChain collection not available, trying alternative access..."
+                )
+                # Try alternative access method
+                langchain_collection = getattr(self.vector_store, "collection", None)
+
+            if langchain_collection is None:
+                logger.warning(
+                    "No LangChain collection found, proceeding with empty loaded_papers"
+                )
+                return
+
+            # Force flush and check entity count via LangChain's collection
+            langchain_collection.flush()
+            num_entities = langchain_collection.num_entities
+
+            logger.info("LangChain collection entity count: %d", num_entities)
+
+            if num_entities > 0:
+                logger.info("Loading existing paper IDs from LangChain collection...")
+
+                # Query via LangChain's collection (not the direct one)
+                results = langchain_collection.query(
+                    expr="",  # No filter - get all
+                    output_fields=["paper_id"],
+                    limit=16384,  # Max limit
+                    consistency_level="Strong",
+                )
+
+                # Extract unique paper IDs
+                existing_paper_ids = set(result["paper_id"] for result in results)
+                self.loaded_papers.update(existing_paper_ids)
+
+                logger.info(
+                    "Found %d unique papers in LangChain collection",
+                    len(existing_paper_ids),
+                )
+                logger.info(
+                    "Sample papers: %s",
+                    (
+                        list(existing_paper_ids)[:5] + ["..."]
+                        if len(existing_paper_ids) > 5
+                        else list(existing_paper_ids)
+                    ),
+                )
+            else:
+                logger.info("LangChain collection is empty - no existing papers")
+
+        except Exception as e:
+            logger.warning("Failed to load existing paper IDs via LangChain: %s", e)
+            logger.info("Will proceed with empty loaded_papers set")
 
     def similarity_search(
         self, query: str, k: int = 4, filter: Optional[Dict[str, Any]] = None, **kwargs
