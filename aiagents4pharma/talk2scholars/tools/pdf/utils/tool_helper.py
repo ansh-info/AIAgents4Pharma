@@ -11,7 +11,7 @@ from typing import Any, Dict, List
 from .generate_answer import generate_answer
 from .nvidia_nim_reranker import rerank_chunks
 from .retrieve_chunks import retrieve_relevant_chunks
-from .vector_store import get_vectorstore
+from .singleton_manager import get_vectorstore
 
 logger = logging.getLogger(__name__)
 

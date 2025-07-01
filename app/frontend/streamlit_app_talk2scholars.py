@@ -26,7 +26,7 @@ from aiagents4pharma.talk2scholars.agents.main_agent import get_app
 from aiagents4pharma.talk2scholars.tools.pdf.utils.generate_answer import (
     load_hydra_config,
 )
-from aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store import (
+from aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager import (
     get_vectorstore,
 )
 from aiagents4pharma.talk2scholars.tools.zotero.utils.read_helper import (
