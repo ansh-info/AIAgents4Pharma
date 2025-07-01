@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from .utils.generate_answer import load_hydra_config
 from .utils.tool_helper import QAToolHelper
+from .utils.paper_loader import load_all_papers
 
 # Helper for managing state, vectorstore, reranking, and formatting
 helper = QAToolHelper()
@@ -115,7 +116,13 @@ def question_and_answer(
         call_id,
         len(article_data),
     )
-    helper.load_all_papers(vs, article_data)
+    load_all_papers(
+        vector_store=vs,
+        articles=article_data,
+        call_id=call_id,
+        config=config,
+        has_gpu=helper.has_gpu,
+    )
 
     # Traditional RAG Pipeline: Retrieve from ALL papers, then rerank
     logger.info(

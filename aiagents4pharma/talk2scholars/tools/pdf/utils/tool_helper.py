@@ -9,7 +9,6 @@ import logging
 from typing import Any, Dict, List
 
 
-from .batch_processor import add_papers_batch
 from .generate_answer import generate_answer
 
 # Import our GPU detection utility
@@ -86,130 +85,6 @@ class QAToolHelper:
             )
 
         return vs
-
-    def load_all_papers(
-        self,
-        vs: Any,
-        articles: Dict[str, Any],
-    ) -> None:
-        """
-        Ensure all papers from article_data are loaded into the Milvus vector store.
-        Optimized for GPU/CPU processing.
-        """
-        papers_to_load = []
-        skipped_papers = []
-        already_loaded = []
-
-        # Check which papers need to be loaded
-        for pid, article_info in articles.items():
-            if pid not in vs.loaded_papers:
-                pdf_url = article_info.get("pdf_url")
-                if pdf_url:
-                    # Prepare tuple for batch loading
-                    papers_to_load.append((pid, pdf_url, article_info))
-                else:
-                    skipped_papers.append(pid)
-            else:
-                already_loaded.append(pid)
-
-        # Log summary of papers status with hardware info
-        hardware_info = (
-            f" (GPU acceleration: {'enabled' if self.has_gpu else 'disabled'})"
-        )
-        logger.info(
-            "%s: Paper loading summary%s - Total: %d, Already loaded: %d, To load: %d, No PDF: %d",
-            self.call_id,
-            hardware_info,
-            len(articles),
-            len(already_loaded),
-            len(papers_to_load),
-            len(skipped_papers),
-        )
-
-        if skipped_papers:
-            logger.warning(
-                "%s: Skipping %d papers without PDF URLs: %s%s",
-                self.call_id,
-                len(skipped_papers),
-                skipped_papers[:5],  # Show first 5
-                "..." if len(skipped_papers) > 5 else "",
-            )
-
-        if not papers_to_load:
-            logger.info(
-                "%s: All papers with PDFs are already loaded in Milvus", self.call_id
-            )
-            return
-
-        # Use batch loading with parallel processing for ALL papers at once
-        # Adjust parameters based on hardware capabilities
-        try:
-            if self.has_gpu:
-                # GPU can handle more parallel processing
-                max_workers = min(
-                    12, max(4, len(papers_to_load))
-                )  # More workers for GPU
-                batch_size = self.config.get(
-                    "embedding_batch_size", 2000
-                )  # Larger batches for GPU
-                logger.info(
-                    "%s: Using GPU-optimized loading parameters: %d workers, batch size %d",
-                    self.call_id,
-                    max_workers,
-                    batch_size,
-                )
-            else:
-                # CPU - more conservative parameters
-                max_workers = min(
-                    8, max(3, len(papers_to_load))
-                )  # Conservative for CPU
-                batch_size = self.config.get(
-                    "embedding_batch_size", 1000
-                )  # Smaller batches for CPU
-                logger.info(
-                    "%s: Using CPU-optimized loading parameters: %d workers, batch size %d",
-                    self.call_id,
-                    max_workers,
-                    batch_size,
-                )
-
-            logger.info(
-                "%s: Loading %d papers in ONE BATCH using %d parallel workers (batch size: %d, %s)",
-                self.call_id,
-                len(papers_to_load),
-                max_workers,
-                batch_size,
-                "GPU accelerated" if self.has_gpu else "CPU processing",
-            )
-
-            # This should process ALL papers at once with hardware optimization
-            add_papers_batch(
-                papers_to_add=papers_to_load,
-                vector_store=vs.vector_store,  # Pass the LangChain vector store
-                loaded_papers=vs.loaded_papers,
-                paper_metadata=vs.paper_metadata,
-                documents=vs.documents,
-                config=vs.config,
-                metadata_fields=vs.metadata_fields,
-                has_gpu=vs.has_gpu,
-                max_workers=max_workers,
-                batch_size=batch_size,
-            )
-
-            logger.info(
-                "%s: Successfully completed batch loading of all %d papers with %s",
-                self.call_id,
-                len(papers_to_load),
-                "GPU acceleration" if self.has_gpu else "CPU processing",
-            )
-
-        except Exception as exc:
-            logger.error(
-                "%s: Error during batch paper loading: %s",
-                self.call_id,
-                exc,
-                exc_info=True,
-            )
 
     def retrieve_and_rerank_chunks(
         self,
