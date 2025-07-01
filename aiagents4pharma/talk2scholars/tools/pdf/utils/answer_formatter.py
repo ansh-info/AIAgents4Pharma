@@ -1,8 +1,5 @@
 """
-Helper class for PDF Q&A tool orchestration: state validation, vectorstore init,
-paper loading, chunk retrieval, reranking, and answer formatting.
-Updated to follow traditional RAG pipeline: retrieve -> rerank -> generate
-Enhanced with automatic GPU/CPU detection and optimization.
+Format the final answer text with source attributions and hardware info.
 """
 
 import logging
