@@ -26,7 +26,7 @@ def detect_nvidia_gpu(config=None) -> bool:
         force_cpu = getattr(config.gpu_detection, "force_cpu_mode", False)
         if force_cpu:
             logger.info(
-                "🔧 Force CPU mode enabled in config - using CPU even though GPU may be available"
+                "Force CPU mode enabled in config - using CPU even though GPU may be available"
             )
             return False
 
