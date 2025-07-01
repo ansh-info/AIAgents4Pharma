@@ -8,7 +8,11 @@ Enhanced with automatic GPU/CPU detection and optimization.
 import logging
 from typing import Any, Dict, List
 
+
+from .batch_processor import add_papers_batch
 from .generate_answer import generate_answer
+
+# Import our GPU detection utility
 from .nvidia_nim_reranker import rerank_chunks
 from .retrieve_chunks import retrieve_relevant_chunks
 from .singleton_manager import get_vectorstore
@@ -179,8 +183,15 @@ class QAToolHelper:
             )
 
             # This should process ALL papers at once with hardware optimization
-            vs.add_papers_batch(
+            add_papers_batch(
                 papers_to_add=papers_to_load,
+                vector_store=vs.vector_store,  # Pass the LangChain vector store
+                loaded_papers=vs.loaded_papers,
+                paper_metadata=vs.paper_metadata,
+                documents=vs.documents,
+                config=vs.config,
+                metadata_fields=vs.metadata_fields,
+                has_gpu=vs.has_gpu,
                 max_workers=max_workers,
                 batch_size=batch_size,
             )

@@ -29,6 +29,9 @@ from aiagents4pharma.talk2scholars.tools.pdf.utils.generate_answer import (
 from aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager import (
     get_vectorstore,
 )
+from aiagents4pharma.talk2scholars.tools.pdf.utils.batch_processor import (
+    add_papers_batch,
+)
 from aiagents4pharma.talk2scholars.tools.zotero.utils.read_helper import (
     ZoteroSearchData,
 )
@@ -276,8 +279,15 @@ def initialize_zotero_and_build_store():
             batch_size = pdf_config.get("embedding_batch_size", 100)
 
             logger.info(f"Starting batch loading of {len(papers_to_load)} papers...")
-            vector_store.add_papers_batch(
+            add_papers_batch(
                 papers_to_add=papers_to_load,
+                vector_store=vector_store.vector_store,  # Pass the LangChain Milvus instance
+                loaded_papers=vector_store.loaded_papers,
+                paper_metadata=vector_store.paper_metadata,
+                documents=vector_store.documents,
+                config=vector_store.config,
+                metadata_fields=vector_store.metadata_fields,
+                has_gpu=vector_store.has_gpu,
                 max_workers=max_workers,
                 batch_size=batch_size,
             )
