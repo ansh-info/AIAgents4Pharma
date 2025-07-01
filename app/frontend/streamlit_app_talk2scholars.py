@@ -4,15 +4,19 @@
 Talk2Scholars: A Streamlit app for the Talk2Scholars graph.
 """
 
+import hashlib
 import logging
 import os
 import random
 import sys
+import tempfile
 
 import hydra
 import streamlit as st
+from hydra.core.global_hydra import GlobalHydra
 from langchain_core.messages import AIMessage, ChatMessage, HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langsmith import Client
 from streamlit_feedback import streamlit_feedback
@@ -41,7 +45,8 @@ logging.getLogger("langsmith.client").setLevel(logging.ERROR)
 # Set the logging level for httpx to ERROR to suppress info logs
 logging.getLogger("httpx").setLevel(logging.ERROR)
 # Initialize configuration
-hydra.core.global_hydra.GlobalHydra.instance().clear()
+
+GlobalHydra.instance().clear()
 if "config" not in st.session_state:
     # Load Hydra configuration
     with hydra.initialize(
@@ -132,6 +137,11 @@ def _submit_feedback(user_response):
     st.info("Your feedback is on its way to the developers. Thank you!", icon="🚀")
 
 
+def get_pdf_hash(file_bytes):
+    """Generate a SHA-256 hash from PDF bytes."""
+    return hashlib.sha256(file_bytes).hexdigest()
+
+
 @st.fragment
 def process_pdf_upload():
     """
@@ -148,35 +158,30 @@ def process_pdf_upload():
     )
 
     if pdf_files:
-        import tempfile
-        import time
 
         # Step 1: Initialize or get existing article_data
         article_data = st.session_state.get("article_data", {})
 
         # Step 2: Process each uploaded file
         for pdf_file in pdf_files:
-            with tempfile.NamedTemporaryFile(delete=False) as f:
-                f.write(pdf_file.read())
+            file_bytes = pdf_file.read()
+
+            # Generate a stable hash-based ID
+            pdf_hash = get_pdf_hash(file_bytes)
+            pdf_id = f"uploaded_{pdf_hash}"
 
             # Prevent duplicates before adding new entry
-            filename = pdf_file.name
-            existing_ids = [
-                id
-                for id, data in article_data.items()
-                if data.get("filename") == filename
-            ]
+            if pdf_id in article_data:
+                # Optionally skip or update existing
+                logging.info(
+                    f"Duplicate detected for: {pdf_file.name}. Skipping re-upload."
+                )
+                continue
 
-            if existing_ids:
-                # Remove old entries with the same filename
-                for existing_id in existing_ids:
-                    article_data.pop(existing_id)
-
-            # Generate unique ID using filename + timestamp
-            timestamp = int(time.time() * 1000)
-            pdf_id = (
-                f"uploaded_{filename.replace(' ', '_').replace('.', '_')}_{timestamp}"
-            )
+            # Save file temporarily
+            with tempfile.NamedTemporaryFile(delete=False) as f:
+                f.write(file_bytes)
+                file_path = f.name
 
             # Create metadata dict
             pdf_metadata = {
@@ -184,8 +189,8 @@ def process_pdf_upload():
                 "Authors": ["Uploaded by user"],
                 "Abstract": "User uploaded PDF",
                 "Publication Date": "N/A",
-                "pdf_url": f.name,
-                "filename": filename,
+                "pdf_url": file_path,
+                "filename": pdf_file.name,
                 "source": "upload",
             }
 
@@ -196,18 +201,18 @@ def process_pdf_upload():
         st.session_state.article_data = article_data
 
         # Step 4: Update LangGraph state
-        config = {"configurable": {"thread_id": st.session_state.unique_id}}
+        config: RunnableConfig = {
+            "configurable": {"thread_id": st.session_state.unique_id}
+        }
 
-        # Optional: ensure article_data is initialized in LangGraph state
         current_state = app.get_state(config)
         if "article_data" not in current_state.values:
             app.update_state(config, {"article_data": {}})
 
-        # Perform final update
         app.update_state(config, {"article_data": article_data})
 
         # Final confirmation
-        st.success(f"{len(pdf_files)} PDF(s) uploaded successfully.")
+        st.success(f"{len(pdf_files)} PDF(s) processed (new or updated).")
 
 
 def initialize_zotero_and_build_store():
@@ -393,7 +398,9 @@ with main_col2:
                     # Initialize Zotero library and RAG index before greeting
                     if "zotero_initialized" not in st.session_state:
                         initialize_zotero_and_build_store()
-                    config = {"configurable": {"thread_id": st.session_state.unique_id}}
+                    config: RunnableConfig = {
+                        "configurable": {"thread_id": st.session_state.unique_id}
+                    }
                     # Update the agent state with the selected LLM model
                     current_state = app.get_state(config)
                     app.update_state(
@@ -424,7 +431,8 @@ with main_col2:
                     current_state = app.get_state(config)
                     # Add response to chat history
                     assistant_msg = ChatMessage(
-                        current_state.values["messages"][-1].content, role="assistant"
+                        content=current_state.values["messages"][-1].content,
+                        role="assistant",
                     )
                     st.session_state.messages.append(
                         {"type": "message", "content": assistant_msg}
@@ -453,7 +461,7 @@ with main_col2:
             #     st.session_state.article_pdf = uploaded_file.read().decode("utf-8")
 
             # Display user prompt
-            prompt_msg = ChatMessage(prompt, role="user")
+            prompt_msg = ChatMessage(content=prompt, role="user")
             st.session_state.messages.append({"type": "message", "content": prompt_msg})
             with st.chat_message("user", avatar="👩🏻‍💻"):
                 st.markdown(prompt)
