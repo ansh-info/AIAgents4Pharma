@@ -36,6 +36,8 @@ from aiagents4pharma.talk2scholars.tools.zotero.utils.read_helper import (
     ZoteroSearchData,
 )
 
+from aiagents4pharma.talk2scholars.tools.pdf.utils.paper_loader import load_all_papers
+
 # Set the logging level for Langsmith tracer to ERROR to suppress warnings
 logging.getLogger("langsmith").setLevel(logging.ERROR)
 logging.getLogger("langsmith.client").setLevel(logging.ERROR)
@@ -275,21 +277,13 @@ def initialize_zotero_and_build_store():
         )
 
         if papers_to_load:
-            max_workers = min(10, max(3, len(papers_to_load)))
-            batch_size = pdf_config.get("embedding_batch_size", 100)
-
             logger.info(f"Starting batch loading of {len(papers_to_load)} papers...")
-            add_papers_batch(
-                papers_to_add=papers_to_load,
-                vector_store=vector_store.vector_store,  # Pass the LangChain Milvus instance
-                loaded_papers=vector_store.loaded_papers,
-                paper_metadata=vector_store.paper_metadata,
-                documents=vector_store.documents,
-                config=vector_store.config,
-                metadata_fields=vector_store.metadata_fields,
+            load_all_papers(
+                vector_store=vector_store,
+                articles=article_data,
+                call_id="streamlit_startup",
+                config=pdf_config,
                 has_gpu=vector_store.has_gpu,
-                max_workers=max_workers,
-                batch_size=batch_size,
             )
             logger.info("Successfully loaded all papers into vector store.")
         else:

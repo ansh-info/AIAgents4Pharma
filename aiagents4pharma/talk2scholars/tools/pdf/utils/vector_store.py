@@ -87,7 +87,7 @@ class Vectorstore:
             and hasattr(config, "gpu_detection")
             and getattr(config.gpu_detection, "force_cpu_mode", False)
         ):
-            logger.info("🔧 Running in forced CPU mode (config override)")
+            logger.info("Running in forced CPU mode (config override)")
             self.has_gpu = False
 
         # Configure index parameters AFTER determining GPU usage
