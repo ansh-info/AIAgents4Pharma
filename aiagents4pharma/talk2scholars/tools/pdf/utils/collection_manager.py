@@ -135,7 +135,7 @@ def ensure_collection_exists(
                 logger.info("Collection num_entities: %d", collection.num_entities)
 
                 # Check if collection is actually loaded
-                logger.info("Is collection loaded: %s", collection.is_loaded)
+                # logger.info("Is collection loaded: %s", collection.load)
 
                 # Check available indexes
                 indexes = collection.indexes
