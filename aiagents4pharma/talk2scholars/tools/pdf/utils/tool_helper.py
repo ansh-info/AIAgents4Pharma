@@ -6,7 +6,7 @@ import logging
 from typing import Any, Dict
 
 
-from .singleton_manager import get_vectorstore
+from .get_vectorstore import get_vectorstore
 
 logger = logging.getLogger(__name__)
 
