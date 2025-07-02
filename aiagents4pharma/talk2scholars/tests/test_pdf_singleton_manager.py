@@ -6,6 +6,8 @@ from pymilvus.exceptions import MilvusException
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager import (
     VectorstoreSingleton,
+)
+from aiagents4pharma.talk2scholars.tools.pdf.utils.get_vectorstore import (
     get_vectorstore,
 )
 
@@ -63,10 +65,11 @@ def test_get_vector_store_creates_if_missing(mock_milvus):
     mock_milvus.assert_called_once()
 
 
-@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.Vectorstore")
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.get_vectorstore.Vectorstore")
 def test_get_vectorstore_factory(mock_vectorstore):
     mock_config = MagicMock()
     mock_config.milvus.collection_name = "demo"
+    mock_config.milvus.embedding_dim = 768
     mock_embed = MagicMock()
 
     # Force new instance
@@ -80,20 +83,18 @@ def test_get_vectorstore_factory(mock_vectorstore):
 
 def test_get_vectorstore_force_new():
     with patch(
-        "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.Vectorstore"
+        "aiagents4pharma.talk2scholars.tools.pdf.utils.get_vectorstore.Vectorstore"
     ) as MockVectorstore:
-        # Return two different instances on successive calls
         mock_vs1 = MagicMock(name="Vectorstore1")
         mock_vs2 = MagicMock(name="Vectorstore2")
         MockVectorstore.side_effect = [mock_vs1, mock_vs2]
 
         dummy_config = MagicMock()
         dummy_config.milvus.collection_name = "my_test_collection"
+        dummy_config.milvus.embedding_dim = 768
 
-        from aiagents4pharma.talk2scholars.tools.pdf.utils import singleton_manager
-
-        vs1 = singleton_manager.get_vectorstore(mock_vs1, dummy_config)
-        vs2 = singleton_manager.get_vectorstore(mock_vs2, dummy_config, force_new=True)
+        vs1 = get_vectorstore(mock_vs1, dummy_config)
+        vs2 = get_vectorstore(mock_vs2, dummy_config, force_new=True)
 
         assert vs1 is mock_vs1
         assert vs2 is mock_vs2
@@ -118,13 +119,6 @@ def test_get_connection_milvus_error(mock_db, mock_has_connection, mock_connect)
 
     with pytest.raises(MilvusException, match="Connection failed"):
         manager.get_connection("localhost", 19530, "test_db")
-
-
-import asyncio
-from unittest.mock import patch, MagicMock
-from aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager import (
-    VectorstoreSingleton,
-)
 
 
 def test_get_event_loop_creates_new_loop_on_closed():
