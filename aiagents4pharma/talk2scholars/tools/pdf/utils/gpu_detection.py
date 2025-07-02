@@ -42,7 +42,7 @@ def detect_nvidia_gpu(config=None) -> bool:
         if result.returncode == 0 and result.stdout.strip():
             gpu_names = result.stdout.strip().split("\n")
             logger.info("Detected NVIDIA GPU(s): %s", gpu_names)
-            logger.info("💡 To force CPU mode, set 'force_cpu_mode: true' in config")
+            logger.info("To force CPU mode, set 'force_cpu_mode: true' in config")
             return True
         else:
             logger.info("nvidia-smi command failed or no GPUs detected")
