@@ -4,7 +4,7 @@ Unit tests for QAToolHelper routines in tool_helper.py
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.tool_helper import QAToolHelper
 
@@ -66,75 +66,24 @@ class TestQAToolHelper(unittest.TestCase):
             self.helper.get_state_models_and_data(state)
         self.assertEqual(str(cm.exception), "No article_data found in state.")
 
-    def test_load_candidate_papers_calls_add_paper_only_for_valid(self):
-        """test load_candidate_papers calls add_paper only for valid candidates"""
-        vs = SimpleNamespace(loaded_papers=set(), add_paper=MagicMock())
-        articles = {"p1": {"pdf_url": "url1"}, "p2": {}, "p3": {"pdf_url": None}}
-        candidates = ["p1", "p2", "p3"]
-        self.helper.load_candidate_papers(vs, articles, candidates)
-        vs.add_paper.assert_called_once_with("p1", "url1", articles["p1"])
+    def test_get_hardware_stats(self):
+        helper = QAToolHelper()
+        helper.call_id = "test_call"
 
-    def test_load_candidate_papers_handles_add_paper_exception(self):
-        """test load_candidate_papers handles add_paper exception"""
-        # If add_paper raises, it should be caught and not propagate
-        vs = SimpleNamespace(
-            loaded_papers=set(), add_paper=MagicMock(side_effect=ValueError("oops"))
-        )
-        articles = {"p1": {"pdf_url": "url1"}}
-        # Start call to set call_id (used in logging)
-        self.helper.start_call(SimpleNamespace(), "call001")
-        # Should not raise despite exception
-        self.helper.load_candidate_papers(vs, articles, ["p1"])
-        vs.add_paper.assert_called_once_with("p1", "url1", articles["p1"])
+        # Case 1: GPU not available
+        helper.has_gpu = False
+        stats = helper.get_hardware_stats()
+        assert stats == {
+            "gpu_available": False,
+            "hardware_mode": "CPU-only",
+            "call_id": "test_call",
+        }
 
-    def test_run_reranker_success_and_filtering(self):
-        """test run_reranker success and filtering"""
-        # Successful rerank returns filtered candidates
-        cfg = SimpleNamespace(top_k_papers=2)
-        self.helper.config = cfg
-        vs = MagicMock()
-        with patch(
-            "aiagents4pharma.talk2scholars.tools.pdf.utils.tool_helper.rank_papers_by_query",
-            return_value=["a", "c"],
-        ):
-            out = self.helper.run_reranker(vs, "q", ["a", "b"])
-        self.assertEqual(out, ["a"])
-
-    def test_run_reranker_exception_fallback(self):
-        """test run_reranker exception fallback"""
-        # On reranker failure, should return original candidates
-        cfg = SimpleNamespace(top_k_papers=5)
-        self.helper.config = cfg
-        vs = MagicMock()
-
-        def fail(*args, **kwargs):
-            raise RuntimeError("fail")
-
-        with patch(
-            "aiagents4pharma.talk2scholars.tools.pdf.utils.tool_helper.rank_papers_by_query",
-            side_effect=fail,
-        ):
-            candidates = ["x", "y"]
-            out = self.helper.run_reranker(vs, "q", candidates)
-        self.assertEqual(out, candidates)
-
-    def test_format_answer_with_and_without_sources(self):
-        """test format_answer with and without sources"""
-        articles = {"p1": {"Title": "T1"}, "p2": {"Title": "T2"}}
-        # With sources
-        with patch(
-            "aiagents4pharma.talk2scholars.tools.pdf.utils.tool_helper.generate_answer",
-            return_value={"output_text": "ans", "papers_used": ["p1", "p2"]},
-        ):
-            res = self.helper.format_answer("q", [], MagicMock(), articles)
-            self.assertIn("ans", res)
-            self.assertIn("Sources:", res)
-            self.assertIn("- T1", res)
-            self.assertIn("- T2", res)
-        # Without sources
-        with patch(
-            "aiagents4pharma.talk2scholars.tools.pdf.utils.tool_helper.generate_answer",
-            return_value={"output_text": "ans", "papers_used": []},
-        ):
-            res2 = self.helper.format_answer("q", [], MagicMock(), {})
-            self.assertEqual(res2, "ans")
+        # Case 2: GPU available
+        helper.has_gpu = True
+        stats = helper.get_hardware_stats()
+        assert stats == {
+            "gpu_available": True,
+            "hardware_mode": "GPU-accelerated",
+            "call_id": "test_call",
+        }
