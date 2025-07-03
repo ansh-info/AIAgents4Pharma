@@ -303,7 +303,7 @@ class Vectorstore:
                 collection.load()
 
                 logger.info(
-                    "✅ Collection successfully loaded into %s memory with %d entities",
+                    "Collection successfully loaded into %s memory with %d entities",
                     "GPU" if self.has_gpu else "CPU",
                     num_entities,
                 )
