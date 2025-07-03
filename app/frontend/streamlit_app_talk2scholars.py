@@ -342,9 +342,6 @@ def initialize_zotero_and_build_store():
             f"No PDF: {len(skipped_papers)}"
         )
 
-        # Track if we're adding new papers
-        adding_new_papers = papers_to_actually_load > 0
-
         if papers_to_load:
             logger.info(f"Starting batch loading of {len(papers_to_load)} papers...")
 
@@ -386,16 +383,20 @@ def initialize_zotero_and_build_store():
 
         # Log final statistics
         try:
-            collection = vector_store.vector_store.col
-            final_entities = collection.num_entities
-            hardware_type = "GPU" if vector_store.has_gpu else "CPU"
+            collection = getattr(vector_store.vector_store, "col", None)
+            if collection is not None:
+                final_entities = collection.num_entities
+                hardware_type = "GPU" if vector_store.has_gpu else "CPU"
 
-            logger.info(
-                f"Zotero initialization complete! "
-                f"{final_entities} document chunks ready in {hardware_type} memory"
-            )
+                logger.info(
+                    f"Zotero initialization complete! "
+                    f"{final_entities} document chunks ready in {hardware_type} memory"
+                )
+            else:
+                logger.info("Zotero initialization complete!")
         except Exception as e:
             logger.debug(f"Could not get final entity count: {e}")
+            logger.info("Zotero initialization complete!")
 
     except Exception:
         logger.error(
