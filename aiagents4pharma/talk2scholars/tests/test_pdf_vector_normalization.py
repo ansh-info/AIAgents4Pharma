@@ -53,6 +53,11 @@ def test_normalize_vectors_batch_with_zero_vector(caplog):
 
 
 class DummyEmbedding(Embeddings):
+    """A dummy embedding class for testing normalization wrapper."""
+
+    def __init__(self):
+        self.test_attr = "test"
+
     def embed_documents(self, texts):
         return [[3.0, 4.0] for _ in texts]
 
@@ -78,7 +83,6 @@ def test_normalizing_embeddings_embed_query():
 def test_normalizing_embeddings_passthrough():
     """Test attribute delegation to base embedding model."""
     dummy = DummyEmbedding()
-    dummy.test_attr = "test"
     model = vn.NormalizingEmbeddings(dummy)
     assert model.test_attr == "test"
 
