@@ -26,14 +26,15 @@ from utils.streamlit_utils import get_text_embedding_model
 sys.path.append("./")
 # import get_app from main_agent
 
+
 from aiagents4pharma.talk2scholars.agents.main_agent import get_app
 from aiagents4pharma.talk2scholars.tools.pdf.utils.generate_answer import (
     load_hydra_config,
 )
-from aiagents4pharma.talk2scholars.tools.pdf.utils.paper_loader import load_all_papers
 from aiagents4pharma.talk2scholars.tools.pdf.utils.get_vectorstore import (
     get_vectorstore,
 )
+from aiagents4pharma.talk2scholars.tools.pdf.utils.paper_loader import load_all_papers
 from aiagents4pharma.talk2scholars.tools.zotero.utils.read_helper import (
     ZoteroSearchData,
 )
@@ -215,10 +216,60 @@ def process_pdf_upload():
         st.success(f"{len(pdf_files)} PDF(s) processed (new or updated).")
 
 
+def force_collection_reload_after_loading(vector_store, call_id: str = "streamlit"):
+    """
+    Force reload collection into memory after new papers are loaded.
+    This ensures new embeddings are available for fast search.
+    """
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Get the collection from the vector store
+        collection = getattr(vector_store.vector_store, "col", None)
+        if collection is None:
+            collection = getattr(vector_store.vector_store, "collection", None)
+
+        if collection is None:
+            logger.warning(f"{call_id}: Cannot access collection for reloading")
+            return False
+
+        # Flush to ensure all data is persisted
+        logger.info(
+            f"{call_id}: Flushing collection to ensure all data is persisted..."
+        )
+        collection.flush()
+
+        # Get current entity count
+        num_entities = collection.num_entities
+        hardware_type = "GPU" if vector_store.has_gpu else "CPU"
+
+        logger.info(
+            f"{call_id}: Reloading collection with {num_entities} entities into {hardware_type} memory..."
+        )
+
+        # Reload collection into memory
+        collection.load()
+
+        # Verify the reload
+        final_count = collection.num_entities
+        logger.info(
+            f"{call_id}: Collection successfully reloaded into {hardware_type} memory with {final_count} entities"
+        )
+
+        return True
+
+    except Exception as e:
+        logger.error(
+            f"{call_id}: Failed to reload collection into memory: {e}", exc_info=True
+        )
+        return False
+
+
 def initialize_zotero_and_build_store():
     """
     Initializes the Zotero library, downloads PDFs, and builds the Milvus-based vector store.
     Uses a singleton factory pattern to avoid redundant vector store creation.
+    Enhanced with proper collection reloading for new embeddings.
     """
 
     logger = logging.getLogger(__name__)
@@ -258,6 +309,10 @@ def initialize_zotero_and_build_store():
         )
         st.session_state.vector_store = vector_store
 
+        # Log hardware configuration
+        hardware_info = "GPU-accelerated" if vector_store.has_gpu else "CPU-optimized"
+        logger.info(f"Vector store initialized in {hardware_info} mode")
+
         # Prepare papers for loading
         papers_to_load = [
             (paper_id, meta["pdf_url"], meta)
@@ -271,14 +326,29 @@ def initialize_zotero_and_build_store():
             if not meta.get("pdf_url")
         ]
 
+        # Count papers that are actually new (not already loaded)
+        papers_already_loaded = len(
+            vector_store.loaded_papers.intersection(
+                set(paper_id for paper_id, _, _ in papers_to_load)
+            )
+        )
+        papers_to_actually_load = len(papers_to_load) - papers_already_loaded
+
         logger.info(
             f"Paper status — Total: {len(article_data)}, "
             f"To load (deduped internally): {len(papers_to_load)}, "
+            f"Already loaded: {papers_already_loaded}, "
+            f"Actually new: {papers_to_actually_load}, "
             f"No PDF: {len(skipped_papers)}"
         )
 
+        # Track if we're adding new papers
+        adding_new_papers = papers_to_actually_load > 0
+
         if papers_to_load:
             logger.info(f"Starting batch loading of {len(papers_to_load)} papers...")
+
+            # Load papers (this will handle deduplication internally)
             load_all_papers(
                 vector_store=vector_store,
                 articles=article_data,
@@ -286,11 +356,46 @@ def initialize_zotero_and_build_store():
                 config=pdf_config,
                 has_gpu=vector_store.has_gpu,
             )
+
             logger.info("Successfully loaded all papers into vector store.")
+
+            # CRITICAL: Force reload collection if we added new papers OR if it wasn't loaded initially
+            # This ensures both new and existing embeddings are in memory
+            logger.info(
+                "Ensuring collection is properly loaded into memory for fast access..."
+            )
+            reload_success = force_collection_reload_after_loading(
+                vector_store, "streamlit_startup"
+            )
+
+            if reload_success:
+                logger.info(
+                    "Collection successfully loaded into memory - ready for fast searches!"
+                )
+            else:
+                logger.warning("Collection reload failed - searches may be slower")
+
         else:
             logger.info("All papers are already embedded or skipped.")
 
+            # Even if no new papers, ensure existing collection is loaded
+            logger.info("Ensuring existing collection is loaded into memory...")
+            force_collection_reload_after_loading(vector_store, "streamlit_startup")
+
         st.session_state.zotero_initialized = True
+
+        # Log final statistics
+        try:
+            collection = vector_store.vector_store.col
+            final_entities = collection.num_entities
+            hardware_type = "GPU" if vector_store.has_gpu else "CPU"
+
+            logger.info(
+                f"Zotero initialization complete! "
+                f"{final_entities} document chunks ready in {hardware_type} memory"
+            )
+        except Exception as e:
+            logger.debug(f"Could not get final entity count: {e}")
 
     except Exception:
         logger.error(
