@@ -1,14 +1,13 @@
 """answer_formatter tests."""
 
 from unittest.mock import patch
-
 import pytest
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.answer_formatter import format_answer
 
 
-@pytest.fixture
-def base_args():
+@pytest.fixture(name="base_args")
+def _base_args():
     """base_args fixture to provide common arguments for tests."""
     return {
         "question": "What is the conclusion?",
