@@ -1,5 +1,7 @@
-from unittest.mock import MagicMock, patch
+"""gpu detection and index configuration tests."""
 
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection import (
     detect_nvidia_gpu,
@@ -12,18 +14,8 @@ from aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection import (
 
 def test_detect_nvidia_gpu_force_cpu_from_config():
     """detect_nvidia_gpu should return False if force_cpu_mode is set."""
-
-    class GPUConfig:
-        """gPU configuration class."""
-
-        force_cpu_mode = True
-
-    class Config:
-        """configuration class."""
-
-        gpu_detection = GPUConfig()
-
-    assert detect_nvidia_gpu(Config()) is False
+    config = SimpleNamespace(gpu_detection=SimpleNamespace(force_cpu_mode=True))
+    assert detect_nvidia_gpu(config) is False
 
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection.subprocess.run")
