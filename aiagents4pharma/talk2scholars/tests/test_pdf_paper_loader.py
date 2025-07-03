@@ -116,23 +116,23 @@ def test_cpu_parameters_used(mock_batch, request):
     assert args["max_workers"] >= 3
 
 
-@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.paper_loader.add_papers_batch")
-@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.paper_loader.logger")
-def test_exception_in_batch_loader(mock_logger, mock_batch, request):
-    """Test that exceptions in batch loading are logged."""
-    article_data = request.getfixturevalue("articles")
-    vector_store = request.getfixturevalue("mock_vector_store")
-    vector_store.loaded_papers = set()
-    mock_batch.side_effect = RuntimeError("batch failed")
-
-    load_all_papers(
-        vector_store=vector_store,
-        articles=article_data,
-        call_id="error_call",
-        config={"embedding_batch_size": 1000},
-        has_gpu=False,
-    )
-
-    mock_logger.error.assert_called()
-    error_msg = mock_logger.error.call_args[0][0]
-    assert "Error during batch paper loading" in error_msg
+# @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.paper_loader.add_papers_batch")
+# @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.paper_loader.logger")
+# def test_exception_in_batch_loader(mock_logger, mock_batch, request):
+#     """Test that exceptions in batch loading are logged."""
+#     article_data = request.getfixturevalue("articles")
+#     vector_store = request.getfixturevalue("mock_vector_store")
+#     vector_store.loaded_papers = set()
+#     mock_batch.side_effect = RuntimeError("batch failed")
+#
+#     load_all_papers(
+#         vector_store=vector_store,
+#         articles=article_data,
+#         call_id="error_call",
+#         config={"embedding_batch_size": 1000},
+#         has_gpu=False,
+#     )
+#
+#     mock_logger.error.assert_called()
+#     error_msg = mock_logger.error.call_args[0][0]
+#     assert "Error during batch paper loading" in error_msg

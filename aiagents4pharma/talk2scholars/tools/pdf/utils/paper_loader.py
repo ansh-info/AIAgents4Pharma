@@ -71,66 +71,53 @@ def load_all_papers(
 
     # Use batch loading with parallel processing for ALL papers at once
     # Adjust parameters based on hardware capabilities
-    try:
-        if has_gpu:
-            # GPU can handle more parallel processing
-            max_workers = min(12, max(4, len(papers_to_load)))  # More workers for GPU
-            batch_size = config.get(
-                "embedding_batch_size", 2000
-            )  # Larger batches for GPU
-            logger.info(
-                "%s: Using GPU-optimized loading parameters: %d workers, batch size %d",
-                call_id,
-                max_workers,
-                batch_size,
-            )
-        else:
-            # CPU - more conservative parameters
-            max_workers = min(8, max(3, len(papers_to_load)))  # Conservative for CPU
-            batch_size = config.get(
-                "embedding_batch_size", 1000
-            )  # Smaller batches for CPU
-            logger.info(
-                "%s: Using CPU-optimized loading parameters: %d workers, batch size %d",
-                call_id,
-                max_workers,
-                batch_size,
-            )
-
+    if has_gpu:
+        # GPU can handle more parallel processing
+        max_workers = min(12, max(4, len(papers_to_load)))  # More workers for GPU
+        batch_size = config.get("embedding_batch_size", 2000)  # Larger batches for GPU
         logger.info(
-            "%s: Loading %d papers in ONE BATCH using %d parallel workers (batch size: %d, %s)",
+            "%s: Using GPU-optimized loading parameters: %d workers, batch size %d",
             call_id,
-            len(papers_to_load),
             max_workers,
             batch_size,
-            "GPU accelerated" if has_gpu else "CPU processing",
         )
-
-        # This should process ALL papers at once with hardware optimization
-        add_papers_batch(
-            papers_to_add=papers_to_load,
-            vector_store=vector_store.vector_store,  # Pass the LangChain vector store
-            loaded_papers=vector_store.loaded_papers,
-            paper_metadata=vector_store.paper_metadata,
-            documents=vector_store.documents,
-            config=vector_store.config,
-            metadata_fields=vector_store.metadata_fields,
-            has_gpu=vector_store.has_gpu,
-            max_workers=max_workers,
-            batch_size=batch_size,
-        )
-
+    else:
+        # CPU - more conservative parameters
+        max_workers = min(8, max(3, len(papers_to_load)))  # Conservative for CPU
+        batch_size = config.get("embedding_batch_size", 1000)  # Smaller batches for CPU
         logger.info(
-            "%s: Successfully completed batch loading of all %d papers with %s",
+            "%s: Using CPU-optimized loading parameters: %d workers, batch size %d",
             call_id,
-            len(papers_to_load),
-            "GPU acceleration" if has_gpu else "CPU processing",
+            max_workers,
+            batch_size,
         )
 
-    except Exception as exc:
-        logger.error(
-            "%s: Error during batch paper loading: %s",
-            call_id,
-            exc,
-            exc_info=True,
-        )
+    logger.info(
+        "%s: Loading %d papers in ONE BATCH using %d parallel workers (batch size: %d, %s)",
+        call_id,
+        len(papers_to_load),
+        max_workers,
+        batch_size,
+        "GPU accelerated" if has_gpu else "CPU processing",
+    )
+
+    # This should process ALL papers at once with hardware optimization
+    add_papers_batch(
+        papers_to_add=papers_to_load,
+        vector_store=vector_store.vector_store,  # Pass the LangChain vector store
+        loaded_papers=vector_store.loaded_papers,
+        paper_metadata=vector_store.paper_metadata,
+        documents=vector_store.documents,
+        config=vector_store.config,
+        metadata_fields=vector_store.metadata_fields,
+        has_gpu=vector_store.has_gpu,
+        max_workers=max_workers,
+        batch_size=batch_size,
+    )
+
+    logger.info(
+        "%s: Successfully completed batch loading of all %d papers with %s",
+        call_id,
+        len(papers_to_load),
+        "GPU acceleration" if has_gpu else "CPU processing",
+    )

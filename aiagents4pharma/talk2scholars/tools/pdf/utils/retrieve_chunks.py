@@ -54,7 +54,8 @@ def retrieve_relevant_chunks(
     filter_dict = None
     if paper_ids:
         logger.warning(
-            "Paper IDs filter provided. Traditional RAG pipeline typically retrieves from ALL papers first. "
+            "Paper IDs filter provided. Traditional RAG pipeline typically"
+            "retrieves from ALL papers first. "
             "Consider removing paper_ids filter for better results."
         )
         logger.info("Filtering retrieval to papers: %s", paper_ids)
@@ -85,71 +86,47 @@ def retrieve_relevant_chunks(
         fetch_k = min(top_k * 4, 500)  # Original conservative approach
         logger.debug("Using CPU-optimized fetch_k: %d", fetch_k)
 
-    try:
-        # Get search parameters from vector store if available
-        search_params = getattr(vector_store, "search_params", None)
+    # Get search parameters from vector store if available
+    search_params = getattr(vector_store, "search_params", None)
 
-        if search_params:
-            logger.debug(
-                "Using hardware-optimized search parameters: %s", search_params
-            )
-        else:
-            logger.debug("Using default search parameters (no hardware optimization)")
+    if search_params:
+        logger.debug("Using hardware-optimized search parameters: %s", search_params)
+    else:
+        logger.debug("Using default search parameters (no hardware optimization)")
 
-        # Perform MMR search - let the vector store handle search_params internally
-        # Don't pass search_params explicitly to avoid conflicts
-        results = vector_store.max_marginal_relevance_search(
-            query=query,
-            k=top_k,
-            fetch_k=fetch_k,
-            lambda_mult=mmr_diversity,
-            filter=filter_dict,
+    # Perform MMR search - let the vector store handle search_params internally
+    # Don't pass search_params explicitly to avoid conflicts
+    results = vector_store.max_marginal_relevance_search(
+        query=query,
+        k=top_k,
+        fetch_k=fetch_k,
+        lambda_mult=mmr_diversity,
+        filter=filter_dict,
+    )
+
+    logger.info(
+        "Retrieved %d chunks using %s MMR from Milvus", len(results), search_mode
+    )
+
+    # Log some details about retrieved chunks for debugging
+    if results and logger.isEnabledFor(logging.DEBUG):
+        paper_counts = {}
+        for doc in results:
+            paper_id = doc.metadata.get("paper_id", "unknown")
+            paper_counts[paper_id] = paper_counts.get(paper_id, 0) + 1
+
+        logger.debug(
+            "%s retrieval - chunks per paper: %s",
+            search_mode,
+            dict(sorted(paper_counts.items(), key=lambda x: x[1], reverse=True)[:10]),
+        )
+        logger.debug(
+            "%s retrieval - total papers represented: %d",
+            search_mode,
+            len(paper_counts),
         )
 
-        logger.info(
-            "Retrieved %d chunks using %s MMR from Milvus", len(results), search_mode
-        )
-
-        # Log some details about retrieved chunks for debugging
-        if results and logger.isEnabledFor(logging.DEBUG):
-            paper_counts = {}
-            for doc in results:
-                paper_id = doc.metadata.get("paper_id", "unknown")
-                paper_counts[paper_id] = paper_counts.get(paper_id, 0) + 1
-
-            logger.debug(
-                "%s retrieval - chunks per paper: %s",
-                search_mode,
-                dict(
-                    sorted(paper_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-                ),
-            )
-            logger.debug(
-                "%s retrieval - total papers represented: %d",
-                search_mode,
-                len(paper_counts),
-            )
-
-        return results
-
-    except Exception as e:
-        logger.error("Error during %s MMR search: %s", search_mode, e, exc_info=True)
-
-        # Fallback to basic similarity search if MMR fails
-        logger.warning("Falling back to basic similarity search")
-        try:
-            # Don't pass search_params to avoid conflicts
-            results = vector_store.similarity_search(
-                query=query,
-                k=top_k,
-                filter=filter_dict,
-            )
-            logger.info("Fallback search retrieved %d chunks", len(results))
-            return results
-
-        except Exception as fallback_e:
-            logger.error("Fallback search also failed: %s", fallback_e, exc_info=True)
-            return []
+    return results
 
 
 def retrieve_relevant_chunks_with_scores(
@@ -192,51 +169,37 @@ def retrieve_relevant_chunks_with_scores(
         score_threshold,
     )
 
-    try:
-        # Check hardware optimization status instead of unused search_params
-        has_optimization = hasattr(vector_store, "has_gpu") and vector_store.has_gpu
+    # Check hardware optimization status instead of unused search_params
+    has_optimization = hasattr(vector_store, "has_gpu") and vector_store.has_gpu
 
-        if has_optimization:
-            logger.debug("GPU-accelerated similarity search enabled")
-        else:
-            logger.debug("Standard CPU similarity search")
+    if has_optimization:
+        logger.debug("GPU-accelerated similarity search enabled")
+    else:
+        logger.debug("Standard CPU similarity search")
 
-        if hasattr(vector_store, "similarity_search_with_score"):
-            # Don't pass search_params to avoid conflicts
-            results = vector_store.similarity_search_with_score(
-                query=query,
-                k=top_k,
-                filter=filter_dict,
-            )
-
-            # Filter by score threshold
-            filtered_results = [
-                (doc, score) for doc, score in results if score >= score_threshold
-            ]
-
-            logger.info(
-                "%s search with scores retrieved %d/%d chunks above threshold %.3f",
-                search_mode,
-                len(filtered_results),
-                len(results),
-                score_threshold,
-            )
-
-            return filtered_results
-
-        else:
-            logger.warning(
-                "Vector store doesn't support similarity_search_with_score, falling back to regular search"
-            )
-            docs = retrieve_relevant_chunks(vector_store, query, paper_ids, top_k)
-            # Return with dummy scores
-            return [(doc, 1.0) for doc in docs]
-
-    except Exception as e:
-        logger.error(
-            "Error during %s similarity search with scores: %s",
-            search_mode,
-            e,
-            exc_info=True,
+    if hasattr(vector_store, "similarity_search_with_score"):
+        # Don't pass search_params to avoid conflicts
+        results = vector_store.similarity_search_with_score(
+            query=query,
+            k=top_k,
+            filter=filter_dict,
         )
-        return []
+
+        # Filter by score threshold
+        filtered_results = [
+            (doc, score) for doc, score in results if score >= score_threshold
+        ]
+
+        logger.info(
+            "%s search with scores retrieved %d/%d chunks above threshold %.3f",
+            search_mode,
+            len(filtered_results),
+            len(results),
+            score_threshold,
+        )
+
+        return filtered_results
+
+    raise NotImplementedError(
+        "Vector store does not support similarity_search_with_score"
+    )

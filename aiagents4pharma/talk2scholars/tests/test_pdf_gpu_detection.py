@@ -1,7 +1,9 @@
 """gpu detection and index configuration tests."""
 
+import subprocess
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection import (
     detect_nvidia_gpu,
@@ -34,13 +36,6 @@ def test_detect_nvidia_gpu_no_output(mock_run):
     """detect_nvidia_gpu should return False if no GPUs are detected."""
     mock_run.return_value = MagicMock(returncode=0, stdout="")
 
-    assert detect_nvidia_gpu() is False
-
-
-@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection.subprocess.run")
-def test_detect_nvidia_gpu_exception(mock_run):
-    """detect_nvidia_gpu should handle exceptions gracefully."""
-    mock_run.side_effect = RuntimeError("command failed")
     assert detect_nvidia_gpu() is False
 
 
@@ -115,3 +110,31 @@ def test_log_index_configuration_logs_cosine_simulation_note(mock_logger):
 
     log_messages = [str(call.args[0]) for call in mock_logger.info.call_args_list]
     assert any("simulate COSINE for GPU" in msg for msg in log_messages)
+
+
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection.logger")
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection.subprocess.run")
+def test_detect_nvidia_gpu_timeout_raises_false(mock_run, mock_logger):
+    """detect_nvidia_gpu should return False and log info on subprocess.TimeoutExpired."""
+    # Simulate a timeout
+    mock_run.side_effect = subprocess.TimeoutExpired(cmd="nvidia-smi", timeout=10)
+
+    result = detect_nvidia_gpu()
+    assert result is False
+    mock_logger.info.assert_called_with(
+        "NVIDIA GPU detection failed: %s", mock_run.side_effect
+    )
+
+
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection.logger")
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection.subprocess.run")
+def test_detect_nvidia_gpu_file_not_found_raises_false(mock_run, mock_logger):
+    """detect_nvidia_gpu should return False and log info on FileNotFoundError."""
+    # Simulate nvidia-smi not installed
+    mock_run.side_effect = FileNotFoundError("nvidia-smi not found")
+
+    result = detect_nvidia_gpu()
+    assert result is False
+    mock_logger.info.assert_called_with(
+        "NVIDIA GPU detection failed: %s", mock_run.side_effect
+    )

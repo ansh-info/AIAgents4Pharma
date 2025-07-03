@@ -37,6 +37,7 @@ def detect_nvidia_gpu(config=None) -> bool:
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
 
         if result.returncode == 0 and result.stdout.strip():
@@ -44,11 +45,11 @@ def detect_nvidia_gpu(config=None) -> bool:
             logger.info("Detected NVIDIA GPU(s): %s", gpu_names)
             logger.info("To force CPU mode, set 'force_cpu_mode: true' in config")
             return True
-        else:
-            logger.info("nvidia-smi command failed or no GPUs detected")
-            return False
 
-    except Exception as e:
+        logger.info("nvidia-smi command failed or no GPUs detected")
+        return False
+
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
         logger.info("NVIDIA GPU detection failed: %s", e)
         return False
 

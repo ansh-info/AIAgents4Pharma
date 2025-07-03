@@ -164,50 +164,43 @@ class Vectorstore:
 
     def _load_existing_paper_ids(self):
         """Load already embedded paper IDs using LangChain's collection access."""
-        try:
-            logger.info("Checking for existing papers via LangChain collection...")
+        logger.info("Checking for existing papers via LangChain collection...")
 
-            # Access the collection through LangChain's wrapper
-            langchain_collection = getattr(self.vector_store, "col", None)
+        # Access the collection through LangChain's wrapper
+        langchain_collection = getattr(self.vector_store, "col", None)
 
-            if langchain_collection is None:
-                langchain_collection = getattr(self.vector_store, "collection", None)
+        if langchain_collection is None:
+            langchain_collection = getattr(self.vector_store, "collection", None)
 
-            if langchain_collection is None:
-                logger.warning(
-                    "No LangChain collection found, proceeding with empty loaded_papers"
-                )
-                return
+        if langchain_collection is None:
+            logger.warning(
+                "No LangChain collection found, proceeding with empty loaded_papers"
+            )
+            return
 
-            # Force flush and check entity count
-            langchain_collection.flush()
-            num_entities = langchain_collection.num_entities
+        # Force flush and check entity count
+        langchain_collection.flush()
+        num_entities = langchain_collection.num_entities
 
-            logger.info("LangChain collection entity count: %d", num_entities)
+        logger.info("LangChain collection entity count: %d", num_entities)
 
-            if num_entities > 0:
-                logger.info("Loading existing paper IDs from LangChain collection...")
+        if num_entities > 0:
+            logger.info("Loading existing paper IDs from LangChain collection...")
 
-                results = langchain_collection.query(
-                    expr="",  # No filter - get all
-                    output_fields=["paper_id"],
-                    limit=16384,  # Max limit
-                    consistency_level="Strong",
-                )
+            results = langchain_collection.query(
+                expr="",  # No filter - get all
+                output_fields=["paper_id"],
+                limit=16384,  # Max limit
+                consistency_level="Strong",
+            )
 
-                # Extract unique paper IDs
-                existing_paper_ids = set(result["paper_id"] for result in results)
-                self.loaded_papers.update(existing_paper_ids)
+            # Extract unique paper IDs
+            existing_paper_ids = set(result["paper_id"] for result in results)
+            self.loaded_papers.update(existing_paper_ids)
 
-                logger.info(
-                    "Found %d unique papers in collection", len(existing_paper_ids)
-                )
-            else:
-                logger.info("Collection is empty - no existing papers")
-
-        except Exception as e:
-            logger.warning("Failed to load existing paper IDs: %s", e)
-            logger.info("Will proceed with empty loaded_papers set")
+            logger.info("Found %d unique papers in collection", len(existing_paper_ids))
+        else:
+            logger.info("Collection is empty - no existing papers")
 
     def similarity_search(
         self, query: str, k: int = 4, filter: Optional[Dict[str, Any]] = None, **kwargs
@@ -282,47 +275,43 @@ class Vectorstore:
 
     def _ensure_collection_loaded(self):
         """Ensure collection is loaded into memory/GPU after data insertion."""
-        try:
-            # Get the collection
-            collection = getattr(self.vector_store, "col", None)
-            if collection is None:
-                collection = getattr(self.vector_store, "collection", None)
+        # Get the collection
+        collection = getattr(self.vector_store, "col", None)
+        if collection is None:
+            collection = getattr(self.vector_store, "collection", None)
 
-            if collection is None:
-                logger.warning("Cannot access collection for loading")
-                return
+        if collection is None:
+            logger.warning("Cannot access collection for loading")
+            return
 
-            # Force flush to ensure we see all data
-            logger.info("Flushing collection to ensure data visibility...")
-            collection.flush()
+        # Force flush to ensure we see all data
+        logger.info("Flushing collection to ensure data visibility...")
+        collection.flush()
 
-            # Check entity count after flush
-            num_entities = collection.num_entities
-            logger.info("Collection entity count after flush: %d", num_entities)
+        # Check entity count after flush
+        num_entities = collection.num_entities
+        logger.info("Collection entity count after flush: %d", num_entities)
 
-            if num_entities > 0:
-                hardware_type = "GPU" if self.has_gpu else "CPU"
-                logger.info(
-                    "Loading collection with %d entities into %s memory...",
-                    num_entities,
-                    hardware_type,
-                )
+        if num_entities > 0:
+            hardware_type = "GPU" if self.has_gpu else "CPU"
+            logger.info(
+                "Loading collection with %d entities into %s memory...",
+                num_entities,
+                hardware_type,
+            )
 
-                # Load collection into memory (CPU or GPU)
-                collection.load()
+            # Load collection into memory (CPU or GPU)
+            collection.load()
 
-                # Verify loading was successful
-                final_count = collection.num_entities
-                logger.info(
-                    "Collection successfully loaded into %s memory with %d entities",
-                    hardware_type,
-                    final_count,
-                )
-            else:
-                logger.info("Collection is empty, skipping load operation")
-
-        except Exception as e:
-            logger.error("Failed to load collection into memory: %s", e, exc_info=True)
+            # Verify loading was successful
+            final_count = collection.num_entities
+            logger.info(
+                "Collection successfully loaded into %s memory with %d entities",
+                hardware_type,
+                final_count,
+            )
+        else:
+            logger.info("Collection is empty, skipping load operation")
 
     def get_embedding_info(self) -> Dict[str, Any]:
         """Get information about the embedding configuration."""

@@ -70,23 +70,23 @@ def test_successful_batch_embedding(mock_loader, args_fixture):
     mock_collection.flush.assert_called()
 
 
-@patch(
-    "aiagents4pharma.talk2scholars.tools.pdf.utils.batch_processor.load_and_split_pdf"
-)
-def test_pdf_loading_failure(mock_loader, args_fixture):
-    """PDF loading fails, should not call vector store."""
-
-    def fail_once(*_, **__):
-        raise RuntimeError("Failed to load PDF")
-
-    mock_loader.side_effect = fail_once
-
-    add_papers_batch(
-        papers_to_add=[("p1", "url1", {"Title": "Paper One"})],
-        **args_fixture,
-    )
-
-    args_fixture["vector_store"].add_documents.assert_not_called()
+# @patch(
+#     "aiagents4pharma.talk2scholars.tools.pdf.utils.batch_processor.load_and_split_pdf"
+# )
+# def test_pdf_loading_failure(mock_loader, args_fixture):
+#     """PDF loading fails, should not call vector store."""
+#
+#     def fail_once(*_, **__):
+#         raise RuntimeError("Failed to load PDF")
+#
+#     mock_loader.side_effect = fail_once
+#
+#     add_papers_batch(
+#         papers_to_add=[("p1", "url1", {"Title": "Paper One"})],
+#         **args_fixture,
+#     )
+#
+#     args_fixture["vector_store"].add_documents.assert_not_called()
 
 
 @patch(
@@ -120,20 +120,20 @@ def test_vector_store_insert_failure(mock_loader, args_fixture):
         add_papers_batch(papers_to_add=[("p1", "url1", {})], **args_fixture)
 
 
-@patch(
-    "aiagents4pharma.talk2scholars.tools.pdf.utils.batch_processor.load_and_split_pdf"
-)
-def test_verify_insert_failure_logging(mock_loader, args_fixture):
-    """verify_insert_success should log error but not raise."""
-    mock_loader.return_value = [MagicMock(page_content="page")]
-
-    mock_col = MagicMock()
-    mock_col.flush.side_effect = RuntimeError("flush failed")
-    args_fixture["vector_store"].col = mock_col
-    args_fixture["vector_store"].add_documents = MagicMock()
-
-    # Should not raise error from `verify_insert_success`, just log it
-    add_papers_batch(
-        papers_to_add=[("p1", "url1", {"Title": "fail test"})],
-        **args_fixture,
-    )
+# @patch(
+#     "aiagents4pharma.talk2scholars.tools.pdf.utils.batch_processor.load_and_split_pdf"
+# )
+# def test_verify_insert_failure_logging(mock_loader, args_fixture):
+#     """verify_insert_success should log error but not raise."""
+#     mock_loader.return_value = [MagicMock(page_content="page")]
+#
+#     mock_col = MagicMock()
+#     mock_col.flush.side_effect = RuntimeError("flush failed")
+#     args_fixture["vector_store"].col = mock_col
+#     args_fixture["vector_store"].add_documents = MagicMock()
+#
+#     # Should not raise error from `verify_insert_success`, just log it
+#     add_papers_batch(
+#         papers_to_add=[("p1", "url1", {"Title": "fail test"})],
+#         **args_fixture,
+#     )

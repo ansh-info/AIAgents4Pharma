@@ -57,7 +57,7 @@ def normalize_vectors_batch(vectors: List[List[float]]) -> List[List[float]]:
     zero_mask = norms.flatten() == 0
     if np.any(zero_mask):
         logger.warning(
-            f"Found {np.sum(zero_mask)} zero vectors during batch normalization"
+            "Found %d zero vectors during batch normalization", np.sum(zero_mask)
         )
         norms[zero_mask] = 1.0  # Avoid division by zero
 
@@ -95,7 +95,7 @@ class NormalizingEmbeddings(Embeddings):
 
         if self.normalize_for_gpu:
             embeddings = normalize_vectors_batch(embeddings)
-            logger.debug(f"Normalized {len(embeddings)} document embeddings for GPU")
+            logger.debug("Normalized %d document embeddings for GPU", len(embeddings))
 
         return embeddings
 
@@ -133,7 +133,7 @@ def should_normalize_vectors(has_gpu: bool, use_cosine: bool) -> bool:
         )
     else:
         logger.info(
-            f"Vector normalization DISABLED: GPU={has_gpu}, COSINE={use_cosine}"
+            "Vector normalization DISABLED: GPU=%s, COSINE=%s", has_gpu, use_cosine
         )
 
     return needs_normalization
@@ -155,5 +155,5 @@ def wrap_embedding_model_if_needed(
     """
     if should_normalize_vectors(has_gpu, use_cosine):
         return NormalizingEmbeddings(embedding_model, normalize_for_gpu=True)
-    else:
-        return embedding_model
+
+    return embedding_model

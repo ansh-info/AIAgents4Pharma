@@ -129,30 +129,24 @@ def ensure_collection_exists(
 
         def debug_collection_state(collection, collection_name):
             """Debug collection state for troubleshooting."""
-            try:
-                logger.info("=== DEBUG COLLECTION STATE ===")
-                logger.info("Collection name: %s", collection_name)
-                logger.info("Collection schema: %s", collection.schema)
-                logger.info("Collection num_entities: %d", collection.num_entities)
+            logger.info("=== DEBUG COLLECTION STATE ===")
+            logger.info("Collection name: %s", collection_name)
+            logger.info("Collection schema: %s", collection.schema)
+            logger.info("Collection num_entities: %d", collection.num_entities)
 
-                # Check if collection is actually loaded
-                # logger.info("Is collection loaded: %s", collection.load)
+            # Check if collection is actually loaded
+            # logger.info("Is collection loaded: %s", collection.load)
 
-                # Check available indexes
-                indexes = collection.indexes
-                logger.info(
-                    "Collection indexes: %s", [idx.field_name for idx in indexes]
-                )
+            # Check available indexes
+            indexes = collection.indexes
+            logger.info("Collection indexes: %s", [idx.field_name for idx in indexes])
 
-                # Try to get collection stats
-                logger.info("Collection statistics: %s", collection.num_entities)
+            # Try to get collection stats
+            logger.info("Collection statistics: %s", collection.num_entities)
 
-                logger.info("Active connections: %s", connections.list_connections())
+            logger.info("Active connections: %s", connections.list_connections())
 
-                logger.info("=== END DEBUG ===")
-
-            except Exception as e:
-                logger.error("Debug collection state failed: %s", e)
+            logger.info("=== END DEBUG ===")
 
         # Add this call in ensure_collection_exists() after collection.load():
         debug_collection_state(collection, collection_name)

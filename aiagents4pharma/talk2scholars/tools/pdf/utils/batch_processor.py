@@ -100,39 +100,30 @@ def add_papers_batch(
         for future in concurrent.futures.as_completed(future_to_paper):
             paper_id, metadata = future_to_paper[future]
             completed += 1
-            try:
-                chunks = future.result()
+            chunks = future.result()
 
-                # Generate IDs for these chunks
-                chunk_ids = [f"{paper_id}_{i}" for i in range(len(chunks))]
+            # Generate IDs for these chunks
+            chunk_ids = [f"{paper_id}_{i}" for i in range(len(chunks))]
 
-                all_chunks.extend(chunks)
-                all_ids.extend(chunk_ids)
-                successful_papers.append(paper_id)
+            all_chunks.extend(chunks)
+            all_ids.extend(chunk_ids)
+            successful_papers.append(paper_id)
 
-                # Store paper metadata
-                paper_metadata[paper_id] = metadata
+            # Store paper metadata
+            paper_metadata[paper_id] = metadata
 
-                logger.info(
-                    "Progress: %d/%d - Loaded paper %s (%d chunks)",
-                    completed,
-                    len(papers_to_process),
-                    paper_id,
-                    len(chunks),
-                )
-
-            except Exception as e:
-                logger.error(
-                    "Progress: %d/%d - Failed to load paper %s: %s",
-                    completed,
-                    len(papers_to_process),
-                    paper_id,
-                    e,
-                )
+            logger.info(
+                "Progress: %d/%d - Loaded paper %s (%d chunks)",
+                completed,
+                len(papers_to_process),
+                paper_id,
+                len(chunks),
+            )
 
     load_time = time.time() - start_time
     logger.info(
-        "PARALLEL LOADING COMPLETE: Processed %d/%d papers into %d chunks in %.2f seconds (%.2f papers/sec)",
+        "PARALLEL LOADING COMPLETE: Processed %d/%d papers into %d chunks"
+        "in %.2f seconds (%.2f papers/sec)",
         len(successful_papers),
         len(papers_to_process),
         len(all_chunks),
@@ -191,35 +182,31 @@ def add_papers_batch(
 
             def verify_insert_success(vector_store, batch_num):
                 """Verify that documents were actually inserted."""
-                try:
-                    # Get the underlying Milvus collection
-                    collection = (
-                        vector_store.col
-                    )  # LangChain Milvus stores collection in .col
+                # Get the underlying Milvus collection
+                collection = (
+                    vector_store.col
+                )  # LangChain Milvus stores collection in .col
 
-                    # Force flush to ensure data is persisted
-                    collection.flush()
+                # Force flush to ensure data is persisted
+                collection.flush()
 
-                    # Check entity count after flush
-                    entity_count = collection.num_entities
-                    logger.info(
-                        "POST-INSERT verification batch %d: Collection now has %d entities",
-                        batch_num,
-                        entity_count,
+                # Check entity count after flush
+                entity_count = collection.num_entities
+                logger.info(
+                    "POST-INSERT verification batch %d: Collection now has %d entities",
+                    batch_num,
+                    entity_count,
+                )
+
+                # If we have entities, sample a few to verify structure
+                if entity_count > 0:
+                    sample_results = collection.query(
+                        expr="", output_fields=["paper_id"], limit=3
                     )
-
-                    # If we have entities, sample a few to verify structure
-                    if entity_count > 0:
-                        sample_results = collection.query(
-                            expr="", output_fields=["paper_id"], limit=3
-                        )
-                        sample_papers = [
-                            r.get("paper_id", "unknown") for r in sample_results
-                        ]
-                        logger.info("Sample paper IDs in collection: %s", sample_papers)
-
-                except Exception as e:
-                    logger.error("Insert verification failed: %s", e)
+                    sample_papers = [
+                        r.get("paper_id", "unknown") for r in sample_results
+                    ]
+                    logger.info("Sample paper IDs in collection: %s", sample_papers)
 
             # Update the function call:
             verify_insert_success(vector_store, (i // batch_size) + 1)
@@ -246,7 +233,8 @@ def add_papers_batch(
 
         total_time = time.time() - start_time
         logger.info(
-            "FULL BATCH PROCESSING COMPLETE: %d papers, %d chunks in %.2f seconds total (%.2f sec/paper) - %s",
+            "FULL BATCH PROCESSING COMPLETE: %d papers, %d chunks in %.2f"
+            "seconds total (%.2f sec/paper) - %s",
             len(successful_papers),
             total_chunks,
             total_time,
