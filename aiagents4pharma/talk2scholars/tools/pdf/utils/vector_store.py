@@ -1,7 +1,9 @@
 """
-Vectorstore class for managing document embeddings and retrieval using Milvus.
-Implements singleton pattern for connection reuse across Streamlit sessions.
-Enhanced with parallel PDF processing, batch embedding, and automatic GPU/CPU detection.
+Updated Vectorstore class with GPU normalization support.
+Key changes:
+1. Wraps embedding model with normalization for GPU compatibility
+2. Uses IP distance instead of COSINE for GPU indexes
+3. Maintains backward compatibility for CPU usage
 """
 
 import logging
@@ -14,14 +16,13 @@ from langchain_core.embeddings import Embeddings
 from langchain_milvus import Milvus
 
 from .collection_manager import ensure_collection_exists
-
-# Import our GPU detection utility
 from .gpu_detection import (
     detect_nvidia_gpu,
     get_optimal_index_config,
     log_index_configuration,
 )
 from .singleton_manager import VectorstoreSingleton
+from .vector_normalization import wrap_embedding_model_if_needed
 
 # Set up logging with configurable level
 log_level = os.environ.get("LOG_LEVEL", "INFO")
@@ -32,9 +33,8 @@ logger.setLevel(getattr(logging, log_level))
 
 class Vectorstore:
     """
-    A class for managing document embeddings and retrieval using Milvus.
-    Uses singleton pattern to reuse connections across instances.
-    Enhanced with parallel PDF processing, batch embedding, and automatic GPU/CPU detection.
+    Enhanced Vectorstore class with GPU normalization support.
+    Automatically handles COSINE -> IP conversion for GPU compatibility.
     """
 
     def __init__(
@@ -44,14 +44,13 @@ class Vectorstore:
         config: Any = None,
     ):
         """
-        Initialize the document store with Milvus.
+        Initialize the document store with Milvus and GPU optimization.
 
         Args:
             embedding_model: The embedding model to use
-            metadata_fields: Fields to include in document metadata for filtering/retrieval
+            metadata_fields: Fields to include in document metadata
             config: Configuration object containing Milvus connection details
         """
-        self.embedding_model = embedding_model
         self.config = config
         self.metadata_fields = metadata_fields or [
             "title",
@@ -60,7 +59,38 @@ class Vectorstore:
             "chunk_id",
         ]
         self.initialization_time = time.time()
-        logger.info("Vectorstore initialized at: %s", self.initialization_time)
+
+        # GPU detection with config override (SINGLE CALL)
+        self.has_gpu = detect_nvidia_gpu(config)
+
+        # Additional check for force CPU mode
+        if (
+            config
+            and hasattr(config, "gpu_detection")
+            and getattr(config.gpu_detection, "force_cpu_mode", False)
+        ):
+            logger.info("Running in forced CPU mode (config override)")
+            self.has_gpu = False
+
+        # Determine if we want to use COSINE similarity
+        self.use_cosine = True  # Default preference
+        if config and hasattr(config, "similarity_metric"):
+            self.use_cosine = getattr(config.similarity_metric, "use_cosine", True)
+
+        # Wrap embedding model with normalization if needed for GPU
+        self.original_embedding_model = embedding_model
+        self.embedding_model = wrap_embedding_model_if_needed(
+            embedding_model, self.has_gpu, self.use_cosine
+        )
+
+        # Configure index parameters AFTER determining GPU usage and normalization
+        embedding_dim = config.milvus.embedding_dim if config else 768
+        self.index_params, self.search_params = get_optimal_index_config(
+            self.has_gpu, embedding_dim, self.use_cosine
+        )
+
+        # Log the configuration
+        log_index_configuration(self.index_params, self.search_params, self.use_cosine)
 
         # Track loaded papers to prevent duplicate loading
         self.loaded_papers = set()
@@ -78,36 +108,15 @@ class Vectorstore:
         # Get singleton instance
         self._singleton = VectorstoreSingleton()
 
-        # GPU detection with config override (SINGLE CALL)
-        self.has_gpu = detect_nvidia_gpu(config)
-
-        # Additional check for force CPU mode
-        if (
-            config
-            and hasattr(config, "gpu_detection")
-            and getattr(config.gpu_detection, "force_cpu_mode", False)
-        ):
-            logger.info("Running in forced CPU mode (config override)")
-            self.has_gpu = False
-
-        # Configure index parameters AFTER determining GPU usage
-        embedding_dim = config.milvus.embedding_dim if config else 768
-        self.index_params, self.search_params = get_optimal_index_config(
-            self.has_gpu, embedding_dim
-        )
-
-        # Log the configuration
-        log_index_configuration(self.index_params, self.search_params)
-
         # Connect to Milvus (reuses existing connection if available)
         self._connect_milvus()
 
-        # Create collection ONCE
+        # Create collection with proper metric type
         self.collection = ensure_collection_exists(
             self.collection_name, self.config, self.index_params, self.has_gpu
         )
 
-        # Initialize the LangChain Milvus vector store (reuses existing if available)
+        # Initialize the LangChain Milvus vector store
         self.vector_store = self._initialize_vector_store()
 
         # Load existing papers AFTER vector store is ready
@@ -117,10 +126,18 @@ class Vectorstore:
         self.documents: Dict[str, Document] = {}
         self.paper_metadata: Dict[str, Dict[str, Any]] = {}
 
+        # Log final configuration
+        metric_info = (
+            "IP (normalized for COSINE)"
+            if self.has_gpu and self.use_cosine
+            else self.index_params["metric_type"]
+        )
+
         logger.info(
-            "Milvus vector store initialized with collection: %s (GPU: %s)",
+            "Milvus vector store initialized with collection: %s (GPU: %s, Metric: %s)",
             self.collection_name,
             "enabled" if self.has_gpu else "disabled",
+            metric_info,
         )
 
     def _connect_milvus(self) -> None:
@@ -130,19 +147,11 @@ class Vectorstore:
         )
 
     def _initialize_vector_store(self) -> Milvus:
-        """Initialize or load the Milvus vector store using singleton with GPU optimization."""
-
-        # Create the base vector store
+        """Initialize or load the Milvus vector store with proper embedding model."""
+        # Use the wrapped embedding model (with normalization if needed)
         vector_store = self._singleton.get_vector_store(
             self.collection_name, self.embedding_model, self.connection_args
         )
-
-        # Configure search parameters based on hardware detection
-        # This avoids passing search_params through LangChain methods
-        if hasattr(vector_store, "_client") and self.has_gpu:
-            logger.info("Configuring Milvus client for GPU-optimized search")
-            # The GPU optimization will be handled at the collection level
-            # through the index configuration, not search parameters
 
         return vector_store
 
@@ -151,15 +160,10 @@ class Vectorstore:
         try:
             logger.info("Checking for existing papers via LangChain collection...")
 
-            # Access the collection through LangChain's wrapper with type checking
+            # Access the collection through LangChain's wrapper
             langchain_collection = getattr(self.vector_store, "col", None)
 
-            # Check if collection exists and is properly initialized
             if langchain_collection is None:
-                logger.warning(
-                    "LangChain collection not available, trying alternative access..."
-                )
-                # Try alternative access method
                 langchain_collection = getattr(self.vector_store, "collection", None)
 
             if langchain_collection is None:
@@ -168,7 +172,7 @@ class Vectorstore:
                 )
                 return
 
-            # Force flush and check entity count via LangChain's collection
+            # Force flush and check entity count
             langchain_collection.flush()
             num_entities = langchain_collection.num_entities
 
@@ -177,7 +181,6 @@ class Vectorstore:
             if num_entities > 0:
                 logger.info("Loading existing paper IDs from LangChain collection...")
 
-                # Query via LangChain's collection (not the direct one)
                 results = langchain_collection.query(
                     expr="",  # No filter - get all
                     output_fields=["paper_id"],
@@ -190,22 +193,13 @@ class Vectorstore:
                 self.loaded_papers.update(existing_paper_ids)
 
                 logger.info(
-                    "Found %d unique papers in LangChain collection",
-                    len(existing_paper_ids),
-                )
-                logger.info(
-                    "Sample papers: %s",
-                    (
-                        list(existing_paper_ids)[:5] + ["..."]
-                        if len(existing_paper_ids) > 5
-                        else list(existing_paper_ids)
-                    ),
+                    "Found %d unique papers in collection", len(existing_paper_ids)
                 )
             else:
-                logger.info("LangChain collection is empty - no existing papers")
+                logger.info("Collection is empty - no existing papers")
 
         except Exception as e:
-            logger.warning("Failed to load existing paper IDs via LangChain: %s", e)
+            logger.warning("Failed to load existing paper IDs: %s", e)
             logger.info("Will proceed with empty loaded_papers set")
 
     def similarity_search(
@@ -213,15 +207,7 @@ class Vectorstore:
     ) -> List[Document]:
         """
         Perform similarity search on the vector store.
-
-        Args:
-            query: Query string
-            k: Number of results to return
-            filter: Optional filter dict for metadata
-            **kwargs: Additional search parameters
-
-        Returns:
-            List of Document objects
+        Query embedding will be automatically normalized if using GPU with COSINE.
         """
         # Convert filter dict to Milvus expression if provided
         expr = None
@@ -231,7 +217,6 @@ class Vectorstore:
                 if isinstance(value, str):
                     conditions.append(f'{key} == "{value}"')
                 elif isinstance(value, list):
-                    # For filtering by multiple values
                     values_str = ", ".join(
                         [f'"{v}"' if isinstance(v, str) else str(v) for v in value]
                     )
@@ -240,8 +225,7 @@ class Vectorstore:
                     conditions.append(f"{key} == {value}")
             expr = " and ".join(conditions) if conditions else None
 
-        # Don't pass search_params to avoid conflicts with LangChain
-        # The GPU optimization happens at the collection level
+        # The wrapped embedding model will handle normalization automatically
         results = self.vector_store.similarity_search(
             query=query, k=k, expr=expr, **kwargs
         )
@@ -259,17 +243,7 @@ class Vectorstore:
     ) -> List[Document]:
         """
         Perform MMR search on the vector store.
-
-        Args:
-            query: Query string
-            k: Number of results to return
-            fetch_k: Number of results to fetch before MMR
-            lambda_mult: Diversity parameter (0=max diversity, 1=max relevance)
-            filter: Optional filter dict for metadata
-            **kwargs: Additional search parameters
-
-        Returns:
-            List of Document objects
+        Query embedding will be automatically normalized if using GPU with COSINE.
         """
         # Convert filter dict to Milvus expression if provided
         expr = None
@@ -287,8 +261,7 @@ class Vectorstore:
                     conditions.append(f"{key} == {value}")
             expr = " and ".join(conditions) if conditions else None
 
-        # Don't pass search_params to avoid conflicts with LangChain
-        # The GPU optimization happens at the collection level
+        # The wrapped embedding model will handle normalization automatically
         results = self.vector_store.max_marginal_relevance_search(
             query=query,
             k=k,
@@ -299,3 +272,15 @@ class Vectorstore:
         )
 
         return results
+
+    def get_embedding_info(self) -> Dict[str, Any]:
+        """Get information about the embedding configuration."""
+        return {
+            "has_gpu": self.has_gpu,
+            "use_cosine": self.use_cosine,
+            "metric_type": self.index_params["metric_type"],
+            "index_type": self.index_params["index_type"],
+            "normalization_enabled": hasattr(self.embedding_model, "normalize_for_gpu"),
+            "original_model_type": type(self.original_embedding_model).__name__,
+            "wrapped_model_type": type(self.embedding_model).__name__,
+        }
