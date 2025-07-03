@@ -13,9 +13,9 @@ from aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker import (
 )
 
 
-@pytest.fixture
-def mock_chunks():
-    """mock_chunks fixture to simulate PDF chunks."""
+@pytest.fixture(name="chunks_fixture")
+def fixture_chunks():
+    """chunks_fixture fixture to simulate PDF chunks."""
     return [
         Document(
             page_content=f"chunk {i}",
@@ -25,29 +25,30 @@ def mock_chunks():
     ]
 
 
-def test_rerank_chunks_short_input(mock_chunks):
-    """mock rerank_chunks with fewer chunks than top_k."""
+def test_rerank_chunks_short_input(chunks_fixture):
+    """rerank_chunks with fewer chunks than top_k should return original."""
     result = rerank_chunks(
-        mock_chunks[:3], "What is cancer?", config=MagicMock(), top_k=5
+        chunks_fixture[:3], "What is cancer?", config=MagicMock(), top_k=5
     )
-    assert result == mock_chunks[:3]  # Should return original since len <= top_k
+    assert result == chunks_fixture[:3]
 
 
-def test_rerank_chunks_missing_api_key(mock_chunks):
-    """test rerank_chunks with missing API key."""
+def test_rerank_chunks_missing_api_key(chunks_fixture):
+    """rerank_chunks with missing API key should fallback."""
     mock_config = MagicMock()
     mock_config.reranker.api_key = None
 
-    result = rerank_chunks(mock_chunks, "What is cancer?", config=mock_config, top_k=5)
-    assert result == mock_chunks[:5]  # fallback triggered
+    result = rerank_chunks(
+        chunks_fixture, "What is cancer?", config=mock_config, top_k=5
+    )
+    assert result == chunks_fixture[:5]
 
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.NVIDIARerank")
-def test_rerank_chunks_success(mock_reranker_cls, mock_chunks):
-    """test rerank_chunks with successful reranking."""
-    # Fake reranker returns reversed list
+def test_rerank_chunks_success(mock_reranker_cls, chunks_fixture):
+    """rerank_chunks with successful reranking."""
     reranker_instance = MagicMock()
-    reranker_instance.compress_documents.return_value = list(reversed(mock_chunks))
+    reranker_instance.compress_documents.return_value = list(reversed(chunks_fixture))
     mock_reranker_cls.return_value = reranker_instance
 
     mock_config = MagicMock()
@@ -55,17 +56,17 @@ def test_rerank_chunks_success(mock_reranker_cls, mock_chunks):
     mock_config.reranker.model = "test_model"
 
     result = rerank_chunks(
-        mock_chunks, "Explain mitochondria.", config=mock_config, top_k=5
+        chunks_fixture, "Explain mitochondria.", config=mock_config, top_k=5
     )
 
     assert isinstance(result, list)
-    assert result == list(reversed(mock_chunks))[:5]
+    assert result == list(reversed(chunks_fixture))[:5]
     reranker_instance.compress_documents.assert_called_once()
 
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.NVIDIARerank")
-def test_rerank_chunks_reranker_fails(mock_reranker_cls, mock_chunks):
-    """test rerank_chunks when reranker fails."""
+def test_rerank_chunks_reranker_fails(mock_reranker_cls, chunks_fixture):
+    """rerank_chunks when reranker fails should fallback."""
     reranker_instance = MagicMock()
     reranker_instance.compress_documents.side_effect = RuntimeError("API failure")
     mock_reranker_cls.return_value = reranker_instance
@@ -75,29 +76,22 @@ def test_rerank_chunks_reranker_fails(mock_reranker_cls, mock_chunks):
     mock_config.reranker.model = "reranker"
 
     result = rerank_chunks(
-        mock_chunks, "How does light affect plants?", config=mock_config, top_k=3
+        chunks_fixture, "How does light affect plants?", config=mock_config, top_k=3
     )
 
-    # Should fallback to first 3
-    assert result == mock_chunks[:3]
+    assert result == chunks_fixture[:3]
 
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.logger")
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.NVIDIARerank")
-def test_rerank_chunks_debug_block_triggered(mock_reranker_cls, mock_logger):
-    """test rerank_chunks with debug logging enabled."""
-    # Force logger.isEnabledFor(logging.DEBUG) → True
+def test_rerank_chunks_debug_block_triggered(
+    mock_reranker_cls, mock_logger, chunks_fixture
+):
+    """rerank_chunks should log debug info if debug logging is enabled."""
     mock_logger.isEnabledFor.return_value = True
 
-    # Simulate reranker returns chunks with paper_ids
-    chunks = [
-        Document(page_content="a", metadata={"paper_id": "P1"}),
-        Document(page_content="b", metadata={"paper_id": "P2"}),
-        Document(page_content="c", metadata={"paper_id": "P1"}),
-    ]
-
     reranker_instance = MagicMock()
-    reranker_instance.compress_documents.return_value = chunks
+    reranker_instance.compress_documents.return_value = chunks_fixture
     mock_reranker_cls.return_value = reranker_instance
 
     mock_config = MagicMock()
@@ -105,8 +99,8 @@ def test_rerank_chunks_debug_block_triggered(mock_reranker_cls, mock_logger):
     mock_config.reranker.model = "mymodel"
 
     result = nvidia_nim_reranker.rerank_chunks(
-        chunks * 2, "Test query", mock_config, top_k=3
+        chunks_fixture * 2, "Test query", mock_config, top_k=3
     )
 
-    assert result == chunks[:3]
+    assert result == chunks_fixture[:3]
     assert mock_logger.debug.called
