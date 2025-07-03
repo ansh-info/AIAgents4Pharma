@@ -122,6 +122,9 @@ class Vectorstore:
         # Load existing papers AFTER vector store is ready
         self._load_existing_paper_ids()
 
+        # CRITICAL: Load collection into memory/GPU after any existing data is identified
+        self._ensure_collection_loaded()
+
         # Store for document metadata (keeping for compatibility)
         self.documents: Dict[str, Document] = {}
         self.paper_metadata: Dict[str, Dict[str, Any]] = {}
@@ -272,6 +275,43 @@ class Vectorstore:
         )
 
         return results
+
+    def _ensure_collection_loaded(self):
+        """Ensure collection is loaded into memory/GPU after data insertion."""
+        try:
+            # Get the collection
+            collection = getattr(self.vector_store, "col", None)
+            if collection is None:
+                collection = getattr(self.vector_store, "collection", None)
+
+            if collection is None:
+                logger.warning("Cannot access collection for loading")
+                return
+
+            # Check if collection has data
+            collection.flush()  # Ensure all data is persisted
+            num_entities = collection.num_entities
+
+            if num_entities > 0:
+                logger.info(
+                    "Loading collection with %d entities into %s memory...",
+                    num_entities,
+                    "GPU" if self.has_gpu else "CPU",
+                )
+
+                # Load collection into memory/GPU
+                collection.load()
+
+                logger.info(
+                    "✅ Collection successfully loaded into %s memory with %d entities",
+                    "GPU" if self.has_gpu else "CPU",
+                    num_entities,
+                )
+            else:
+                logger.info("Collection is empty, skipping load operation")
+
+        except Exception as e:
+            logger.error("Failed to load collection into memory: %s", e)
 
     def get_embedding_info(self) -> Dict[str, Any]:
         """Get information about the embedding configuration."""
