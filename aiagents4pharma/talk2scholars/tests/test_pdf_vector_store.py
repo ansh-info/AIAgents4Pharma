@@ -66,6 +66,7 @@ def test_vectorstore_initialization(
 ):
     """test Vectorstore initialization with mock components."""
     mock_detect_gpu.return_value = True
+    mock_log_config.return_value = None
     mock_get_index_config.return_value = ("mock_index_params", "mock_search_params")
     mock_singleton = MagicMock()
     mock_singleton.get_connection.return_value = None
@@ -218,6 +219,7 @@ def test_force_cpu_mode(dummy_embedding, dummy_config, dummy_vectorstore_compone
     dummy_config.gpu_detection.force_cpu_mode = True
     _, mock_vector_store = dummy_vectorstore_components
     vs = Vectorstore(dummy_embedding, config=dummy_config)
+    mock_vector_store.detect_nvidia_gpu.return_value = False
     assert vs.has_gpu is False
 
 

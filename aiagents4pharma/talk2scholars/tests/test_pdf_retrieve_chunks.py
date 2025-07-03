@@ -1,3 +1,5 @@
+"""retrieve_chunks for PDF tool tests"""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -37,6 +39,7 @@ def mock_scored_chunks():
 def test_retrieve_chunks_cpu_success(mock_logger, mock_vector_store, mock_chunks):
     """ "test retrieve_relevant_chunks with CPU path."""
     mock_vector_store.has_gpu = False
+    mock_logger.debug = MagicMock()
     mock_vector_store.max_marginal_relevance_search.return_value = mock_chunks
 
     results = retrieve_relevant_chunks(mock_vector_store, query="AI", top_k=5)
@@ -49,6 +52,7 @@ def test_retrieve_chunks_cpu_success(mock_logger, mock_vector_store, mock_chunks
 def test_retrieve_chunks_gpu_success(mock_logger, mock_vector_store, mock_chunks):
     """test retrieve_relevant_chunks with GPU path."""
     mock_vector_store.has_gpu = True
+    mock_logger.debug = MagicMock()
     mock_vector_store.max_marginal_relevance_search.return_value = mock_chunks
 
     results = retrieve_relevant_chunks(mock_vector_store, query="AI", top_k=5)
@@ -63,6 +67,7 @@ def test_retrieve_chunks_fallback_on_exception(
 ):
     """test retrieve_relevant_chunks fallback to similarity search on exception."""
     mock_vector_store.has_gpu = False
+    mock_logger.debug = MagicMock()
     mock_vector_store.max_marginal_relevance_search.side_effect = Exception("MMR fail")
     mock_vector_store.similarity_search.return_value = mock_chunks
 
@@ -77,6 +82,7 @@ def test_retrieve_chunks_fallback_on_exception(
 def test_retrieve_chunks_final_failure_returns_empty(mock_logger, mock_vector_store):
     """test retrieve_relevant_chunks returns empty on final failure."""
     mock_vector_store.has_gpu = False
+    mock_logger.debug = MagicMock()
     mock_vector_store.max_marginal_relevance_search.side_effect = Exception("MMR fail")
     mock_vector_store.similarity_search.side_effect = Exception("Sim fail")
 
@@ -88,6 +94,7 @@ def test_retrieve_chunks_final_failure_returns_empty(mock_logger, mock_vector_st
 def test_retrieve_chunks_with_filter(mock_logger, mock_vector_store, mock_chunks):
     """test retrieve_relevant_chunks with paper_id filter."""
     mock_vector_store.has_gpu = False
+    mock_logger.debug = MagicMock()
     mock_vector_store.max_marginal_relevance_search.return_value = mock_chunks
 
     results = retrieve_relevant_chunks(
@@ -95,6 +102,7 @@ def test_retrieve_chunks_with_filter(mock_logger, mock_vector_store, mock_chunks
     )
     assert results == mock_chunks
     args, kwargs = mock_vector_store.max_marginal_relevance_search.call_args
+    assert len(args) == 0
     assert kwargs["filter"] == {"paper_id": ["P1"]}
 
 
@@ -104,6 +112,7 @@ def test_retrieve_chunks_with_scores_success(
 ):
     """retrieve_relevant_chunks_with_scores with GPU path."""
     mock_vector_store.has_gpu = True
+    mock_logger.debug = MagicMock()
     mock_vector_store.similarity_search_with_score.return_value = mock_scored_chunks
 
     results = retrieve_relevant_chunks_with_scores(
@@ -124,6 +133,7 @@ def test_retrieve_chunks_with_scores_fallback_to_default(
     """test retrieve_relevant_chunks_with_scores fallback to default search."""
     del mock_vector_store.similarity_search_with_score
     mock_vector_store.has_gpu = False
+    mock_logger.debug = MagicMock()
     mock_vector_store.max_marginal_relevance_search.return_value = mock_chunks
 
     results = retrieve_relevant_chunks_with_scores(
@@ -145,6 +155,7 @@ def test_retrieve_chunks_with_scores_error_returns_empty(
     mock_vector_store.similarity_search_with_score.side_effect = Exception(
         "score search failed"
     )
+    mock_logger.debug = MagicMock()
 
     results = retrieve_relevant_chunks_with_scores(
         vector_store=mock_vector_store,
@@ -199,6 +210,7 @@ def test_retrieve_chunks_with_scores_paper_filter(
 ):
     """ensure retrieve_relevant_chunks_with_scores applies paper_id filter."""
     mock_vector_store.similarity_search_with_score.return_value = mock_scored_chunks
+    mock_logger.debug = MagicMock()
 
     results = retrieve_relevant_chunks_with_scores(
         vector_store=mock_vector_store,

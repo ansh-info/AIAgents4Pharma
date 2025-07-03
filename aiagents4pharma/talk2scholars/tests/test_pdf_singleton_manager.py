@@ -32,6 +32,7 @@ def test_detect_gpu_once(mock_detect):
     assert result is True
     # Should not call detect_nvidia_gpu again
     result2 = singleton.detect_gpu_once()
+    assert result2 is True
     mock_detect.assert_called_once()
 
 
@@ -46,7 +47,7 @@ def test_get_event_loop_reuses_existing():
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.connections")
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.db")
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.utility")
-def test_get_connection_creates_connection(mock_util, mock_db, mock_conns):
+def test_get_connection_creates_connection(_, mock_db, mock_conns):
     """get_connection should create a new connection if none exists."""
     singleton = VectorstoreSingleton()
     mock_conns.has_connection.return_value = True
@@ -67,6 +68,7 @@ def test_get_vector_store_creates_if_missing(mock_milvus):
     singleton._event_loops.clear()
     mock_embed = MagicMock()
     vs = singleton.get_vector_store("collection1", mock_embed, {"host": "localhost"})
+    assert vs is singleton._vector_stores["collection1"]
     assert "collection1" in singleton._vector_stores
     mock_milvus.assert_called_once()
 
@@ -116,7 +118,7 @@ def test_get_vectorstore_force_new():
     "aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.connections.has_connection"
 )
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.db")
-def test_get_connection_milvus_error(mock_db, mock_has_connection, mock_connect):
+def test_get_connection_milvus_error(_, mock_has_connection, mock_connect):
     """ "test get_connection raises MilvusException on connection failure."""
     # Ensure the singleton has no previous cached connection
     manager = VectorstoreSingleton()

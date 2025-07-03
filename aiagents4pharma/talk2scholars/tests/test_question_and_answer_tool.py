@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain_core.messages import ToolMessage
-from langgraph.types import Command
 
 from aiagents4pharma.talk2scholars.tools.pdf.question_and_answer import (
     question_and_answer,
@@ -52,6 +51,7 @@ def test_question_and_answer_success(
         mock_input["state"]["article_data"],
     )
     mock_helper.init_vector_store.return_value = MagicMock()
+    mock_load_all_papers.return_value = MagicMock()
     mock_helper.has_gpu = True
     mock_helper_cls.return_value = mock_helper
     mock_load_config.return_value = {"config_key": "value"}
@@ -91,6 +91,7 @@ def test_question_and_answer_no_reranked_chunks(
         mock_input["state"]["article_data"],
     )
     mock_helper.init_vector_store.return_value = MagicMock()
+    mock_load_all_papers.return_value = MagicMock()
     mock_helper.has_gpu = False
     mock_helper_cls.return_value = mock_helper
     mock_load_config.return_value = {"config_key": "value"}

@@ -98,7 +98,7 @@ def test_debug_collection_state_failure(
 
     # Force failure inside debug_collection_state
     mock_collection.schema = property(
-        lambda self: (_ for _ in ()).throw(Exception("bad schema"))
+        lambda _: (_ for _ in ()).throw(Exception("bad schema"))
     )
 
     # Proceed with normal call (it will log but not raise)
@@ -115,6 +115,7 @@ def test_ensure_collection_exception(
 ):
     """ensure_collection_exists should raise on utility failure."""
     mock_utility.list_collections.side_effect = RuntimeError("milvus failure")
+    mock_Collection.return_value = MagicMock()
 
     with pytest.raises(RuntimeError, match="milvus failure"):
         collection_manager.ensure_collection_exists(
@@ -136,7 +137,7 @@ def test_debug_collection_state_logs_exception(
 
     # Simulate exception when accessing .indexes
     type(mock_collection).indexes = property(
-        lambda self: (_ for _ in ()).throw(Exception("Index fetch failed"))
+        lambda _: (_ for _ in ()).throw(Exception("Index fetch failed"))
     )
 
     mock_Collection.return_value = mock_collection
