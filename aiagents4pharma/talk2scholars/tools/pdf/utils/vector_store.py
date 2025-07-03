@@ -123,6 +123,10 @@ class Vectorstore:
         self._load_existing_paper_ids()
 
         # CRITICAL: Load collection into memory/GPU after any existing data is identified
+        logger.info(
+            "Calling _ensure_collection_loaded() for %s processing...",
+            "GPU" if self.has_gpu else "CPU",
+        )
         self._ensure_collection_loaded()
 
         # Store for document metadata (keeping for compatibility)
@@ -288,30 +292,37 @@ class Vectorstore:
                 logger.warning("Cannot access collection for loading")
                 return
 
-            # Check if collection has data
-            collection.flush()  # Ensure all data is persisted
+            # Force flush to ensure we see all data
+            logger.info("Flushing collection to ensure data visibility...")
+            collection.flush()
+
+            # Check entity count after flush
             num_entities = collection.num_entities
+            logger.info("Collection entity count after flush: %d", num_entities)
 
             if num_entities > 0:
+                hardware_type = "GPU" if self.has_gpu else "CPU"
                 logger.info(
                     "Loading collection with %d entities into %s memory...",
                     num_entities,
-                    "GPU" if self.has_gpu else "CPU",
+                    hardware_type,
                 )
 
-                # Load collection into memory/GPU
+                # Load collection into memory (CPU or GPU)
                 collection.load()
 
+                # Verify loading was successful
+                final_count = collection.num_entities
                 logger.info(
                     "Collection successfully loaded into %s memory with %d entities",
-                    "GPU" if self.has_gpu else "CPU",
-                    num_entities,
+                    hardware_type,
+                    final_count,
                 )
             else:
                 logger.info("Collection is empty, skipping load operation")
 
         except Exception as e:
-            logger.error("Failed to load collection into memory: %s", e)
+            logger.error("Failed to load collection into memory: %s", e, exc_info=True)
 
     def get_embedding_info(self) -> Dict[str, Any]:
         """Get information about the embedding configuration."""
