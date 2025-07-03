@@ -85,3 +85,33 @@ def test_log_index_configuration_logs_all(mock_logger):
     log_index_configuration(index_params, search_params)
 
     assert mock_logger.info.call_count >= 5
+
+
+def test_get_optimal_index_config_gpu_without_cosine():
+    """Ensure GPU config defaults to IP when use_cosine is False."""
+    index_params, search_params = get_optimal_index_config(
+        has_gpu=True, embedding_dim=768, use_cosine=False
+    )
+
+    assert index_params["index_type"] == "GPU_CAGRA"
+    assert index_params["metric_type"] == "IP"
+    assert search_params["metric_type"] == "IP"
+
+
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection.logger")
+def test_log_index_configuration_logs_cosine_simulation_note(mock_logger):
+    """Test GPU_CAGRA COSINE -> IP note is logged properly."""
+    index_params = {
+        "index_type": "GPU_CAGRA",
+        "metric_type": "IP",
+        "params": {"itopk_size": 128},
+    }
+    search_params = {
+        "metric_type": "IP",
+        "params": {"search_width": 16},
+    }
+
+    log_index_configuration(index_params, search_params, use_cosine=True)
+
+    log_messages = [str(call.args[0]) for call in mock_logger.info.call_args_list]
+    assert any("simulate COSINE for GPU" in msg for msg in log_messages)

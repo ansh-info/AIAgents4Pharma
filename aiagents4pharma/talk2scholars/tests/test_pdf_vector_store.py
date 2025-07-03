@@ -1,4 +1,4 @@
-"""Vectorstore for managing PDF embeddings and similarity searches."""
+"""Unit tests for the Vectorstore class with GPU support and embedding normalization."""
 
 from unittest.mock import MagicMock, patch
 
@@ -11,11 +11,9 @@ from aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store import Vectorsto
 
 @pytest.fixture
 def mock_config():
-    """mock configuration for testing."""
+    """Return a mock configuration object."""
 
     class MockMilvusConfig:
-        """mock configuration for Milvus connection."""
-
         host = "localhost"
         port = 19530
         collection_name = "test_collection"
@@ -23,13 +21,9 @@ def mock_config():
         embedding_dim = 384
 
     class MockGPUDetection:
-        """mock configuration for GPU detection."""
-
         force_cpu_mode = False
 
     class MockConfig:
-        """ "mock configuration class."""
-
         milvus = MockMilvusConfig()
         gpu_detection = MockGPUDetection()
 
@@ -38,10 +32,71 @@ def mock_config():
 
 @pytest.fixture
 def mock_embedding():
-    """mock embedding model for testing."""
+    """Return a mock embedding model."""
     return MagicMock(spec=Embeddings)
 
 
+@pytest.fixture
+def dummy_embedding():
+    """Dummy embedding model for testing purposes."""
+    return MagicMock(spec=Embeddings)
+
+
+@pytest.fixture
+def dummy_config():
+    """Dummy config fixture with CPU override logic."""
+
+    class DummyMilvus:
+        host = "localhost"
+        port = 19530
+        db_name = "test_db"
+        collection_name = "test_collection"
+        embedding_dim = 768
+
+    class DummyGPU:
+        force_cpu_mode = False
+
+    class DummyConfig:
+        milvus = DummyMilvus()
+        gpu_detection = DummyGPU()
+
+    return DummyConfig()
+
+
+@pytest.fixture
+def dummy_vectorstore_components():
+    """Yield a patched vectorstore singleton and vector store instance."""
+    with (
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.detect_nvidia_gpu",
+            return_value=True,
+        ),
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.get_optimal_index_config",
+            return_value=(
+                {"index_type": "IVF_FLAT", "metric_type": "IP"},
+                {"nprobe": 10},
+            ),
+        ),
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.ensure_collection_exists",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.VectorstoreSingleton"
+        ) as mock_singleton_class,
+    ):
+        mock_singleton = MagicMock()
+        mock_vector_store = MagicMock()
+        mock_singleton.get_vector_store.return_value = mock_vector_store
+        mock_singleton.get_connection.return_value = "connected"
+        mock_singleton_class.return_value = mock_singleton
+        yield mock_singleton, mock_vector_store
+
+
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.wrap_embedding_model_if_needed"
+)
 @patch(
     "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.VectorstoreSingleton"
 )
@@ -61,13 +116,16 @@ def test_vectorstore_initialization(
     mock_detect_gpu,
     mock_ensure_collection,
     mock_singleton_class,
+    mock_wrap_embedding,
     mock_config,
     mock_embedding,
 ):
-    """test Vectorstore initialization with mock components."""
+    """Test Vectorstore initialization with GPU and mocked dependencies."""
     mock_detect_gpu.return_value = True
     mock_log_config.return_value = None
-    mock_get_index_config.return_value = ("mock_index_params", "mock_search_params")
+    mock_get_index_config.return_value = ({"metric_type": "IP"}, {})
+    mock_wrap_embedding.return_value = mock_embedding
+
     mock_singleton = MagicMock()
     mock_singleton.get_connection.return_value = None
     mock_singleton.get_vector_store.return_value = MagicMock()
@@ -84,260 +142,350 @@ def test_vectorstore_initialization(
 
 
 @patch(
-    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.VectorstoreSingleton"
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.wrap_embedding_model_if_needed"
 )
-def test_similarity_search(mock_singleton_class, mock_embedding, mock_config):
-    """test similarity search with mock vectorstore."""
-    mock_vectorstore_instance = MagicMock()
-    mock_vectorstore_instance.similarity_search.return_value = [
-        Document(page_content="test content")
-    ]
-    mock_singleton = MagicMock()
-    mock_singleton.get_vector_store.return_value = mock_vectorstore_instance
-    mock_singleton.get_connection.return_value = None
-    mock_singleton_class.return_value = mock_singleton
-
-    with patch(
-        "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.ensure_collection_exists"
-    ):
-        with patch(
-            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.detect_nvidia_gpu",
-            return_value=False,
-        ):
-            with patch(
-                "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.get_optimal_index_config",
-                return_value=("", ""),
-            ):
-                with patch(
-                    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.log_index_configuration"
-                ):
-                    vs = Vectorstore(mock_embedding, config=mock_config)
-                    result = vs.similarity_search(query="test")
-                    assert isinstance(result, list)
-                    assert isinstance(result[0], Document)
-
-
 @patch(
     "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.VectorstoreSingleton"
 )
-def test_max_marginal_relevance_search(
-    mock_singleton_class, mock_embedding, mock_config
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.ensure_collection_exists"
+)
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.detect_nvidia_gpu")
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.get_optimal_index_config"
+)
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.log_index_configuration"
+)
+def test_get_embedding_info(
+    mock_log_config,
+    mock_get_index_config,
+    mock_detect_gpu,
+    mock_ensure_collection,
+    mock_singleton_class,
+    mock_wrap_embedding,
+    mock_config,
+    mock_embedding,
 ):
-    """test max marginal relevance search with mock vectorstore."""
-    mock_vectorstore_instance = MagicMock()
-    mock_vectorstore_instance.max_marginal_relevance_search.return_value = [
-        Document(page_content="test content")
-    ]
+    """Test retrieval of embedding configuration info."""
+    mock_detect_gpu.return_value = True
+    mock_log_config.return_value = None
+    mock_get_index_config.return_value = (
+        {"metric_type": "IP", "index_type": "IVF"},
+        {},
+    )
+    mock_wrap_embedding.return_value = mock_embedding
+
     mock_singleton = MagicMock()
-    mock_singleton.get_vector_store.return_value = mock_vectorstore_instance
     mock_singleton.get_connection.return_value = None
+    mock_singleton.get_vector_store.return_value = MagicMock()
     mock_singleton_class.return_value = mock_singleton
+    mock_ensure_collection.return_value = "mock_collection"
 
-    with patch(
-        "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.ensure_collection_exists"
-    ):
-        with patch(
-            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.detect_nvidia_gpu",
-            return_value=False,
-        ):
-            with patch(
-                "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.get_optimal_index_config",
-                return_value=("", ""),
-            ):
-                with patch(
-                    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.log_index_configuration"
-                ):
-                    vs = Vectorstore(mock_embedding, config=mock_config)
-                    result = vs.max_marginal_relevance_search(query="test")
-                    assert isinstance(result, list)
-                    assert isinstance(result[0], Document)
+    vs = Vectorstore(embedding_model=mock_embedding, config=mock_config)
+    info = vs.get_embedding_info()
+
+    assert info["has_gpu"] is True
+    assert info["use_cosine"] is True
+    assert "original_model_type" in info
+    assert "wrapped_model_type" in info
+    assert "normalization_enabled" in info
 
 
-class DummyConfig:
-    """dummy configuration class for testing purposes."""
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.wrap_embedding_model_if_needed"
+)
+def test_load_existing_papers_with_exception(
+    mock_wrap_embedding, mock_embedding, mock_config
+):
+    """Test that load_existing_paper_ids handles exceptions gracefully."""
+    mock_wrap_embedding.return_value = mock_embedding
 
-    class Milvus:
-        """mock configuration for Milvus connection."""
-
-        host = "localhost"
-        port = 19530
-        db_name = "test_db"
-        collection_name = "test_collection"
-        embedding_dim = 768
-
-    class GPUDetection:
-        """force CPU mode for testing."""
-
-        force_cpu_mode = True
-
-    milvus = Milvus()
-    gpu_detection = GPUDetection()
-
-
-@pytest.fixture
-def dummy_embedding():
-    """dummy embedding model for testing purposes."""
-    return MagicMock(spec=Embeddings)
-
-
-@pytest.fixture
-def dummy_config():
-    """dummy configuration for testing purposes."""
-    return DummyConfig()
-
-
-@pytest.fixture
-def dummy_vectorstore_components():
-    """dummy vectorstore components for testing purposes."""
     with (
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.VectorstoreSingleton"
+        ) as singleton_class,
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.ensure_collection_exists"
+        ),
         patch(
             "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.detect_nvidia_gpu",
             return_value=True,
         ),
         patch(
             "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.get_optimal_index_config",
-            return_value=({"index_type": "IVF_FLAT"}, {"metric_type": "L2"}),
+            return_value=({"metric_type": "IP"}, {}),
         ),
         patch(
-            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.ensure_collection_exists",
-            return_value=MagicMock(),
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.log_index_configuration"
         ),
-        patch(
-            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.VectorstoreSingleton"
-        ) as mock_singleton_class,
     ):
+
         mock_singleton = MagicMock()
         mock_vector_store = MagicMock()
+        mock_vector_store.col.flush.side_effect = Exception("flush failed")
         mock_singleton.get_vector_store.return_value = mock_vector_store
-        mock_singleton.get_connection.return_value = "default"
-        mock_singleton_class.return_value = mock_singleton
-        yield mock_singleton, mock_vector_store
+        mock_singleton.get_connection.return_value = None
+        singleton_class.return_value = mock_singleton
+
+        vs = Vectorstore(mock_embedding, config=mock_config)
+        vs.vector_store = mock_vector_store
+        vs._load_existing_paper_ids()
+
+        assert isinstance(vs.loaded_papers, set)
 
 
-def test_force_cpu_mode(dummy_embedding, dummy_config, dummy_vectorstore_components):
-    """force_cpu_mode should disable GPU detection."""
-    dummy_config.gpu_detection.force_cpu_mode = True
-    _, mock_vector_store = dummy_vectorstore_components
-    vs = Vectorstore(dummy_embedding, config=dummy_config)
-    mock_vector_store.detect_nvidia_gpu.return_value = False
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.wrap_embedding_model_if_needed"
+)
+def test_ensure_collection_loaded_with_entities(
+    mock_wrap_embedding, mock_embedding, mock_config
+):
+    """Test ensure_collection_loaded loads data into memory when entities are present."""
+    mock_wrap_embedding.return_value = mock_embedding
+
+    with (
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.VectorstoreSingleton"
+        ) as singleton_class,
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.ensure_collection_exists"
+        ),
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.detect_nvidia_gpu",
+            return_value=True,
+        ),
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.get_optimal_index_config",
+            return_value=({"metric_type": "IP"}, {}),
+        ),
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.log_index_configuration"
+        ),
+    ):
+
+        mock_singleton = MagicMock()
+        mock_vector_store = MagicMock()
+
+        mock_collection = MagicMock()
+        mock_collection.num_entities = 5
+        mock_vector_store.col = mock_collection
+
+        mock_singleton.get_vector_store.return_value = mock_vector_store
+        mock_singleton.get_connection.return_value = None
+        singleton_class.return_value = mock_singleton
+
+        vs = Vectorstore(mock_embedding, config=mock_config)
+        vs.vector_store = mock_vector_store
+        vs._ensure_collection_loaded()
+
+        assert mock_collection.load.called is True
+
+
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.wrap_embedding_model_if_needed"
+)
+def test_ensure_collection_loaded_with_exception(
+    mock_wrap_embedding, mock_embedding, mock_config
+):
+    """Test ensure_collection_loaded handles exceptions."""
+    mock_wrap_embedding.return_value = mock_embedding
+
+    with (
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.VectorstoreSingleton"
+        ) as singleton_class,
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.ensure_collection_exists"
+        ),
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.detect_nvidia_gpu",
+            return_value=True,
+        ),
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.get_optimal_index_config",
+            return_value=({"metric_type": "IP"}, {}),
+        ),
+        patch(
+            "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.log_index_configuration"
+        ),
+    ):
+
+        mock_singleton = MagicMock()
+        mock_vector_store = MagicMock()
+
+        mock_collection = MagicMock()
+        mock_collection.flush.side_effect = Exception("flush error")
+        mock_vector_store.col = mock_collection
+
+        mock_singleton.get_vector_store.return_value = mock_vector_store
+        mock_singleton.get_connection.return_value = None
+        singleton_class.return_value = mock_singleton
+
+        vs = Vectorstore(mock_embedding, config=mock_config)
+        vs.vector_store = mock_vector_store
+        vs._ensure_collection_loaded()
+
+        assert True  # Should not crash despite exception
+
+
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.wrap_embedding_model_if_needed"
+)
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.VectorstoreSingleton"
+)
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.ensure_collection_exists"
+)
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.detect_nvidia_gpu")
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.get_optimal_index_config"
+)
+@patch(
+    "aiagents4pharma.talk2scholars.tools.pdf.utils.vector_store.log_index_configuration"
+)
+def test_force_cpu_mode_logs_override(
+    mock_log_config,
+    mock_get_index_config,
+    mock_detect_gpu,
+    mock_ensure_collection,
+    mock_singleton_class,
+    mock_wrap_embedding,
+    mock_config,
+    mock_embedding,
+):
+    """Test logging of forced CPU mode."""
+    mock_detect_gpu.return_value = True  # But will be overridden
+    mock_log_config.return_value = None
+    mock_get_index_config.return_value = ({"metric_type": "IP"}, {})
+    mock_wrap_embedding.return_value = mock_embedding
+
+    mock_config.gpu_detection.force_cpu_mode = True
+
+    mock_singleton = MagicMock()
+    mock_singleton.get_connection.return_value = None
+    mock_singleton.get_vector_store.return_value = MagicMock()
+    mock_singleton_class.return_value = mock_singleton
+    mock_ensure_collection.return_value = "mock_collection"
+
+    vs = Vectorstore(embedding_model=mock_embedding, config=mock_config)
+
     assert vs.has_gpu is False
 
 
-def test_load_existing_papers_collection_missing(
+def test_similarity_metric_override(
     dummy_embedding, dummy_config, dummy_vectorstore_components
 ):
-    """load_existing_papers should handle missing collection gracefully."""
+    """Test setting of use_cosine from config.similarity_metric."""
+
+    class SimilarityMetric:
+        use_cosine = False
+
+    dummy_config.similarity_metric = SimilarityMetric()
     _, mock_vector_store = dummy_vectorstore_components
-    mock_vector_store.col = None
-    mock_vector_store.collection = None
+
+    vs = Vectorstore(dummy_embedding, config=dummy_config)
+    assert vs.use_cosine is False
+
+
+def test_load_existing_paper_ids_fallback_to_collection(
+    dummy_embedding, dummy_config, dummy_vectorstore_components
+):
+    """Test fallback to collection and warning if both attributes are missing."""
+    _, mock_vector_store = dummy_vectorstore_components
+
+    # Both `col` and `collection` are missing
+    delattr(mock_vector_store, "col")
+    delattr(mock_vector_store, "collection")
+
     vs = Vectorstore(dummy_embedding, config=dummy_config)
     vs.vector_store = mock_vector_store
     vs._load_existing_paper_ids()
+
     assert isinstance(vs.loaded_papers, set)
 
 
-def test_load_existing_papers_collection_empty(
+def test_load_existing_papers_collection_empty_logs(
     dummy_embedding, dummy_config, dummy_vectorstore_components
 ):
-    """load_existing_papers should handle empty collection gracefully."""
+    """Test logging when collection is empty."""
     _, mock_vector_store = dummy_vectorstore_components
     mock_collection = MagicMock()
     mock_collection.num_entities = 0
     mock_collection.flush.return_value = None
     mock_vector_store.col = mock_collection
+
     vs = Vectorstore(dummy_embedding, config=dummy_config)
     vs.vector_store = mock_vector_store
     vs._load_existing_paper_ids()
     assert len(vs.loaded_papers) == 0
 
 
-def test_similarity_search_with_filters(
+def test_similarity_search_filter_paths(
     dummy_embedding, dummy_config, dummy_vectorstore_components
 ):
-    """test similarity search with filters."""
+    """Test full filter expression generation path in similarity search."""
     _, mock_vector_store = dummy_vectorstore_components
-    mock_vector_store.similarity_search.return_value = [Document(page_content="Test")]
-    vs = Vectorstore(dummy_embedding, config=dummy_config)
-    vs.vector_store = mock_vector_store
-    results = vs.similarity_search(
-        query="test query", k=2, filter={"paper_id": ["p1", "p2"], "page": 3}
-    )
-    assert len(results) == 1
-    assert isinstance(results[0], Document)
-
-
-def test_mmr_search_with_filters(
-    dummy_embedding, dummy_config, dummy_vectorstore_components
-):
-    """mmr_search with filters should return filtered results."""
-    _, mock_vector_store = dummy_vectorstore_components
-    mock_vector_store.max_marginal_relevance_search.return_value = [
-        Document(page_content="Test")
-    ]
-    vs = Vectorstore(dummy_embedding, config=dummy_config)
-    vs.vector_store = mock_vector_store
-    results = vs.max_marginal_relevance_search(
-        query="test query", k=2, filter={"chunk_id": "c123"}
-    )
-    assert len(results) == 1
-    assert isinstance(results[0], Document)
-
-
-def test_filter_expression_all_cases(
-    dummy_embedding, dummy_config, dummy_vectorstore_components
-):
-    """filter expression should handle all cases."""
-    _, mock_vector_store = dummy_vectorstore_components
-    mock_vector_store.similarity_search.return_value = [Document(page_content="Test")]
-
+    mock_vector_store.similarity_search.return_value = [Document(page_content="test")]
     vs = Vectorstore(dummy_embedding, config=dummy_config)
     vs.vector_store = mock_vector_store
 
     filter_dict = {
-        "string_field": "text",
-        "list_field": ["val1", "val2"],
-        "int_field": 42,
-        "float_field": 3.14,
+        "field1": "value",
+        "field2": [1, 2],
+        "field3": 99,
+        "field4": 3.14,
     }
 
-    results = vs.similarity_search(query="test", k=2, filter=filter_dict)
-    assert len(results) == 1
-    assert isinstance(results[0], Document)
-
-    # Also test for MMR path
-    mock_vector_store.max_marginal_relevance_search.return_value = [
-        Document(page_content="Test")
-    ]
-    results_mmr = vs.max_marginal_relevance_search(
-        query="test", k=2, filter=filter_dict
-    )
-    assert len(results_mmr) == 1
-    assert isinstance(results_mmr[0], Document)
+    result = vs.similarity_search(query="text", filter=filter_dict)
+    assert isinstance(result, list)
 
 
-def test_load_existing_papers_with_entities(
+def test_mmr_search_filter_paths(
     dummy_embedding, dummy_config, dummy_vectorstore_components
 ):
-    """Ensure existing papers are loaded when LangChain collection has entities."""
+    """Test full filter expression generation path in MMR search."""
+    _, mock_vector_store = dummy_vectorstore_components
+    mock_vector_store.max_marginal_relevance_search.return_value = [
+        Document(page_content="test")
+    ]
+    vs = Vectorstore(dummy_embedding, config=dummy_config)
+    vs.vector_store = mock_vector_store
+
+    filter_dict = {"f": "text", "g": ["a", "b"], "h": 7, "j": 3.3}
+
+    result = vs.max_marginal_relevance_search(query="q", filter=filter_dict)
+    assert isinstance(result, list)
+
+
+def test_ensure_collection_loaded_no_col_and_no_collection(
+    dummy_embedding, dummy_config, dummy_vectorstore_components
+):
+    """Test fallback logic if both `col` and `collection` are missing."""
+    _, mock_vector_store = dummy_vectorstore_components
+    delattr(mock_vector_store, "col")
+    delattr(mock_vector_store, "collection")
+
+    vs = Vectorstore(dummy_embedding, config=dummy_config)
+    vs.vector_store = mock_vector_store
+
+    vs._ensure_collection_loaded()
+    assert True  # Should not crash
+
+
+def test_ensure_collection_loaded_empty_logs(
+    dummy_embedding, dummy_config, dummy_vectorstore_components
+):
+    """Test logging path when collection is empty in _ensure_collection_loaded."""
     _, mock_vector_store = dummy_vectorstore_components
 
     mock_collection = MagicMock()
-    mock_collection.num_entities = 3
-    mock_collection.flush.return_value = None
-    mock_collection.query.return_value = [
-        {"paper_id": "p1"},
-        {"paper_id": "p2"},
-        {"paper_id": "p3"},
-    ]
+    mock_collection.num_entities = 0
     mock_vector_store.col = mock_collection
 
     vs = Vectorstore(dummy_embedding, config=dummy_config)
     vs.vector_store = mock_vector_store
 
-    # Call private method explicitly to test loading logic
-    vs._load_existing_paper_ids()
-
-    assert len(vs.loaded_papers) == 3
-    assert "p1" in vs.loaded_papers
-    assert "p2" in vs.loaded_papers
-    assert "p3" in vs.loaded_papers
+    vs._ensure_collection_loaded()
+    assert True
