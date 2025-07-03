@@ -12,6 +12,7 @@ from pymilvus import (
     CollectionSchema,
     DataType,
     FieldSchema,
+    connections,
     utility,
 )
 
@@ -145,9 +146,6 @@ def ensure_collection_exists(
 
                 # Try to get collection stats
                 logger.info("Collection statistics: %s", collection.num_entities)
-
-                # Check connection status
-                from pymilvus import connections
 
                 logger.info("Active connections: %s", connections.list_connections())
 
