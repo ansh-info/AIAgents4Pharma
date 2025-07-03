@@ -33,15 +33,25 @@ def test_rerank_chunks_short_input(chunks_fixture):
     assert result == chunks_fixture[:3]
 
 
-def test_rerank_chunks_missing_api_key(chunks_fixture):
-    """rerank_chunks with missing API key should fallback."""
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.logger")
+def test_rerank_chunks_missing_api_key_logs_and_raises(mock_logger, chunks_fixture):
+    """
+    If config.reranker.api_key is None:
+      - logger.error(...) should be called
+      - rerank_chunks should raise ValueError
+    """
     mock_config = MagicMock()
     mock_config.reranker.api_key = None
 
-    result = rerank_chunks(
-        chunks_fixture, "What is cancer?", config=mock_config, top_k=5
+    with pytest.raises(
+        ValueError,
+        match="Configuration 'reranker.api_key' must be set for reranking",
+    ):
+        rerank_chunks(chunks_fixture, "What is cancer?", config=mock_config, top_k=5)
+
+    mock_logger.error.assert_called_once_with(
+        "No NVIDIA API key found in configuration for reranking"
     )
-    assert result == chunks_fixture[:5]
 
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.NVIDIARerank")
@@ -61,12 +71,20 @@ def test_rerank_chunks_success(mock_reranker_cls, chunks_fixture):
 
     assert isinstance(result, list)
     assert result == list(reversed(chunks_fixture))[:5]
-    reranker_instance.compress_documents.assert_called_once()
+    reranker_instance.compress_documents.assert_called_once_with(
+        query="Explain mitochondria.", documents=chunks_fixture
+    )
 
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.NVIDIARerank")
-def test_rerank_chunks_reranker_fails(mock_reranker_cls, chunks_fixture):
-    """rerank_chunks when reranker fails should fallback."""
+def test_rerank_chunks_reranker_fails_raises_and_calls_compress(
+    mock_reranker_cls, chunks_fixture
+):
+    """
+    If NVIDIARerank.compress_documents raises RuntimeError:
+      - rerank_chunks should propagate the RuntimeError
+      - and compress_documents should have been called
+    """
     reranker_instance = MagicMock()
     reranker_instance.compress_documents.side_effect = RuntimeError("API failure")
     mock_reranker_cls.return_value = reranker_instance
@@ -75,11 +93,14 @@ def test_rerank_chunks_reranker_fails(mock_reranker_cls, chunks_fixture):
     mock_config.reranker.api_key = "valid_key"
     mock_config.reranker.model = "reranker"
 
-    result = rerank_chunks(
-        chunks_fixture, "How does light affect plants?", config=mock_config, top_k=3
-    )
+    with pytest.raises(RuntimeError, match="API failure"):
+        rerank_chunks(
+            chunks_fixture, "How does light affect plants?", config=mock_config, top_k=3
+        )
 
-    assert result == chunks_fixture[:3]
+    reranker_instance.compress_documents.assert_called_once_with(
+        query="How does light affect plants?", documents=chunks_fixture
+    )
 
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.logger")

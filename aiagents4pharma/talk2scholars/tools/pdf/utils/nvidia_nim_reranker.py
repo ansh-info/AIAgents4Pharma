@@ -50,59 +50,48 @@ def rerank_chunks(
         )
         return chunks
 
-    try:
-        # Get API key from config
-        api_key = config.reranker.api_key
-        if not api_key:
-            logger.error("No NVIDIA API key found in configuration for reranking")
-            raise ValueError(
-                "Configuration 'reranker.api_key' must be set for reranking"
-            )
+    # Get API key from config
+    api_key = config.reranker.api_key
+    if not api_key:
+        logger.error("No NVIDIA API key found in configuration for reranking")
+        raise ValueError("Configuration 'reranker.api_key' must be set for reranking")
 
-        logger.info("Using NVIDIA reranker model: %s", config.reranker.model)
+    logger.info("Using NVIDIA reranker model: %s", config.reranker.model)
 
-        # Initialize reranker with truncation to handle long chunks
-        reranker = NVIDIARerank(
-            model=config.reranker.model,
-            api_key=api_key,
-            truncate="END",  # Truncate at the end if too long
-        )
+    # Initialize reranker with truncation to handle long chunks
+    reranker = NVIDIARerank(
+        model=config.reranker.model,
+        api_key=api_key,
+        truncate="END",  # Truncate at the end if too long
+    )
 
-        # Log chunk metadata for debugging
-        logger.debug(
-            "Reranking chunks from papers: %s",
-            list(set(chunk.metadata.get("paper_id", "unknown") for chunk in chunks))[
-                :5
-            ],
-        )
+    # Log chunk metadata for debugging
+    logger.debug(
+        "Reranking chunks from papers: %s",
+        list(set(chunk.metadata.get("paper_id", "unknown") for chunk in chunks))[:5],
+    )
 
-        # Rerank the chunks
-        logger.info("Calling NVIDIA reranker API with %d chunks...", len(chunks))
-        reranked_chunks = reranker.compress_documents(query=query, documents=chunks)
+    # Rerank the chunks
+    logger.info("Calling NVIDIA reranker API with %d chunks...", len(chunks))
+    reranked_chunks = reranker.compress_documents(query=query, documents=chunks)
 
-        for i, doc in enumerate(reranked_chunks[:top_k]):
-            score = doc.metadata.get("relevance_score", "N/A")
-            source = doc.metadata.get("paper_id", "unknown")
-            logger.info("Rank %d | Score: %.4f | Source: %s", i + 1, score, source)
+    for i, doc in enumerate(reranked_chunks[:top_k]):
+        score = doc.metadata.get("relevance_score", "N/A")
+        source = doc.metadata.get("paper_id", "unknown")
+        logger.info("Rank %d | Score: %.4f | Source: %s", i + 1, score, source)
 
-        logger.info(
-            "Successfully reranked chunks. Returning top %d chunks",
-            min(top_k, len(reranked_chunks)),
-        )
+    logger.info(
+        "Successfully reranked chunks. Returning top %d chunks",
+        min(top_k, len(reranked_chunks)),
+    )
 
-        # Log which papers the top chunks come from
-        if reranked_chunks and logger.isEnabledFor(logging.DEBUG):
-            top_papers = {}
-            for chunk in reranked_chunks[:top_k]:
-                paper_id = chunk.metadata.get("paper_id", "unknown")
-                top_papers[paper_id] = top_papers.get(paper_id, 0) + 1
-            logger.debug("Top %d chunks distribution by paper: %s", top_k, top_papers)
+    # Log which papers the top chunks come from
+    if reranked_chunks and logger.isEnabledFor(logging.DEBUG):
+        top_papers = {}
+        for chunk in reranked_chunks[:top_k]:
+            paper_id = chunk.metadata.get("paper_id", "unknown")
+            top_papers[paper_id] = top_papers.get(paper_id, 0) + 1
+        logger.debug("Top %d chunks distribution by paper: %s", top_k, top_papers)
 
-        # Return only top_k chunks (convert to list to match return type)
-        return list(reranked_chunks[:top_k])
-
-    except Exception as e:
-        logger.error("NVIDIA reranker failed: %s", e, exc_info=True)
-        logger.info("Falling back to original chunk order (first %d chunks)", top_k)
-        # Return the first top_k chunks as fallback
-        return chunks[:top_k]
+    # Return only top_k chunks (convert to list to match return type)
+    return list(reranked_chunks[:top_k])
