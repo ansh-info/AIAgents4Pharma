@@ -1,5 +1,8 @@
+"""pdf rag pipeline tests."""
+
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from langchain_core.documents import Document
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.rag_pipeline import (
@@ -9,8 +12,13 @@ from aiagents4pharma.talk2scholars.tools.pdf.utils.rag_pipeline import (
 
 @pytest.fixture
 def base_config():
+    """base_config fixture to provide common configuration for tests."""
+
     class Config:
+        """configuration class for tests."""
+
         def get(self, key, default=None):
+            """get method to retrieve configuration values."""
             return {
                 "initial_retrieval_k": 120,
                 "mmr_diversity": 0.7,
@@ -23,6 +31,7 @@ def base_config():
 
 @pytest.fixture
 def mock_docs():
+    """mock_docs fixture to simulate PDF chunks."""
     return [
         Document(page_content=f"chunk {i}", metadata={"paper_id": f"P{i % 2}"})
         for i in range(10)
@@ -34,6 +43,7 @@ def mock_docs():
     "aiagents4pharma.talk2scholars.tools.pdf.utils.rag_pipeline.retrieve_relevant_chunks"
 )
 def test_rag_pipeline_gpu_path(mock_retrieve, mock_rerank, base_config, mock_docs):
+    """test RAG pipeline with GPU path."""
     mock_retrieve.return_value = mock_docs
     mock_rerank.return_value = mock_docs[:5]
 
@@ -55,6 +65,7 @@ def test_rag_pipeline_gpu_path(mock_retrieve, mock_rerank, base_config, mock_doc
     "aiagents4pharma.talk2scholars.tools.pdf.utils.rag_pipeline.retrieve_relevant_chunks"
 )
 def test_rag_pipeline_cpu_path(mock_retrieve, mock_rerank, base_config, mock_docs):
+    """rag pipeline with CPU path."""
     mock_retrieve.return_value = mock_docs
     mock_rerank.return_value = mock_docs[:5]
 
@@ -76,6 +87,7 @@ def test_rag_pipeline_cpu_path(mock_retrieve, mock_rerank, base_config, mock_doc
     "aiagents4pharma.talk2scholars.tools.pdf.utils.rag_pipeline.retrieve_relevant_chunks"
 )
 def test_rag_pipeline_empty_results(mock_retrieve, mock_rerank, base_config):
+    """rag pipeline with no results."""
     mock_retrieve.return_value = []
 
     result = retrieve_and_rerank_chunks(

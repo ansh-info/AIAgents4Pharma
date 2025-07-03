@@ -1,5 +1,8 @@
+"""Unit tests for PDF document processing utilities."""
+
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.document_processor import (
     load_and_split_pdf,
@@ -8,6 +11,7 @@ from aiagents4pharma.talk2scholars.tools.pdf.utils.document_processor import (
 
 @pytest.fixture
 def base_args():
+    """base_args fixture to provide common arguments for tests."""
     return {
         "paper_id": "P123",
         "pdf_url": "mock/path/to/paper.pdf",
@@ -23,6 +27,7 @@ def base_args():
     "aiagents4pharma.talk2scholars.tools.pdf.utils.document_processor.RecursiveCharacterTextSplitter"
 )
 def test_load_and_split_pdf_success(mock_splitter_cls, mock_loader_cls, base_args):
+    """load_and_split_pdf should load and split PDF correctly."""
     mock_doc = MagicMock()
     mock_doc.metadata = {"page": 1}
     mock_loader = MagicMock()
@@ -50,6 +55,7 @@ def test_load_and_split_pdf_success(mock_splitter_cls, mock_loader_cls, base_arg
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.document_processor.PyPDFLoader")
 def test_load_and_split_pdf_raises_if_config_missing(mock_loader_cls, base_args):
+    """load_and_split_pdf should raise ValueError if config is None."""
     mock_loader = MagicMock()
     mock_loader.load.return_value = [MagicMock()]
     mock_loader_cls.return_value = mock_loader

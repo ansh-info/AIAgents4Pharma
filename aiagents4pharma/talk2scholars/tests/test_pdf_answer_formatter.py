@@ -1,11 +1,15 @@
-import pytest
+"""answer_formatter tests."""
+
 from unittest.mock import patch
+
+import pytest
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.answer_formatter import format_answer
 
 
 @pytest.fixture
 def base_args():
+    """base_args fixture to provide common arguments for tests."""
     return {
         "question": "What is the conclusion?",
         "chunks": [{"content": "chunk1"}, {"content": "chunk2"}],
@@ -22,6 +26,7 @@ def base_args():
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.answer_formatter.generate_answer")
 def test_format_answer_with_sources(mock_generate_answer, base_args):
+    """test format_answer with sources."""
     mock_generate_answer.return_value = {
         "output_text": "This is the generated answer.",
         "papers_used": ["paper1", "paper2"],
@@ -38,6 +43,7 @@ def test_format_answer_with_sources(mock_generate_answer, base_args):
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.answer_formatter.generate_answer")
 def test_format_answer_no_sources(mock_generate_answer, base_args):
+    """test format_answer with no sources."""
     mock_generate_answer.return_value = {
         "output_text": "No sources were used.",
         "papers_used": [],  # No papers used
@@ -51,6 +57,7 @@ def test_format_answer_no_sources(mock_generate_answer, base_args):
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.answer_formatter.generate_answer")
 def test_format_answer_missing_output_text(mock_generate_answer, base_args):
+    """test format_answer with missing output text."""
     mock_generate_answer.return_value = {"papers_used": ["paper1"]}
 
     result = format_answer(**base_args)

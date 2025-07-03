@@ -1,5 +1,5 @@
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection import (
     detect_nvidia_gpu,
@@ -7,15 +7,20 @@ from aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection import (
     log_index_configuration,
 )
 
-
 # === detect_nvidia_gpu ===
 
 
 def test_detect_nvidia_gpu_force_cpu_from_config():
+    """detect_nvidia_gpu should return False if force_cpu_mode is set."""
+
     class GPUConfig:
+        """gPU configuration class."""
+
         force_cpu_mode = True
 
     class Config:
+        """configuration class."""
+
         gpu_detection = GPUConfig()
 
     assert detect_nvidia_gpu(Config()) is False
@@ -23,6 +28,7 @@ def test_detect_nvidia_gpu_force_cpu_from_config():
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection.subprocess.run")
 def test_detect_nvidia_gpu_success(mock_run):
+    """detect_nvidia_gpu should return True if NVIDIA GPUs are detected."""
     mock_run.return_value = MagicMock(
         returncode=0, stdout="NVIDIA A100\nNVIDIA RTX 3090"
     )
@@ -33,6 +39,7 @@ def test_detect_nvidia_gpu_success(mock_run):
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection.subprocess.run")
 def test_detect_nvidia_gpu_no_output(mock_run):
+    """detect_nvidia_gpu should return False if no GPUs are detected."""
     mock_run.return_value = MagicMock(returncode=0, stdout="")
 
     assert detect_nvidia_gpu() is False
@@ -40,6 +47,7 @@ def test_detect_nvidia_gpu_no_output(mock_run):
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection.subprocess.run")
 def test_detect_nvidia_gpu_exception(mock_run):
+    """detect_nvidia_gpu should handle exceptions gracefully."""
     mock_run.side_effect = RuntimeError("command failed")
     assert detect_nvidia_gpu() is False
 
@@ -48,6 +56,7 @@ def test_detect_nvidia_gpu_exception(mock_run):
 
 
 def test_get_optimal_index_config_gpu():
+    """get_optimal_index_config should return GPU_CAGRA for GPU setup."""
     index_params, search_params = get_optimal_index_config(
         has_gpu=True, embedding_dim=768
     )
@@ -58,6 +67,7 @@ def test_get_optimal_index_config_gpu():
 
 
 def test_get_optimal_index_config_cpu():
+    """get_optimal_index_config should return IVF_FLAT for CPU setup."""
     index_params, search_params = get_optimal_index_config(
         has_gpu=False, embedding_dim=768
     )
@@ -72,6 +82,7 @@ def test_get_optimal_index_config_cpu():
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection.logger")
 def test_log_index_configuration_logs_all(mock_logger):
+    """log_index_configuration should log all parameters correctly."""
     index_params = {
         "index_type": "IVF_FLAT",
         "metric_type": "COSINE",

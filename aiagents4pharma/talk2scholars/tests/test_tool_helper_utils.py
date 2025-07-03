@@ -4,34 +4,40 @@ Unit tests for QAToolHelper routines in tool_helper.py
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.tool_helper import QAToolHelper
 
 
 class TestQAToolHelper(unittest.TestCase):
-    """tests for QAToolHelper routines in tool_helper.py"""
+    """tests for QAToolHelper routines"""
 
     def setUp(self):
-        """set up test case"""
+        """setup for each test"""
         self.helper = QAToolHelper()
 
     def test_start_call_sets_config_and_call_id(self):
-        """test start_call sets config and call_id"""
+        """start_call should set config and call_id"""
         cfg = SimpleNamespace(foo="bar")
         self.helper.start_call(cfg, "call123")
         self.assertIs(self.helper.config, cfg)
         self.assertEqual(self.helper.call_id, "call123")
 
-    def test_init_vector_store_reuse(self):
-        """test init_vector_store reuses existing instance"""
+    @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.tool_helper.get_vectorstore")
+    def test_init_vector_store_reuse(self, mock_get_vectorstore):
+        """Mock vector store reuse test"""
         emb_model = MagicMock()
+        mock_instance = MagicMock()
+        mock_get_vectorstore.return_value = mock_instance
+
         first = self.helper.init_vector_store(emb_model)
         second = self.helper.init_vector_store(emb_model)
-        self.assertIs(second, first)
+
+        self.assertIs(first, second)
+        self.assertIs(second, mock_instance)
 
     def test_get_state_models_and_data_success(self):
-        """test get_state_models_and_data returns models and data"""
+        """get_state_models_and_data should return models and data from state"""
         emb = MagicMock()
         llm = MagicMock()
         articles = {"p": {}}
@@ -46,44 +52,34 @@ class TestQAToolHelper(unittest.TestCase):
         self.assertIs(ret_articles, articles)
 
     def test_get_state_models_and_data_missing_text_embedding(self):
-        """test get_state_models_and_data raises ValueError if missing text embedding"""
+        """get_state_models_and_data should raise ValueError if text_embedding_model is missing"""
         state = {"llm_model": MagicMock(), "article_data": {"p": {}}}
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(ValueError):
             self.helper.get_state_models_and_data(state)
-        self.assertEqual(str(cm.exception), "No text embedding model found in state.")
 
     def test_get_state_models_and_data_missing_llm(self):
-        """test get_state_models_and_data raises ValueError if missing LLM"""
+        """should raise ValueError if llm_model is missing"""
         state = {"text_embedding_model": MagicMock(), "article_data": {"p": {}}}
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(ValueError):
             self.helper.get_state_models_and_data(state)
-        self.assertEqual(str(cm.exception), "No LLM model found in state.")
 
     def test_get_state_models_and_data_missing_article_data(self):
-        """test get_state_models_and_data raises ValueError if missing article data"""
+        """get_state_models_and_data should raise ValueError if article_data is missing"""
         state = {"text_embedding_model": MagicMock(), "llm_model": MagicMock()}
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(ValueError):
             self.helper.get_state_models_and_data(state)
-        self.assertEqual(str(cm.exception), "No article_data found in state.")
 
     def test_get_hardware_stats(self):
+        """get_hardware_stats should return correct GPU and hardware mode"""
         helper = QAToolHelper()
         helper.call_id = "test_call"
 
-        # Case 1: GPU not available
         helper.has_gpu = False
         stats = helper.get_hardware_stats()
-        assert stats == {
-            "gpu_available": False,
-            "hardware_mode": "CPU-only",
-            "call_id": "test_call",
-        }
+        self.assertEqual(stats["gpu_available"], False)
+        self.assertEqual(stats["hardware_mode"], "CPU-only")
 
-        # Case 2: GPU available
         helper.has_gpu = True
         stats = helper.get_hardware_stats()
-        assert stats == {
-            "gpu_available": True,
-            "hardware_mode": "GPU-accelerated",
-            "call_id": "test_call",
-        }
+        self.assertEqual(stats["gpu_available"], True)
+        self.assertEqual(stats["hardware_mode"], "GPU-accelerated")

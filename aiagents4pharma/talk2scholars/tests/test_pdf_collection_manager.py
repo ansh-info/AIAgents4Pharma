@@ -1,11 +1,16 @@
+"""collection_manager for managing Milvus collections for PDF chunks."""
+
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils import collection_manager
 
 
 @pytest.fixture
 def config_mock():
+    """config_mock fixture to simulate configuration."""
+
     class Config:
         class Milvus:
             embedding_dim = 768
@@ -17,10 +22,12 @@ def config_mock():
 
 @pytest.fixture
 def index_params():
+    """index_params fixture to provide index parameters for tests."""
     return {"index_type": "IVF_FLAT", "params": {"nlist": 128}, "metric_type": "L2"}
 
 
 def test_cached_collection_returned(config_mock, index_params):
+    """ "check if cached collection is returned."""
     mock_collection = MagicMock()
     collection_name = "test_cached"
     collection_manager._collection_cache[collection_name] = mock_collection
@@ -38,6 +45,7 @@ def test_cached_collection_returned(config_mock, index_params):
 def test_create_new_collection(
     mock_utility, mock_Collection, config_mock, index_params
 ):
+    """check if new collection is created when it does not exist."""
     mock_utility.list_collections.return_value = []
 
     mock_collection = MagicMock()
@@ -59,6 +67,7 @@ def test_create_new_collection(
 def test_load_existing_collection(
     mock_utility, mock_Collection, config_mock, index_params
 ):
+    """test loading an existing collection."""
     mock_utility.list_collections.return_value = ["existing_collection"]
 
     mock_collection = MagicMock()
@@ -79,6 +88,7 @@ def test_load_existing_collection(
 def test_debug_collection_state_failure(
     mock_utility, mock_Collection, config_mock, index_params
 ):
+    """debug_collection_state should log but not raise on failure."""
     mock_utility.list_collections.return_value = ["bad_collection"]
 
     mock_collection = MagicMock()
@@ -103,6 +113,7 @@ def test_debug_collection_state_failure(
 def test_ensure_collection_exception(
     mock_utility, mock_Collection, config_mock, index_params
 ):
+    """ensure_collection_exists should raise on utility failure."""
     mock_utility.list_collections.side_effect = RuntimeError("milvus failure")
 
     with pytest.raises(RuntimeError, match="milvus failure"):
@@ -116,6 +127,7 @@ def test_ensure_collection_exception(
 def test_debug_collection_state_logs_exception(
     mock_utility, mock_Collection, config_mock, index_params
 ):
+    """collection_manager should log exceptions in debug_collection_state."""
     mock_utility.list_collections.return_value = ["trouble_collection"]
 
     mock_collection = MagicMock()

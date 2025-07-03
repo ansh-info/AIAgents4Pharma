@@ -2,13 +2,12 @@
 Unit tests for NVIDIA NIM reranker error handling in nvidia_nim_reranker.py
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from langchain_core.documents import Document
 
-from unittest.mock import patch, MagicMock
-from langchain_core.documents import Document
-
+from aiagents4pharma.talk2scholars.tools.pdf.utils import nvidia_nim_reranker
 from aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker import (
     rerank_chunks,
 )
@@ -16,6 +15,7 @@ from aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker import (
 
 @pytest.fixture
 def mock_chunks():
+    """mock_chunks fixture to simulate PDF chunks."""
     return [
         Document(
             page_content=f"chunk {i}",
@@ -26,6 +26,7 @@ def mock_chunks():
 
 
 def test_rerank_chunks_short_input(mock_chunks):
+    """mock rerank_chunks with fewer chunks than top_k."""
     result = rerank_chunks(
         mock_chunks[:3], "What is cancer?", config=MagicMock(), top_k=5
     )
@@ -33,6 +34,7 @@ def test_rerank_chunks_short_input(mock_chunks):
 
 
 def test_rerank_chunks_missing_api_key(mock_chunks):
+    """test rerank_chunks with missing API key."""
     mock_config = MagicMock()
     mock_config.reranker.api_key = None
 
@@ -42,6 +44,7 @@ def test_rerank_chunks_missing_api_key(mock_chunks):
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.NVIDIARerank")
 def test_rerank_chunks_success(mock_reranker_cls, mock_chunks):
+    """test rerank_chunks with successful reranking."""
     # Fake reranker returns reversed list
     reranker_instance = MagicMock()
     reranker_instance.compress_documents.return_value = list(reversed(mock_chunks))
@@ -62,6 +65,7 @@ def test_rerank_chunks_success(mock_reranker_cls, mock_chunks):
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.NVIDIARerank")
 def test_rerank_chunks_reranker_fails(mock_reranker_cls, mock_chunks):
+    """test rerank_chunks when reranker fails."""
     reranker_instance = MagicMock()
     reranker_instance.compress_documents.side_effect = RuntimeError("API failure")
     mock_reranker_cls.return_value = reranker_instance
@@ -81,6 +85,7 @@ def test_rerank_chunks_reranker_fails(mock_reranker_cls, mock_chunks):
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.logger")
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.nvidia_nim_reranker.NVIDIARerank")
 def test_rerank_chunks_debug_block_triggered(mock_reranker_cls, mock_logger):
+    """test rerank_chunks with debug logging enabled."""
     # Force logger.isEnabledFor(logging.DEBUG) → True
     mock_logger.isEnabledFor.return_value = True
 
@@ -98,8 +103,6 @@ def test_rerank_chunks_debug_block_triggered(mock_reranker_cls, mock_logger):
     mock_config = MagicMock()
     mock_config.reranker.api_key = "abc"
     mock_config.reranker.model = "mymodel"
-
-    from aiagents4pharma.talk2scholars.tools.pdf.utils import nvidia_nim_reranker
 
     result = nvidia_nim_reranker.rerank_chunks(
         chunks * 2, "Test query", mock_config, top_k=3

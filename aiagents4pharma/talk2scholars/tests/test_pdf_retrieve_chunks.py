@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from langchain_core.documents import Document
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.retrieve_chunks import (
@@ -10,11 +11,13 @@ from aiagents4pharma.talk2scholars.tools.pdf.utils.retrieve_chunks import (
 
 @pytest.fixture
 def mock_vector_store():
+    """vector_store fixture to simulate a vector store."""
     return MagicMock()
 
 
 @pytest.fixture
 def mock_chunks():
+    """mock_chunks fixture to simulate PDF chunks."""
     return [
         Document(page_content=f"chunk {i}", metadata={"paper_id": f"P{i%2}"})
         for i in range(5)
@@ -23,6 +26,7 @@ def mock_chunks():
 
 @pytest.fixture
 def mock_scored_chunks():
+    """mock_scored_chunks fixture to simulate scored PDF chunks."""
     return [
         (Document(page_content=f"chunk {i}", metadata={}), score)
         for i, score in enumerate([0.9, 0.8, 0.4, 0.95])
@@ -31,6 +35,7 @@ def mock_scored_chunks():
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.retrieve_chunks.logger")
 def test_retrieve_chunks_cpu_success(mock_logger, mock_vector_store, mock_chunks):
+    """ "test retrieve_relevant_chunks with CPU path."""
     mock_vector_store.has_gpu = False
     mock_vector_store.max_marginal_relevance_search.return_value = mock_chunks
 
@@ -42,6 +47,7 @@ def test_retrieve_chunks_cpu_success(mock_logger, mock_vector_store, mock_chunks
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.retrieve_chunks.logger")
 def test_retrieve_chunks_gpu_success(mock_logger, mock_vector_store, mock_chunks):
+    """test retrieve_relevant_chunks with GPU path."""
     mock_vector_store.has_gpu = True
     mock_vector_store.max_marginal_relevance_search.return_value = mock_chunks
 
@@ -55,6 +61,7 @@ def test_retrieve_chunks_gpu_success(mock_logger, mock_vector_store, mock_chunks
 def test_retrieve_chunks_fallback_on_exception(
     mock_logger, mock_vector_store, mock_chunks
 ):
+    """test retrieve_relevant_chunks fallback to similarity search on exception."""
     mock_vector_store.has_gpu = False
     mock_vector_store.max_marginal_relevance_search.side_effect = Exception("MMR fail")
     mock_vector_store.similarity_search.return_value = mock_chunks
@@ -68,6 +75,7 @@ def test_retrieve_chunks_fallback_on_exception(
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.retrieve_chunks.logger")
 def test_retrieve_chunks_final_failure_returns_empty(mock_logger, mock_vector_store):
+    """test retrieve_relevant_chunks returns empty on final failure."""
     mock_vector_store.has_gpu = False
     mock_vector_store.max_marginal_relevance_search.side_effect = Exception("MMR fail")
     mock_vector_store.similarity_search.side_effect = Exception("Sim fail")
@@ -78,6 +86,7 @@ def test_retrieve_chunks_final_failure_returns_empty(mock_logger, mock_vector_st
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.retrieve_chunks.logger")
 def test_retrieve_chunks_with_filter(mock_logger, mock_vector_store, mock_chunks):
+    """test retrieve_relevant_chunks with paper_id filter."""
     mock_vector_store.has_gpu = False
     mock_vector_store.max_marginal_relevance_search.return_value = mock_chunks
 
@@ -93,6 +102,7 @@ def test_retrieve_chunks_with_filter(mock_logger, mock_vector_store, mock_chunks
 def test_retrieve_chunks_with_scores_success(
     mock_logger, mock_vector_store, mock_scored_chunks
 ):
+    """retrieve_relevant_chunks_with_scores with GPU path."""
     mock_vector_store.has_gpu = True
     mock_vector_store.similarity_search_with_score.return_value = mock_scored_chunks
 
@@ -111,6 +121,7 @@ def test_retrieve_chunks_with_scores_success(
 def test_retrieve_chunks_with_scores_fallback_to_default(
     mock_logger, mock_vector_store, mock_chunks
 ):
+    """test retrieve_relevant_chunks_with_scores fallback to default search."""
     del mock_vector_store.similarity_search_with_score
     mock_vector_store.has_gpu = False
     mock_vector_store.max_marginal_relevance_search.return_value = mock_chunks
@@ -130,6 +141,7 @@ def test_retrieve_chunks_with_scores_fallback_to_default(
 def test_retrieve_chunks_with_scores_error_returns_empty(
     mock_logger, mock_vector_store
 ):
+    """ "retrieve_relevant_chunks_with_scores handles errors gracefully."""
     mock_vector_store.similarity_search_with_score.side_effect = Exception(
         "score search failed"
     )
@@ -146,6 +158,7 @@ def test_retrieve_chunks_with_scores_error_returns_empty(
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.retrieve_chunks.logger")
 def test_retrieve_chunks_no_vector_store(mock_logger):
+    """error handling when vector store is not initialized."""
     result = retrieve_relevant_chunks(vector_store=None, query="irrelevant")
     assert result == []
     mock_logger.error.assert_called_with("Vector store is not initialized")
@@ -153,6 +166,7 @@ def test_retrieve_chunks_no_vector_store(mock_logger):
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.retrieve_chunks.logger")
 def test_retrieve_chunks_with_scores_no_vector_store(mock_logger):
+    """check error handling when vector store is not initialized."""
     result = retrieve_relevant_chunks_with_scores(vector_store=None, query="none")
     assert result == []
     mock_logger.error.assert_called_with("Vector store is not initialized")
@@ -162,6 +176,7 @@ def test_retrieve_chunks_with_scores_no_vector_store(mock_logger):
 def test_retrieve_chunks_default_search_params(
     mock_logger, mock_vector_store, mock_chunks
 ):
+    """retrieve_relevant_chunks uses default search params when not set."""
     mock_vector_store.has_gpu = False
     delattr(mock_vector_store, "search_params")  # Simulate missing search_params
     mock_vector_store.max_marginal_relevance_search.return_value = mock_chunks
@@ -182,6 +197,7 @@ def test_retrieve_chunks_default_search_params(
 def test_retrieve_chunks_with_scores_paper_filter(
     mock_logger, mock_vector_store, mock_scored_chunks
 ):
+    """ensure retrieve_relevant_chunks_with_scores applies paper_id filter."""
     mock_vector_store.similarity_search_with_score.return_value = mock_scored_chunks
 
     results = retrieve_relevant_chunks_with_scores(

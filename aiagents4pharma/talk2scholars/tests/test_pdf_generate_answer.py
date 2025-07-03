@@ -1,14 +1,18 @@
-import pytest
+"""generate_answer tests for the PDF tool"""
+
 from unittest.mock import MagicMock
 
+import pytest
+
 from aiagents4pharma.talk2scholars.tools.pdf.utils.generate_answer import (
-    generate_answer,
     _build_context_and_sources,
+    generate_answer,
 )
 
 
 @pytest.fixture
 def mock_chunks():
+    """mock_chunks fixture to provide sample document chunks."""
     doc1 = MagicMock()
     doc1.page_content = "This is chunk one."
     doc1.metadata = {
@@ -37,6 +41,7 @@ def mock_chunks():
 
 
 def test_build_context_and_sources_formatting(mock_chunks):
+    """build_context_and_sources should format context and sources correctly."""
     context, sources = _build_context_and_sources(mock_chunks)
 
     assert "[Document 1] From: 'Title 1' (ID: P1)" in context
@@ -48,6 +53,7 @@ def test_build_context_and_sources_formatting(mock_chunks):
 
 
 def test_generate_answer_success(mock_chunks):
+    """generate_answer should return formatted answer and sources."""
     mock_llm = MagicMock()
     mock_llm.invoke.return_value.content = "The answer is XYZ."
 
@@ -64,6 +70,7 @@ def test_generate_answer_success(mock_chunks):
 
 
 def test_generate_answer_raises_for_none_config(mock_chunks):
+    """generate_answer should raise ValueError for None config."""
     mock_llm = MagicMock()
     with pytest.raises(
         ValueError, match="Configuration for generate_answer is required."
@@ -72,6 +79,7 @@ def test_generate_answer_raises_for_none_config(mock_chunks):
 
 
 def test_generate_answer_raises_for_missing_template(mock_chunks):
+    """generate_answer should raise ValueError for missing prompt_template in config."""
     mock_llm = MagicMock()
     with pytest.raises(
         ValueError, match="The prompt_template is missing from the configuration."
