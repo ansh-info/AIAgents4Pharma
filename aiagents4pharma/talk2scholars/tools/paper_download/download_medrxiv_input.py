@@ -23,7 +23,7 @@ class DownloadMedrxivPaperInput(BaseModel):
     """Input schema for the medRxiv paper download tool."""
 
     doi: str = Field(
-        description="""The medRxiv DOI, from search_helper or multi_helper or single_helper, 
+        description="""The medRxiv DOI, from search_helper or multi_helper or single_helper,
     used to retrieve the paper details and PDF URL."""
     )
     tool_call_id: Annotated[str, InjectedToolCallId]
