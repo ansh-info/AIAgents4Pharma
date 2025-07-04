@@ -51,9 +51,6 @@ else
 	wget https://github.com/milvus-io/milvus/releases/download/v2.6.0-rc1/milvus-standalone-docker-compose-gpu.yml -O milvus-docker-compose.yml
 fi
 
-# Ensure Docker networks exist
-docker network inspect app-network >/dev/null 2>&1 || docker network create app-network
-
 echo "[STARTUP] Starting Milvus with $GPU_TYPE configuration..."
 
 # Start Milvus services
@@ -86,73 +83,25 @@ if [ "$MILVUS_READY" = false ]; then
 	exit 1
 fi
 
-# Additional verification - try to connect to Milvus API
-echo "[STARTUP] Testing Milvus API endpoints..."
-curl -s http://localhost:19530/health && echo " - Health endpoint OK" || echo " - Health endpoint FAILED"
+echo "[STARTUP] Milvus is ready. Starting talk2scholars application..."
 
-# Try to list collections (this tests if Milvus is actually functional)
-if command -v python3 >/dev/null 2>&1; then
-	python3 -c "
-import sys
-try:
-    from pymilvus import connections, Collection
-    connections.connect('default', host='127.0.0.1', port='19530')
-    print('SUCCESS: Python Milvus connection test passed')
-    connections.disconnect('default')
-except Exception as e:
-    print(f'FAILED: Python Milvus connection test failed: {e}')
-    sys.exit(1)
-" || echo "[STARTUP] Python Milvus test failed - this may be normal if pymilvus is not installed on host"
-fi
+# Start the main application (it will automatically connect to milvus network)
+docker compose up -d talk2scholars
 
-echo "[STARTUP] Milvus is ready. Connecting talk2scholars to Milvus network..."
+# Wait a moment for the application to start
+sleep 10
 
-# Connect the talk2scholars container to the milvus network after it's created
-MILVUS_NETWORK=$(docker network ls --format "table {{.Name}}" | grep milvus | head -1)
-if [ -n "$MILVUS_NETWORK" ]; then
-	echo "[STARTUP] Found Milvus network: $MILVUS_NETWORK"
-else
-	echo "[STARTUP] Warning: Could not find Milvus network, using default bridge"
-	MILVUS_NETWORK="bridge"
-fi
+# Test connectivity
+echo "[STARTUP] Testing Milvus connectivity..."
+docker exec talk2scholars sh -c "
+    echo 'Testing connection to milvus-standalone:19530...'
+    curl -s http://milvus-standalone:19530/health && echo 'SUCCESS: Milvus is accessible' || echo 'FAILED: Cannot reach Milvus'
+"
 
-echo "[STARTUP] Starting talk2scholars application..."
-
-# Check if .env file exists and create a temporary compose file accordingly
-if [ -f ".env" ]; then
-	echo "[STARTUP] Found .env file, using it for environment variables..."
-	# Create a temporary docker-compose file with env_file
-	cat >docker-compose-temp.yml <<'EOF'
-services:
-  talk2scholars:
-    platform: linux/amd64
-    image: virtualpatientengine/talk2scholars:latest
-    container_name: talk2scholars
-    ports:
-      - "8501:8501"
-    env_file:
-      - .env
-    restart: unless-stopped
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    external: true
-    name: app-network
-EOF
-	docker compose -f docker-compose-temp.yml up -d talk2scholars
-	rm docker-compose-temp.yml
-else
-	echo "[STARTUP] No .env file found, starting without environment file..."
-	docker compose up -d talk2scholars
-fi
-
-# Connect talk2scholars to the milvus network
-if [ "$MILVUS_NETWORK" != "bridge" ]; then
-	echo "[STARTUP] Connecting talk2scholars to Milvus network..."
-	docker network connect "$MILVUS_NETWORK" talk2scholars || echo "[STARTUP] Warning: Could not connect to Milvus network"
-fi
+# Clean up the downloaded milvus docker-compose file
+echo "[STARTUP] Cleaning up temporary files..."
+rm -f milvus-docker-compose.yml
+echo "[STARTUP] Removed milvus-docker-compose.yml"
 
 echo "[STARTUP] System fully running at: http://localhost:8501"
 echo "[STARTUP] Milvus API available at: http://localhost:19530"
