@@ -70,7 +70,9 @@ def test_get_vector_store_creates_if_missing(mock_milvus):
     setattr(singleton, "_event_loops", {})
 
     mock_embed = MagicMock()
-    vs = singleton.get_vector_store("collection1", mock_embed, {"host": "localhost"})
+    connection_args = {"host": "localhost", "port": 19530}
+
+    vs = singleton.get_vector_store("collection1", mock_embed, connection_args)
 
     vector_stores = getattr(singleton, "_vector_stores")
     assert vs is vector_stores["collection1"]
