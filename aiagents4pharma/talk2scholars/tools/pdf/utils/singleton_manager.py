@@ -112,11 +112,18 @@ class VectorstoreSingleton:
             # Ensure event loop exists for this thread
             self.get_event_loop()
 
-            # Create LangChain Milvus instance
+            # Create LangChain Milvus instance with explicit URI format
+            # This ensures LangChain uses the correct host
+            milvus_uri = f"http://{connection_args['host']}:{connection_args['port']}"
+
             vector_store = Milvus(
                 embedding_function=embedding_model,
                 collection_name=collection_name,
-                connection_args=connection_args,
+                connection_args={
+                    "uri": milvus_uri,  # Use URI format instead of host/port
+                    "host": connection_args["host"],
+                    "port": connection_args["port"],
+                },
                 text_field="text",
                 auto_id=False,
                 drop_old=False,
@@ -124,6 +131,10 @@ class VectorstoreSingleton:
             )
 
             self._vector_stores[collection_name] = vector_store
-            logger.info("Created new vector store for collection: %s", collection_name)
+            logger.info(
+                "Created new vector store for collection: %s with URI: %s",
+                collection_name,
+                milvus_uri,
+            )
 
         return self._vector_stores[collection_name]

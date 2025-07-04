@@ -3,7 +3,7 @@
 # Milvus vector database settings
 milvus:
   # Connection settings
-  host: ${oc.env:MILVUS_HOST,127.0.0.1}
+  host: ${oc.env:MILVUS_HOST,localhost} # Changed default from 127.0.0.1 to localhost
   port: ${oc.env:MILVUS_PORT,19530}
 
   # Database and collection settings

@@ -94,11 +94,21 @@ class Vectorstore:
         # Track loaded papers to prevent duplicate loading
         self.loaded_papers = set()
 
-        # Initialize Milvus connection parameters
+        # Initialize Milvus connection parameters with environment variable fallback
         self.connection_args = {
-            "host": config.milvus.host if config else "127.0.0.1",
-            "port": config.milvus.port if config else 19530,
+            "host": (
+                config.milvus.host if config else os.getenv("MILVUS_HOST", "127.0.0.1")
+            ),
+            "port": (
+                config.milvus.port if config else int(os.getenv("MILVUS_PORT", "19530"))
+            ),
         }
+        # Log the connection parameters being used
+        logger.info(
+            "Using Milvus connection: %s:%s",
+            self.connection_args["host"],
+            self.connection_args["port"],
+        )
         self.collection_name = (
             config.milvus.collection_name if config else "pdf_rag_documents"
         )
