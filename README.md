@@ -99,16 +99,16 @@ To use the **Agents**, you need a free **NVIDIA API key**. Create an account and
 
 To use **Talk2AIAgents4Pharma** or **Talk2KnowledgeGraphs**, you must have **Ollama** installed. Follow installation instructions for your OS [here](https://ollama.com/download).
 
-After installing, pull the `nomic-embed-text` model and start the server by running:
-
-```sh
-ollama pull nomic-embed-text && ollama serve
-```
-
-More details about the model are available [here](https://ollama.com/library/nomic-embed-text).
-
-Additionally on **Windows**, the `pcst_fast 1.0.10` library requires **Microsoft Visual C++ 14.0 or greater**.  
- You can download the **Microsoft C++ Build Tools** [here](https://visualstudio.microsoft.com/visual-cpp-build-tools/).
+> After installing, pull the `nomic-embed-text` model and start the server by running:
+>
+> ```sh
+> ollama pull nomic-embed-text && ollama serve
+> ```
+>
+> More details about the model are available [here](https://ollama.com/library/nomic-embed-text).
+>
+> Additionally on **Windows**, the `pcst_fast 1.0.10` library requires **Microsoft Visual C++ 14.0 or greater**.
+> You can download the **Microsoft C++ Build Tools** [here](https://visualstudio.microsoft.com/visual-cpp-build-tools/).
 
 **LangSmith** support is optional. To enable it, create an API key [here](https://docs.smith.langchain.com/administration/how_to_guides/organization_management/create_account_api_key).
 
