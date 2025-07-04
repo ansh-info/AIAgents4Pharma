@@ -1,6 +1,6 @@
 """
 GPU Detection Utility for Milvus Index Selection
-Enhanced to handle COSINE -> IP conversion for GPU indexes
+Handle COSINE -> IP conversion for GPU indexes
 """
 
 import logging

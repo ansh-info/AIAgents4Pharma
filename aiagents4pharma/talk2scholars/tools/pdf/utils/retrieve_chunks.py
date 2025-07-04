@@ -1,7 +1,7 @@
 """
 Retrieve relevant chunks from a Milvus vector store using MMR (Maximal Marginal Relevance).
-Updated to follow traditional RAG pipeline - retrieve first, then rerank.
-Enhanced with automatic GPU/CPU search parameter optimization.
+Follows traditional RAG pipeline - retrieve first, then rerank.
+With automatic GPU/CPU search parameter optimization.
 """
 
 import logging

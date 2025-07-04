@@ -1,6 +1,6 @@
 """
 NVIDIA NIM Reranker Utility for Milvus Integration
-Updated to rerank chunks instead of papers following traditional RAG pipeline
+Rerank chunks instead of papers following traditional RAG pipeline
 """
 
 import logging
