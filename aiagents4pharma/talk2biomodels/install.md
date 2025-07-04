@@ -1,4 +1,4 @@
-# Talk2Scholars
+# Talk2BioModels
 
 ## Installation
 
@@ -10,13 +10,11 @@ _This agent is available on Docker Hub._
 
 ```sh
 docker run -d \
-  --name talk2scholars \
+  --name talk2biomodels \
   -e OPENAI_API_KEY=<your_openai_api_key> \
-  -e ZOTERO_API_KEY=<your_zotero_api_key> \
-  -e ZOTERO_USER_ID=<your_zotero_user_id> \
   -e NVIDIA_API_KEY=<your_nvidia_api_key> \
   -p 8501:8501 \
-  virtualpatientengine/talk2scholars
+  virtualpatientengine/talk2biomodels
 ```
 
 ### Access the Web UI
@@ -32,8 +30,6 @@ http://localhost:8501
 ## Environment Variables
 
 - `OPENAI_API_KEY` – required
-- `ZOTERO_API_KEY` – required
-- `ZOTERO_USER_ID` – required
 - `NVIDIA_API_KEY` – required
 
 ---
@@ -41,7 +37,6 @@ http://localhost:8501
 ## Get Key
 
 - `NVIDIA_API_KEY` – required (obtain a free key at [https://build.nvidia.com/explore/discover](https://build.nvidia.com/explore/discover))
-- `ZOTERO_API_KEY` – required (generate at [https://www.zotero.org/user/login#applications](https://www.zotero.org/user/login#applications))
 
 **LangSmith** support is optional. To enable it, create an API key [here](https://docs.smith.langchain.com/administration/how_to_guides/organization_management/create_account_api_key).
 
@@ -49,17 +44,15 @@ http://localhost:8501
 
 ## Running Multiple Agents
 
-To avoid port conflicts, map the container’s port to a different host port. For example, to use port `8502`:
+By default, this agent listens on port `8501`. To run another agent on a different port, map a different host port:
 
 ```sh
 docker run -d \
-  --name talk2scholars \
+  --name talk2biomodels \
   -e OPENAI_API_KEY=<your_openai_api_key> \
-  -e ZOTERO_API_KEY=<your_zotero_api_key> \
-  -e ZOTERO_USER_ID=<your_zotero_user_id> \
   -e NVIDIA_API_KEY=<your_nvidia_api_key> \
   -p 8502:8501 \
-  virtualpatientengine/talk2scholars
+  virtualpatientengine/talk2biomodels
 ```
 
 Then visit: [http://localhost:8502](http://localhost:8502)

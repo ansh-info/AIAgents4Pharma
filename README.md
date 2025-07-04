@@ -43,98 +43,12 @@ Our toolkit currently consists of the following agents:
 
 _We now have all the agents available on Docker Hub._
 
-##### **To run Talk2AIAgents4Pharma / Talk2KnowledgeGraphs**
+Choose your agent below for detailed Docker instructions:
 
-Both agents require [Ollama](https://ollama.com/) to run embedding models like `nomic-embed-text`. We use a **single startup script** that automatically detects your hardware (NVIDIA, AMD, or CPU) and handles container startup, model loading, and service orchestration.
-
-##### **1. Download docker-compose.yml, .env.example and startup.sh from GitHub**
-
-###### Talk2Agents4Pharma
-
-```sh
-mkdir talk2aiagents4pharma && cd talk2aiagents4pharma && wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2aiagents4pharma/docker-compose.yml https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2aiagents4pharma/.env.example https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2aiagents4pharma/startup.sh
-```
-
-###### Talk2KnowledgeGraphs
-
-```sh
-mkdir talk2knowledgegraphs && cd talk2knowledgegraphs && wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/docker-compose.yml https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/.env.example https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/startup.sh
-```
-
-##### **2. Setup environment variables**
-
-Copy and configure your `.env` file:
-
-```sh
-cp .env.example .env
-```
-
-Then edit `.env` and add your API keys:
-
-```env
-OPENAI_API_KEY=...                  # Required for both agents
-NVIDIA_API_KEY=...                  # Required for both agents
-OLLAMA_HOST=http://ollama:11434     # Required for AA4P / T2KG
-LANGCHAIN_TRACING_V2=true           # Optional for both agents
-LANGCHAIN_API_KEY=...               # Optional for both agents
-```
-
-[Additional Notes for Windows Users](https://github.com/VirtualPatientEngine/AIAgents4Pharma/blob/main/aiagents4pharma/talk2aiagents4pharma/install.md#notes-for-windows-users)
-
-##### **3. Start the application**
-
-```sh
-chmod +x startup.sh
-./startup.sh        # Add --cpu flag to force CPU mode if needed
-```
-
-[More about startup script](https://github.com/VirtualPatientEngine/AIAgents4Pharma/blob/main/aiagents4pharma/talk2aiagents4pharma/install.md#about-startupsh)
-
-##### **To Run Talk2Biomodels / Talk2Scholars**
-
-###### Talk2Biomodels
-
-```docker
-docker run -d \
---name talk2biomodels \
--e OPENAI_API_KEY=<your_openai_api_key> \
--e NVIDIA_API_KEY=<your_nvidia_api_key> \
--p 8501:8501 \
-virtualpatientengine/talk2biomodels
-```
-
-###### Talk2Scholars
-
-```docker
-docker run -d \
---name talk2scholars \
--e OPENAI_API_KEY=<your_openai_api_key> \
--e ZOTERO_API_KEY=<your_zotero_api_key> \
--e ZOTERO_USER_ID=<your_zotero_user_id> \
--e NVIDIA_API_KEY=<your_nvidia_api_key> \
--p 8501:8501 \
-virtualpatientengine/talk2scholars
-```
-
-##### **4. Access the Web UI**
-
-Once started, the agent is available at:
-
-```
-http://localhost:8501
-```
-
-To use **Talk2AIAgents4Pharma** or **Talk2KnowledgeGraphs**, you need a free **NVIDIA API key**. Create an account and apply for free credits [here](https://build.nvidia.com/explore/discover).
-
-To use **Talk2BioModels** or **Talk2Scholars**, you need a free **NVIDIA API key**. Create an account and apply for free credits [here](https://build.nvidia.com/explore/discover).
-
-Only for **Talk2Scholars**, you also need a **Zotero API key**, which you can generate [here](https://www.zotero.org/user/login#applications). _(For all other agents, the Zotero key is not required.)_
-
-If you are using docker on Windows, please follow these [Windows Setup Notes](https://github.com/VirtualPatientEngine/AIAgents4Pharma/blob/main/aiagents4pharma/talk2aiagents4pharma/install.md#notes-for-windows-users).
-
-**LangSmith** support is optional. To enable it, create an API key [here](https://docs.smith.langchain.com/administration/how_to_guides/organization_management/create_account_api_key).
-
-[More on running multiple agents simultaneously](https://github.com/VirtualPatientEngine/AIAgents4Pharma/blob/main/aiagents4pharma/talk2aiagents4pharma/install.md#to-run-multiple-agents-simultaneously)
+- [Talk2AIAgents4Pharma](aiagents4pharma/talk2aiagents4pharma/README.md)
+- [Talk2KnowledgeGraphs](aiagents4pharma/talk2knowledgegraphs/README.md)
+- [Talk2BioModels](talk2biomodels/README.md)
+- [Talk2Scholars](talk2scholars/README.md)
 
 #### Option 2: git (for developers and contributors)
 

@@ -1,4 +1,4 @@
-# Talk2AIAgents4Pharma
+# Talk2KnowledgeGraphs
 
 ## Installation
 
@@ -15,10 +15,10 @@ _This agent is available on Docker Hub._
 #### 1. Download files
 
 ```sh
-mkdir talk2aiagents4pharma && cd talk2aiagents4pharma
-wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2aiagents4pharma/docker-compose.yml \
-     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2aiagents4pharma/.env.example \
-     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2aiagents4pharma/startup.sh
+mkdir talk2knowledgegraphs && cd talk2knowledgegraphs
+wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/docker-compose.yml \
+     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/.env.example \
+     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/startup.sh
 ```
 
 #### 2. Setup environment variables
@@ -27,14 +27,14 @@ wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main
 cp .env.example .env
 ```
 
-Edit `.env` with your API keys:
+Edit `.env` with your API keys:
 
 ```env
-OPENAI_API_KEY=...                  # Required
-NVIDIA_API_KEY=...                  # Required
+OPENAI_API_KEY=...                  # Required for agent
+NVIDIA_API_KEY=...                  # Required for embedding models
 OLLAMA_HOST=http://ollama:11434     # Required for embedding models
-LANGCHAIN_TRACING_V2=true           # Optional
-LANGCHAIN_API_KEY=...               # Optional
+LANGCHAIN_TRACING_V2=true           # Optional tracing
+LANGCHAIN_API_KEY=...               # Optional tracing
 ```
 
 ---
@@ -77,7 +77,7 @@ You can download Git Bash here: [Git for Windows](https://git-scm.com/downloads)
 
 When using Docker on Windows, make sure you **run Docker with administrative privileges** if you face permission issues.
 
-To resolve for permission issues, you can:
+To resolve permission issues, you can:
 
 - Review the official Docker documentation on [Windows permission requirements](https://docs.docker.com/desktop/setup/install/windows-permission-requirements/).
 - Alternatively, follow the community discussion and solutions on [Docker Community Forums](https://forums.docker.com/t/error-when-trying-to-run-windows-containers-docker-client-must-be-run-with-elevated-privileges/136619).
@@ -86,10 +86,10 @@ To resolve for permission issues, you can:
 
 ## About `startup.sh`
 
-Run the startup script. It will:
+When executed, the script will:
 
-- Detect your hardware configuration (NVIDIA GPU, AMD GPU, or CPU). Apple Metal is unavailable inside Docker, and Intel SIMD optimizations are automatically handled without special configuration.
-- Choose the correct Ollama image (`latest` or `rocm`).
-- Launch the Ollama container with appropriate runtime settings.
-- Pull the required embedding model (`nomic-embed-text`).
-- Start the agent after the model is available.
+- Detect NVIDIA, AMD, or CPU hardware (Apple Metal unsupported inside Docker).
+- Select the appropriate Ollama image (`latest` or `rocm`).
+- Launch the Ollama container with correct runtime options.
+- Pull the embedding model (`nomic-embed-text`).
+- Start the agent once the model is ready.
