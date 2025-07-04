@@ -64,6 +64,11 @@ http://localhost:8501
 
 **LangSmith** support is optional. To enable it, create an API key [here](https://docs.smith.langchain.com/administration/how_to_guides/organization_management/create_account_api_key).
 
+_Please note that this will create a new tracing project in your Langsmith
+account with the name `T2X-xxxx`, where `X` can be `AA4P` (Main Agent),
+If you skip the previous step, it will default to the name `default`.
+`xxxx` will be the 4-digit ID created for the session._
+
 ---
 
 ## Notes for Windows Users
