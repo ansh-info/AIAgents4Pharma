@@ -45,10 +45,10 @@ _We now have all the agents available on Docker Hub._
 
 Choose your agent below for detailed Docker instructions:
 
-- [Talk2AIAgents4Pharma](aiagents4pharma/talk2aiagents4pharma/README.md)
-- [Talk2KnowledgeGraphs](aiagents4pharma/talk2knowledgegraphs/README.md)
-- [Talk2BioModels](talk2biomodels/README.md)
-- [Talk2Scholars](talk2scholars/README.md)
+- [Talk2AIAgents4Pharma](aiagents4pharma/talk2aiagents4pharma/install.md)
+- [Talk2KnowledgeGraphs](aiagents4pharma/talk2knowledgegraphs/install.md)
+- [Talk2BioModels](talk2biomodels/install.md)
+- [Talk2Scholars](talk2scholars/install.md)
 
 #### Option 2: git (for developers and contributors)
 
@@ -82,8 +82,6 @@ export LANGCHAIN_API_KEY=...        # Optional for all agents
 To use **Talk2AIAgents4Pharma**, **Talk2BioModels**, **Talk2KnowledgeGraphs**, or **Talk2Scholars**, you need a free **NVIDIA API key**. Create an account and apply for free credits [here](https://build.nvidia.com/explore/discover).
 
 Only for **Talk2Scholars**, you also need a **Zotero API key**, which you can generate [here](https://www.zotero.org/user/login#applications). _(For all other agents, the Zotero key is not required.)_
-
-To use **Talk2Scholars**, you must have **FAISS** installed through **Conda**. Follow installation instructions for your OS [here](https://github.com/VirtualPatientEngine/AIAgents4Pharma/tree/main/aiagents4pharma/talk2scholars/install.md).
 
 To use **Talk2AIAgents4Pharma** or **Talk2KnowledgeGraphs**, you must have **Ollama** installed. Follow installation instructions for your OS [here](https://ollama.com/download).
 
