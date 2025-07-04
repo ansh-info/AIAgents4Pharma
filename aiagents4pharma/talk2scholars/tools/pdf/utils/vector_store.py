@@ -202,67 +202,77 @@ class Vectorstore:
         else:
             logger.info("Collection is empty - no existing papers")
 
-    def similarity_search(
-        self, query: str, k: int = 4, filter: Optional[Dict[str, Any]] = None, **kwargs
-    ) -> List[Document]:
+    def similarity_search(self, query: str, **kwargs: Any) -> List[Document]:
         """
         Perform similarity search on the vector store.
         Query embedding will be automatically normalized if using GPU with COSINE.
+        Keyword args:
+            k: int = 4
+            filter: Optional[Dict[str, Any]] = None
+            plus any other kwargs to pass through to the underlying vector_store.
         """
-        # Convert filter dict to Milvus expression if provided
+        # Extract our parameters
+        k: int = kwargs.pop("k", 4)
+        filter_: Optional[Dict[str, Any]] = kwargs.pop("filter", None)
+
+        # Build Milvus expr from filter_, if present
         expr = None
-        if filter:
+        if filter_:
             conditions = []
-            for key, value in filter.items():
+            for key, value in filter_.items():
                 if isinstance(value, str):
                     conditions.append(f'{key} == "{value}"')
                 elif isinstance(value, list):
-                    values_str = ", ".join(
-                        [f'"{v}"' if isinstance(v, str) else str(v) for v in value]
+                    vals = ", ".join(
+                        f'"{v}"' if isinstance(v, str) else str(v) for v in value
                     )
-                    conditions.append(f"{key} in [{values_str}]")
+                    conditions.append(f"{key} in [{vals}]")
                 else:
                     conditions.append(f"{key} == {value}")
-            expr = " and ".join(conditions) if conditions else None
+            expr = " and ".join(conditions)
 
-        # The wrapped embedding model will handle normalization automatically
-        results = self.vector_store.similarity_search(
+        # Delegate to the wrapped store
+        return self.vector_store.similarity_search(
             query=query, k=k, expr=expr, **kwargs
         )
 
-        return results
-
     def max_marginal_relevance_search(
-        self,
-        query: str,
-        k: int = 4,
-        fetch_k: int = 20,
-        lambda_mult: float = 0.5,
-        filter: Optional[Dict[str, Any]] = None,
-        **kwargs,
+        self, query: str, **kwargs: Any
     ) -> List[Document]:
         """
         Perform MMR search on the vector store.
         Query embedding will be automatically normalized if using GPU with COSINE.
+        Keyword args:
+            k: int = 4
+            fetch_k: int = 20
+            lambda_mult: float = 0.5
+            filter: Optional[Dict[str, Any]] = None
+            plus any other kwargs to pass through.
         """
-        # Convert filter dict to Milvus expression if provided
+        # Extract our parameters
+        k: int = kwargs.pop("k", 4)
+        fetch_k: int = kwargs.pop("fetch_k", 20)
+        lambda_mult: float = kwargs.pop("lambda_mult", 0.5)
+        filter_: Optional[Dict[str, Any]] = kwargs.pop("filter", None)
+
+        # Build Milvus expr from filter_, if present
         expr = None
-        if filter:
+        if filter_:
             conditions = []
-            for key, value in filter.items():
+            for key, value in filter_.items():
                 if isinstance(value, str):
                     conditions.append(f'{key} == "{value}"')
                 elif isinstance(value, list):
-                    values_str = ", ".join(
-                        [f'"{v}"' if isinstance(v, str) else str(v) for v in value]
+                    vals = ", ".join(
+                        f'"{v}"' if isinstance(v, str) else str(v) for v in value
                     )
-                    conditions.append(f"{key} in [{values_str}]")
+                    conditions.append(f"{key} in [{vals}]")
                 else:
                     conditions.append(f"{key} == {value}")
-            expr = " and ".join(conditions) if conditions else None
+            expr = " and ".join(conditions)
 
-        # The wrapped embedding model will handle normalization automatically
-        results = self.vector_store.max_marginal_relevance_search(
+        # Delegate to the wrapped store
+        return self.vector_store.max_marginal_relevance_search(
             query=query,
             k=k,
             fetch_k=fetch_k,
@@ -270,8 +280,6 @@ class Vectorstore:
             expr=expr,
             **kwargs,
         )
-
-        return results
 
     def _ensure_collection_loaded(self):
         """Ensure collection is loaded into memory/GPU after data insertion."""

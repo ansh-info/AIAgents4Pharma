@@ -17,28 +17,35 @@ def load_and_split_pdf(
     pdf_url: str,
     paper_metadata: Dict[str, Any],
     config: Any,
-    metadata_fields: List[str],
-    documents_dict: Dict[str, Document],
+    **kwargs: Any,
 ) -> List[Document]:
     """
     Load a PDF and split it into chunks.
 
     Args:
-        paper_id: Unique identifier for the paper
-        pdf_url: URL to the PDF
-        paper_metadata: Metadata about the paper
+        paper_id: Unique identifier for the paper.
+        pdf_url: URL to the PDF.
+        paper_metadata: Metadata about the paper (e.g. Title, Authors, etc.).
+        config: Configuration object with `chunk_size` and `chunk_overlap` attributes.
+        metadata_fields: List of additional metadata keys to propagate into each
+        chunk (passed via kwargs).
+        documents_dict: Dictionary where split chunks will also be stored under keys
+            of the form "{paper_id}_{chunk_index}" (passed via kwargs).
 
     Returns:
-        List of document chunks with metadata
+        A list of Document chunks, each with updated metadata.
     """
+    # Pull these out of kwargs so tests that call
+    # load_and_split_pdf(**base_args_params) continue to work
+    metadata_fields: List[str] = kwargs["metadata_fields"]
+    documents_dict: Dict[str, Document] = kwargs["documents_dict"]
+
     logger.info("Loading PDF for paper %s from %s", paper_id, pdf_url)
 
-    # Load the PDF
-    loader = PyPDFLoader(pdf_url)
-    documents = loader.load()
+    # Load pages
+    documents = PyPDFLoader(pdf_url).load()
     logger.info("Loaded %d pages from paper %s", len(documents), paper_id)
 
-    # Create text splitter according to provided configuration
     if config is None:
         raise ValueError("Configuration is required for text splitting in Vectorstore.")
     splitter = RecursiveCharacterTextSplitter(
@@ -47,16 +54,13 @@ def load_and_split_pdf(
         separators=["\n\n", "\n", ". ", " ", ""],
     )
 
-    # Split documents
+    # Split into chunks
     chunks = splitter.split_documents(documents)
     logger.info("Split paper %s into %d chunks", paper_id, len(chunks))
 
-    # Add metadata to each chunk
+    # Attach metadata & populate documents_dict
     for i, chunk in enumerate(chunks):
-        # Create unique ID for each chunk
         chunk_id = f"{paper_id}_{i}"
-
-        # Enhance metadata
         chunk.metadata.update(
             {
                 "paper_id": paper_id,
@@ -66,13 +70,9 @@ def load_and_split_pdf(
                 "source": pdf_url,
             }
         )
-
-        # Add any additional metadata fields
         for field in metadata_fields:
             if field in paper_metadata and field not in chunk.metadata:
                 chunk.metadata[field] = paper_metadata[field]
-
-        # Store in local dict for compatibility
         documents_dict[chunk_id] = chunk
 
     return chunks

@@ -153,8 +153,8 @@ def question_and_answer(
         llm_model,
         article_data,
         config,
-        call_id,
-        helper.has_gpu,
+        call_id=call_id,
+        has_gpu=helper.has_gpu,
     )
 
     logger.info(
