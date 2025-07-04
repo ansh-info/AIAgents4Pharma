@@ -4,20 +4,52 @@
 
 ### Docker (stable-release)
 
-_This agent is available on Docker Hub._
+**Prerequisites**
 
-### Run via `docker run`
+- [Milvus](https://milvus.io) (for a vector database)
+
+---
+
+#### 1. Download files
 
 ```sh
-docker run -d \
-  --name talk2scholars \
-  -e OPENAI_API_KEY=<your_openai_api_key> \
-  -e ZOTERO_API_KEY=<your_zotero_api_key> \
-  -e ZOTERO_USER_ID=<your_zotero_user_id> \
-  -e NVIDIA_API_KEY=<your_nvidia_api_key> \
-  -p 8501:8501 \
-  virtualpatientengine/talk2scholars
+mkdir talk2scholars && cd talk2scholars
+wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2scholars/docker-compose.yml \
+     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2scholars/.env.example \
+     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2scholars/startup.sh
 ```
+
+#### 2. Setup environment variables
+
+```sh
+cp .env.example .env
+```
+
+Edit `.env` with your API keys:
+
+```env
+OPENAI_API_KEY=...                  # Required
+NVIDIA_API_KEY=...                  # Required
+ZOTERO_API_KEY=...                  # Required
+ZOTERO_USER_ID=...                  # Required
+MILVUS_HOST=milvus-standalone
+MILVUS_PORT=19530
+MILVUS_DB_NAME=...
+MILVUS_COLLECTION_NAME=...
+LANGCHAIN_TRACING_V2=true           # Optional
+LANGCHAIN_API_KEY=...               # Optional
+```
+
+---
+
+#### 3. Start the agent
+
+```sh
+chmod +x startup.sh
+./startup.sh        # Add --cpu flag to force CPU-only mode if needed
+```
+
+---
 
 ### Access the Web UI
 
@@ -26,15 +58,6 @@ Once started, open:
 ```
 http://localhost:8501
 ```
-
----
-
-## Environment Variables
-
-- `OPENAI_API_KEY` – required
-- `ZOTERO_API_KEY` – required
-- `ZOTERO_USER_ID` – required
-- `NVIDIA_API_KEY` – required
 
 ---
 
@@ -47,19 +70,29 @@ http://localhost:8501
 
 ---
 
-## Running Multiple Agents
+## Notes for Windows Users
 
-To avoid port conflicts, map the container’s port to a different host port. For example, to use port `8502`:
+If you are using Windows, it is recommended to install [**Git Bash**](https://git-scm.com/downloads) for a smoother experience when running the bash commands in this guide.
 
-```sh
-docker run -d \
-  --name talk2scholars \
-  -e OPENAI_API_KEY=<your_openai_api_key> \
-  -e ZOTERO_API_KEY=<your_zotero_api_key> \
-  -e ZOTERO_USER_ID=<your_zotero_user_id> \
-  -e NVIDIA_API_KEY=<your_nvidia_api_key> \
-  -p 8502:8501 \
-  virtualpatientengine/talk2scholars
-```
+- For applications that use **Docker Compose**, Git Bash is **required**.
+- For applications that use **docker run** manually, Git Bash is **optional**, but recommended for consistency.
 
-Then visit: [http://localhost:8502](http://localhost:8502)
+You can download Git Bash here: [Git for Windows](https://git-scm.com/downloads).
+
+When using Docker on Windows, make sure you **run Docker with administrative privileges** if you face permission issues.
+
+To resolve for permission issues, you can:
+
+- Review the official Docker documentation on [Windows permission requirements](https://docs.docker.com/desktop/setup/install/windows-permission-requirements/).
+- Alternatively, follow the community discussion and solutions on [Docker Community Forums](https://forums.docker.com/t/error-when-trying-to-run-windows-containers-docker-client-must-be-run-with-elevated-privileges/136619).
+
+---
+
+## About `startup.sh`
+
+Run the startup script. It will:
+
+- Detect your hardware configuration (NVIDIA GPU, AMD GPU, or CPU). Apple Metal is unavailable inside Docker, and Intel SIMD optimizations are automatically handled without special configuration.
+- Choose the correct Milvus image (`CPU` or `GPU`).
+- Launch the Milvus container with appropriate runtime settings.
+- Start the agent after the model is available.
