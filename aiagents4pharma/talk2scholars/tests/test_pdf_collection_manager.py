@@ -148,30 +148,3 @@ def test_ensure_collection_exception(mock_utility, mock_collection_cls, request)
         collection_manager.ensure_collection_exists(
             "fail_collection", config, index, has_gpu=False
         )
-
-
-# @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.collection_manager.Collection")
-# @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.collection_manager.utility")
-# def test_debug_collection_state_logs_exception(
-#     mock_utility, mock_collection_cls, request
-# ):
-#     """collection_manager should log exceptions in debug_collection_state."""
-#     config = request.getfixturevalue("config_mock")
-#     index = request.getfixturevalue("index_params")
-#     mock_utility.list_collections.return_value = ["trouble_collection"]
-#
-#     mock_collection = MagicMock()
-#     mock_collection.num_entities = 5
-#     mock_collection.schema = "Fake schema"
-#
-#     type(mock_collection).indexes = property(
-#         lambda _: (_ for _ in ()).throw(Exception("Index fetch failed"))
-#     )
-#
-#     mock_collection_cls.return_value = mock_collection
-#
-#     result = collection_manager.ensure_collection_exists(
-#         "trouble_collection", config, index, has_gpu=True
-#     )
-#
-#     assert result == mock_collection
