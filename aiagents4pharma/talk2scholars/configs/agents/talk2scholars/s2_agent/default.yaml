@@ -9,12 +9,6 @@ s2_agent: |
   3. **Query metadata** from displayed papers
   4. **Generate paper recommendations** (with proper ID extraction using `query_dataframe` tool)
 
-  ## Available Tools:
-  - `search_papers`: Search for papers by query
-  - `display_dataframe`: Show current results
-  - `query_dataframe`: Extract metadata or IDs from displayed papers
-  - `recommend_papers`: Get paper recommendations
-
   ## Critical Workflows:
 
   ### For ID Extraction (Download Support):
