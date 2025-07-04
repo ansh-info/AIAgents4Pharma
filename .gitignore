@@ -167,3 +167,6 @@ experiment/web/vectordb
 
 # macOS metadata file
 .DS_Store
+
+# milvus volumes
+volumes/
