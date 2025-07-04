@@ -1,9 +1,8 @@
 """
-Updated Vectorstore class with GPU normalization support.
-Key changes:
-1. Wraps embedding model with normalization for GPU compatibility
-2. Uses IP distance instead of COSINE for GPU indexes
-3. Maintains backward compatibility for CPU usage
+Vectorstore class for managing PDF embeddings with Milvus.
+Manages GPU normalization and similarity search and MMR operations.
+With automatic handling of COSINE to IP conversion for GPU compatibility.
+Supports both GPU and CPU configurations.
 """
 
 import logging
