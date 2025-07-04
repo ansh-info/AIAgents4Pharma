@@ -32,10 +32,10 @@ OPENAI_API_KEY=...                  # Required
 NVIDIA_API_KEY=...                  # Required
 ZOTERO_API_KEY=...                  # Required
 ZOTERO_USER_ID=...                  # Required
-MILVUS_HOST=milvus-standalone
-MILVUS_PORT=19530
-MILVUS_DB_NAME=...
-MILVUS_COLLECTION_NAME=...
+MILVUS_HOST=milvus-standalone       # Required
+MILVUS_PORT=19530                   # Required
+MILVUS_DB_NAME=...                  # Required
+MILVUS_COLLECTION_NAME=...          # Required
 LANGCHAIN_TRACING_V2=true           # Optional
 LANGCHAIN_API_KEY=...               # Optional
 ```
