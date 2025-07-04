@@ -35,8 +35,6 @@ def load_and_split_pdf(
     Returns:
         A list of Document chunks, each with updated metadata.
     """
-    # Pull these out of kwargs so tests that call
-    # load_and_split_pdf(**base_args_params) continue to work
     metadata_fields: List[str] = kwargs["metadata_fields"]
     documents_dict: Dict[str, Document] = kwargs["documents_dict"]
 

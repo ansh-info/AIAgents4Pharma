@@ -148,7 +148,6 @@ def ensure_collection_exists(
 
             logger.info("=== END DEBUG ===")
 
-        # Add this call in ensure_collection_exists() after collection.load():
         debug_collection_state(collection, collection_name)
 
         # Log collection statistics with GPU/CPU info
