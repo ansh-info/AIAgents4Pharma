@@ -47,8 +47,8 @@ Choose your agent below for detailed Docker instructions:
 
 - [Talk2AIAgents4Pharma](aiagents4pharma/talk2aiagents4pharma/install.md)
 - [Talk2KnowledgeGraphs](aiagents4pharma/talk2knowledgegraphs/install.md)
-- [Talk2BioModels](talk2biomodels/install.md)
-- [Talk2Scholars](talk2scholars/install.md)
+- [Talk2BioModels](aiagents4pharma/talk2biomodels/install.md)
+- [Talk2Scholars](aiagents4pharma/talk2scholars/install.md)
 
 #### Option 2: git (for developers and contributors)
 
