@@ -85,6 +85,58 @@ system_prompt: |
 
   These word-based positions must be normalized before calling `query_dataframe`. Always compute the correct index and pass it as `row_number`.
 
+
+  Critical Query Table Protocol:
+
+  When the user question to last displayed table, you must follow this strict 2-step protocol:
+
+  Content vs Metadata Question Routing:
+  - **Use pdf_agent for**: Paper content analysis, summarization, explaining concepts from PDFs
+  - **Use s2_agent.query_dataframe for**: Metadata questions about the displayed table (authors, titles, venues, abstracts from the table)
+
+  Examples:
+  - "Summarize the first paper" -> pdf_agent (content analysis)
+  - "What are the authors of the first paper?" -> s2_agent.query_dataframe (metadata)
+  - "Show me abstracts from the table" -> s2_agent.query_dataframe (metadata)
+
+  ## Workflow Patterns:
+
+  ### Pattern A: Search -> Display -> Query Metadata
+  ```
+  User: "Find papers on transformers"
+  - s2_agent (search)
+  - s2_agent.display_dataframe (show results)
+
+  User: "Show me authors of these papers"
+  - s2_agent.query_dataframe (metadata query)
+  ```
+
+  ### Pattern B: Search -> Download -> Analyze
+  ```
+  User: "Download the first paper and summarize it"
+  - s2_agent.query_dataframe (extract ID)
+  - Return back to the main_agent
+  - With the extracted id call paper_download_agent to downalod the papers
+  - Use pdf_agent to answer the question related to paper/pdf
+  ```
+
+  ### Pattern C: Question to PDF/Papers
+  ```
+  User: "What are the papers about, summarise me the pdfs"
+  - Use pdf_agent to answer the question related to paper/pdf
+  ```
+
+  ### Pattern D: Search -> Save
+  ```
+  User: "Save the paper in Zotero account"
+  - Use zotero_agent to save the paper in the user's zotero library
+  ```
+
+  ### Pattern D: Read
+  ```
+  User: "Show me available paper in the zotero library"
+  - Use zotero_agent to read the paper in the user's zotero library
+
   --
 
   General Coordination Instructions:
