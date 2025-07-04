@@ -79,9 +79,9 @@ export LANGCHAIN_TRACING_V2=true    # Optional for all agents
 export LANGCHAIN_API_KEY=...        # Optional for all agents
 ```
 
-To use **Talk2AIAgents4Pharma**, **Talk2BioModels**, **Talk2KnowledgeGraphs**, or **Talk2Scholars**, you need a free **NVIDIA API key**. Create an account and apply for free credits [here](https://build.nvidia.com/explore/discover).
+To use the **Agents**, you need a free **NVIDIA API key**. Create an account and apply for free credits [here](https://build.nvidia.com/explore/discover).
 
-Only for **Talk2Scholars**, you also need a **Zotero API key**, which you can generate [here](https://www.zotero.org/user/login#applications). _(For all other agents, the Zotero key is not required.)_
+**Talk2Scholars** requires Milvus to be set up as the vector database — install Milvus depending on your setup by following the official instructions for [CPU](https://milvus.io/docs/install_standalone-docker-compose.md) or [GPU](https://milvus.io/docs/install_standalone-docker-compose-gpu.md). You will also need a **Zotero API key**, which you can generate [here](https://www.zotero.org/user/login#applications). _(The Zotero key is only required for Talk2Scholars; all other agents do not need it.)_
 
 To use **Talk2AIAgents4Pharma** or **Talk2KnowledgeGraphs**, you must have **Ollama** installed. Follow installation instructions for your OS [here](https://ollama.com/download).
 
