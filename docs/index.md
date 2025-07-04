@@ -79,6 +79,20 @@ export LANGCHAIN_TRACING_V2=true    # Optional for all agents
 export LANGCHAIN_API_KEY=...        # Optional for all agents
 ```
 
+4. **Launch the app:**
+
+```sh
+streamlit run app/frontend/streamlit_app_<agent>.py
+```
+
+_Replace `<agent>` with the agent name you are interested to launch:_
+
+- `talk2aiagents4pharma`
+- `talk2biomodels`
+- `talk2knowledgegraphs`
+- `talk2scholars`
+- `talk2cells`
+
 To use the **Agents**, you need a free **NVIDIA API key**. Create an account and apply for free credits [here](https://build.nvidia.com/explore/discover).
 
 **Talk2Scholars** requires Milvus to be set up as the vector database — install Milvus depending on your setup by following the official instructions for [CPU](https://milvus.io/docs/install_standalone-docker-compose.md) or [GPU](https://milvus.io/docs/install_standalone-docker-compose-gpu.md). You will also need a **Zotero API key**, which you can generate [here](https://www.zotero.org/user/login#applications). _(The Zotero key is only required for Talk2Scholars; all other agents do not need it.)_
@@ -94,7 +108,7 @@ ollama pull nomic-embed-text && ollama serve
 More details about the model are available [here](https://ollama.com/library/nomic-embed-text).
 
 Additionally on **Windows**, the `pcst_fast 1.0.10` library requires **Microsoft Visual C++ 14.0 or greater**.  
-You can download the **Microsoft C++ Build Tools** [here](https://visualstudio.microsoft.com/visual-cpp-build-tools/).
+ You can download the **Microsoft C++ Build Tools** [here](https://visualstudio.microsoft.com/visual-cpp-build-tools/).
 
 **LangSmith** support is optional. To enable it, create an API key [here](https://docs.smith.langchain.com/administration/how_to_guides/organization_management/create_account_api_key).
 
@@ -103,22 +117,6 @@ account with the name `T2X-xxxx`, where `X` can be `AA4P` (Main Agent),
 `B` (Biomodels), `S` (Scholars), `KG` (KnowledgeGraphs), or `C` (Cells).
 If you skip the previous step, it will default to the name `default`.
 `xxxx` will be the 4-digit ID created for the session._
-
-4. **Launch the app:**
-
-```sh
-streamlit run app/frontend/streamlit_app_<agent>.py
-```
-
-_Replace `<agent>` with the agent name you are interested to launch:_
-
-- `talk2aiagents4pharma`
-- `talk2biomodels`
-- `talk2knowledgegraphs`
-- `talk2scholars`
-- `talk2cells`
-
-For detailed instructions on each agent, please refer to their respective modules.
 
 #### Option 3: pip (beta-release)
 
