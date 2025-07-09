@@ -85,8 +85,43 @@ fi
 
 echo "[STARTUP] Milvus is ready. Starting talk2scholars application..."
 
-# Start the main application (it will automatically connect to milvus network)
-docker compose up -d talk2scholars
+# Configure Docker Compose for talk2scholars based on GPU type
+if [ "$GPU_TYPE" = "nvidia" ]; then
+	echo "[STARTUP] Configuring Docker Compose for NVIDIA GPU..."
+	cat >docker-compose-gpu.yml <<'EOF'
+services:
+  talk2scholars:
+    platform: linux/amd64
+    image: virtualpatientengine/talk2scholars:latest
+    container_name: talk2scholars
+    ports:
+      - "8501:8501"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: ["gpu"]
+              device_ids: ["0"]
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - milvus
+
+networks:
+  milvus:
+    external: true
+    name: milvus
+EOF
+	COMPOSE_FILE="docker-compose-gpu.yml"
+else
+	echo "[STARTUP] Using CPU-only configuration..."
+	COMPOSE_FILE="docker-compose.yml"
+fi
+
+# Start the main application with appropriate configuration
+docker compose -f $COMPOSE_FILE up -d talk2scholars
 
 # Wait a moment for the application to start
 sleep 10
@@ -95,12 +130,16 @@ sleep 10
 echo "[STARTUP] Testing Milvus connectivity..."
 docker exec talk2scholars sh -c "
     echo 'Testing connection to milvus-standalone:19530...'
-    curl -s http://milvus-standalone:19530/health && echo 'SUCCESS: Milvus is accessible' || echo 'FAILED: Cannot reach Milvus'
+    curl -s http://milvus-standalone:19530/ips://milvus-standalone:19530/health && echo 'SUCCESS: Milvus is accessible' || echo 'FAILED: Cannot reach Milvus'
 "
 
-# Clean up the downloaded milvus docker-compose file
+# Clean up temporary files
 echo "[STARTUP] Cleaning up temporary files..."
 rm -f milvus-docker-compose.yml
+if [ "$GPU_TYPE" = "nvidia" ]; then
+	rm -f docker-compose-gpu.yml
+	echo "[STARTUP] Removed docker-compose-gpu.yml"
+fi
 echo "[STARTUP] Removed milvus-docker-compose.yml"
 
 echo "[STARTUP] System fully running at: http://localhost:8501"
