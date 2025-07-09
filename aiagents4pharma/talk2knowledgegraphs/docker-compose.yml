@@ -11,7 +11,7 @@ services:
     command: >
       "ollama serve"
     networks:
-      - app-network
+      - milvus
 
   talk2knowledgegraphs:
     platform: linux/amd64
@@ -23,12 +23,12 @@ services:
       - .env
     restart: unless-stopped
     networks:
-      - app-network
+      - milvus
 
 volumes:
   ollama_data:
 
 networks:
-  app-network:
+  milvus:
     external: true
-    name: app-network
+    name: milvus

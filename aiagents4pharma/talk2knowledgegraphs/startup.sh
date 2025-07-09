@@ -42,6 +42,49 @@ else
 	GPU_TYPE="cpu"
 fi
 
+# Download appropriate Milvus docker-compose file
+if [ "$GPU_TYPE" = "cpu" ]; then
+	echo "[STARTUP] Downloading Milvus CPU docker-compose file..."
+	wget https://github.com/milvus-io/milvus/releases/download/v2.6.0-rc1/milvus-standalone-docker-compose.yml -O milvus-docker-compose.yml
+else
+	echo "[STARTUP] Downloading Milvus GPU docker-compose file..."
+	wget https://github.com/milvus-io/milvus/releases/download/v2.6.0-rc1/milvus-standalone-docker-compose-gpu.yml -O milvus-docker-compose.yml
+fi
+
+echo "[STARTUP] Starting Milvus with $GPU_TYPE configuration..."
+
+# Start Milvus services
+docker compose -f milvus-docker-compose.yml up -d
+
+# Wait for Milvus API to be ready
+echo "[STARTUP] Waiting for Milvus API..."
+MILVUS_READY=false
+MAX_ATTEMPTS=30
+ATTEMPT=0
+
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+	if curl -s http://localhost:19530/health >/dev/null 2>&1; then
+		echo "[STARTUP] Milvus health check passed"
+		MILVUS_READY=true
+		break
+	else
+		echo "[STARTUP] Milvus not ready yet... (attempt $((ATTEMPT + 1))/$MAX_ATTEMPTS)"
+		sleep 10
+		ATTEMPT=$((ATTEMPT + 1))
+	fi
+done
+
+if [ "$MILVUS_READY" = false ]; then
+	echo "[STARTUP] ERROR: Milvus failed to start after $MAX_ATTEMPTS attempts"
+	echo "[STARTUP] Checking Milvus logs..."
+	docker logs milvus-standalone --tail 20
+	echo "[STARTUP] Checking if port 19530 is in use..."
+	netstat -ln | grep 19530 || lsof -i :19530 || echo "Port 19530 not found"
+	exit 1
+fi
+
+echo "[STARTUP] Milvus is ready. Starting Ollama service..."
+
 # Select correct Ollama image
 if [ "$GPU_TYPE" = "amd" ]; then
 	OLLAMA_IMAGE="ollama/ollama:rocm"
@@ -50,7 +93,7 @@ else
 fi
 
 # Ensure Docker network exists
-docker network inspect app-network >/dev/null 2>&1 || docker network create app-network
+docker network inspect milvus >/dev/null 2>&1 || docker network create milvus
 
 echo "[STARTUP] Using image: $OLLAMA_IMAGE"
 
@@ -60,7 +103,7 @@ if [ "$GPU_TYPE" = "nvidia" ]; then
 	docker run -d \
 		--name ollama \
 		--runtime=nvidia \
-		--network app-network \
+		--network milvus \
 		-v ollama_data:/root/.ollama \
 		-p 11434:11434 \
 		-e NVIDIA_VISIBLE_DEVICES=all \
@@ -73,7 +116,7 @@ elif [ "$GPU_TYPE" = "amd" ]; then
 	echo "[STARTUP] Launching Ollama with AMD ROCm..."
 	docker run -d \
 		--name ollama \
-		--network app-network \
+		--network milvus \
 		-v ollama_data:/root/.ollama \
 		-p 11434:11434 \
 		--device=/dev/kfd \
@@ -109,7 +152,58 @@ until docker exec ollama ollama list | grep -q "nomic-embed-text"; do
 	sleep 5
 done
 
-echo "[STARTUP] Model is ready. Starting talk2knowledgegraphs agent..."
-docker compose up -d talk2knowledgegraphs
+echo "[STARTUP] Model is ready. Starting talk2knowledgegraphs application..."
+
+# Configure Docker Compose for talk2knowledgegraphs based on GPU type
+if [ "$GPU_TYPE" = "nvidia" ]; then
+	echo "[STARTUP] Configuring Docker Compose for NVIDIA GPU..."
+	cat > docker-compose-gpu.yml << 'EOF'
+services:
+  talk2knowledgegraphs:
+    platform: linux/amd64
+    image: virtualpatientengine/talk2knowledgegraphs:latest
+    container_name: talk2knowledgegraphs
+    ports:
+      - "8501:8501"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: ["gpu"]
+              device_ids: ["0"]
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - milvus
+
+networks:
+  milvus:
+    external: true
+    name: milvus
+EOF
+	COMPOSE_FILE="docker-compose-gpu.yml"
+else
+	echo "[STARTUP] Using CPU-only configuration..."
+	COMPOSE_FILE="docker-compose.yml"
+fi
+
+# Start the main application with appropriate configuration
+docker compose -f $COMPOSE_FILE up -d talk2knowledgegraphs
+
+# Wait a moment for the application to start
+sleep 10
+
+# Clean up temporary files
+echo "[STARTUP] Cleaning up temporary files..."
+rm -f milvus-docker-compose.yml
+if [ "$GPU_TYPE" = "nvidia" ]; then
+	rm -f docker-compose-gpu.yml
+	echo "[STARTUP] Removed docker-compose-gpu.yml"
+fi
+echo "[STARTUP] Removed milvus-docker-compose.yml"
 
 echo "[STARTUP] System fully running at: http://localhost:8501"
+echo "[STARTUP] Milvus API available at: http://localhost:19530"
+echo "[STARTUP] Ollama API available at: http://localhost:11434"
