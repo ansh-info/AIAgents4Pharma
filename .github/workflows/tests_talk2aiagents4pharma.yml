@@ -61,7 +61,7 @@ jobs:
   # pylint job for macos
   pylint-macos:
     name: pylint-macos
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -237,7 +237,7 @@ jobs:
   code-cov-macos:
     name: code-coverage-macos
     needs: pylint-macos
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
