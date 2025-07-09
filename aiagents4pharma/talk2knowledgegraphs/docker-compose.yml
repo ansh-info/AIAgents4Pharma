@@ -19,6 +19,9 @@ services:
     container_name: talk2knowledgegraphs
     ports:
       - "8501:8501"
+    environment:
+      - MILVUS_HOST=milvus-standalone
+      - MILVUS_PORT=19530
     env_file:
       - .env
     restart: unless-stopped

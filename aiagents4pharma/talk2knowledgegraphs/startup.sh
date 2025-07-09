@@ -16,6 +16,10 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
+# Clean up any existing containers first
+echo "[STARTUP] Cleaning up any existing containers..."
+docker rm -f talk2knowledgegraphs ollama 2>/dev/null || true
+
 echo "[STARTUP] Detecting hardware configuration..."
 
 GPU_TYPE="cpu"
@@ -172,6 +176,9 @@ services:
             - driver: nvidia
               capabilities: ["gpu"]
               device_ids: ["0"]
+    environment:
+      - MILVUS_HOST=milvus-standalone
+      - MILVUS_PORT=19530
     env_file:
       - .env
     restart: unless-stopped
