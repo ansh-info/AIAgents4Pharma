@@ -87,7 +87,65 @@ if [ "$MILVUS_READY" = false ]; then
 	exit 1
 fi
 
-echo "[STARTUP] Milvus is ready. Starting Ollama service..."
+# ===== DATA LOADING SECTION =====
+echo "[STARTUP] Milvus is ready. Starting data loading process..."
+
+# Check if data loading should be performed
+if [ -f "load_data_to_milvus.py" ] && [ -f "tests/files/biobridge_multimodal_pyg_graph.pkl" ]; then
+	echo "[STARTUP] Data loading script and pickle file found. Proceeding with data loading..."
+	
+	# Create virtual environment for data loading
+	VENV_DIR="venv"
+	echo "[STARTUP] Creating virtual environment: $VENV_DIR"
+	python3.12 -m venv $VENV_DIR
+	
+	# Activate virtual environment
+	source $VENV_DIR/bin/activate
+	echo "[STARTUP] Virtual environment activated"
+	
+	# Set environment variables for data loader
+	export MILVUS_HOST="localhost"
+	export MILVUS_PORT="19530"
+	export MILVUS_USER="root"
+	export MILVUS_PASSWORD="Milvus"
+	export MILVUS_DATABASE="t2kg_primekg"
+	export PKL_FILE_PATH="tests/files/biobridge_multimodal_pyg_graph.pkl"
+	export BATCH_SIZE="500"
+	
+	# Function to cleanup virtual environment
+	cleanup_venv() {
+		echo "[STARTUP] Cleaning up virtual environment..."
+		deactivate 2>/dev/null || true
+		rm -rf $VENV_DIR
+		echo "[STARTUP] Virtual environment cleaned up"
+	}
+	
+	# Set trap to ensure cleanup happens even if script fails
+	trap cleanup_venv EXIT
+	
+	# Run data loading script
+	echo "[STARTUP] Running data loading script..."
+	if python3.12 load_data_to_milvus.py; then
+		echo "[STARTUP] Data loading completed successfully!"
+	else
+		echo "[STARTUP] ERROR: Data loading failed!"
+		exit 1
+	fi
+	
+	# Deactivate virtual environment (cleanup will happen via trap)
+	deactivate
+	echo "[STARTUP] Data loading process completed"
+	
+else
+	echo "[STARTUP] Data loading skipped - script or pickle file not found"
+	echo "[STARTUP] Expected files:"
+	echo "[STARTUP]   - load_data_to_milvus.py"
+	echo "[STARTUP]   - tests/files/biobridge_multimodal_pyg_graph.pkl"
+fi
+
+# ===== END DATA LOADING SECTION =====
+
+echo "[STARTUP] Starting Ollama service..."
 
 # Select correct Ollama image
 if [ "$GPU_TYPE" = "amd" ]; then
