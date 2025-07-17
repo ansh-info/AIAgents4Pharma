@@ -6,7 +6,16 @@ multimodal_allowed_file_types:
   - "xls"
   - "xlsx"
 upload_data_dir: "../files"
-kg_name: "PrimeKG"
+kg_name: "BioBridge-PrimeKG"
+kg_node_types:
+  - "gene/protein"
+  - "molecular_function"
+  - "cellular_component"
+  - "biological_process"
+  - "drug"
+  - "disease"
+# kg_nodes_path: "aiagents4pharma/talk2knowledgegraphs/tests/files/biobridge_nodes.parquet.gzip"
+# kg_edges_path: "aiagents4pharma/talk2knowledgegraphs/tests/files/biobridge_edges.parquet.gzip"
 kg_pyg_path: "aiagents4pharma/talk2knowledgegraphs/tests/files/biobridge_multimodal_pyg_graph.pkl"
 kg_text_path: "aiagents4pharma/talk2knowledgegraphs/tests/files/biobridge_multimodal_text_graph.pkl"
 openai_api_key: ${oc.env:OPENAI_API_KEY}
@@ -15,6 +24,7 @@ openai_llms:
   - "gpt-4-turbo"
   - "gpt-3.5-turbo"
 openai_embeddings:
+  - "text-embedding-ada-002"
   - "text-embedding-3-small"
 ollama_llms:
   - "llama3.2:1b"
@@ -22,11 +32,32 @@ ollama_llms:
   - "llama3.1"
 ollama_embeddings:
   - "nomic-embed-text"
+default_embedding_model: "openai"
 temperature: 0.1
 streaming: False
-reasoning_subgraph_topk_nodes: 5
+reasoning_subgraph_topk_nodes: 15
 reasoning_subgraph_topk_nodes_min: 1
-reasoning_subgraph_topk_nodes_max: 100
-reasoning_subgraph_topk_edges: 5
+reasoning_subgraph_topk_nodes_max: 50
+reasoning_subgraph_topk_edges: 15
 reasoning_subgraph_topk_edges_min: 1
-reasoning_subgraph_topk_edges_max: 100
+reasoning_subgraph_topk_edges_max: 50
+# Configuration for Milvus
+milvus_db:
+  alias: "default"
+  host: ${oc.env:MILVUS_HOST,localhost}
+  port: ${oc.env:MILVUS_PORT,19530}
+  uri: "http://${oc.env:MILVUS_HOST,localhost}:${oc.env:MILVUS_PORT,19530}"
+  token: "root:Milvus"
+  user: "root"
+  password: "Milvus"
+  database_name: "t2kg_primekg"
+  collection_edges: "t2kg_primekg_edges"
+  collection_nodes: "t2kg_primekg_nodes"
+  collection_nodes_gene_protein: "t2kg_primekg_nodes_gene_protein"
+  collection_nodes_molecular_function: "t2kg_primekg_nodes_molecular_function"
+  collection_nodes_cellular_component: "t2kg_primekg_nodes_cellular_component"
+  collection_nodes_biological_process: "t2kg_primekg_nodes_biological_process"
+  collection_nodes_drug: "t2kg_primekg_nodes_drug"
+  collection_nodes_disease: "t2kg_primekg_nodes_disease"
+  query_batch_size: 1000000
+  cache_edge_index_path: "aiagents4pharma/talk2knowledgegraphs/tests/files/t2kg_primekg_edge_index.pkl"

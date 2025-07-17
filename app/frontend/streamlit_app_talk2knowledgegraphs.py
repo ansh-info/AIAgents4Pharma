@@ -132,6 +132,15 @@ if "topk_nodes" not in st.session_state:
     st.session_state.topk_nodes = cfg.reasoning_subgraph_topk_nodes
     st.session_state.topk_edges = cfg.reasoning_subgraph_topk_edges
 
+if "milvus_connection" not in st.session_state:
+    st.session_state.milvus_connection = streamlit_utils.setup_milvus(cfg)
+    print("Milvus connection established:", st.session_state.milvus_connection)
+    # Cache edge index if it does not exist
+    if not os.path.exists(cfg.milvus_db.cache_edge_index_path):
+        print("Cache edge index does not exist. Creating it now...")
+        # Create the cache edge index
+        streamlit_utils.get_cache_edge_index(cfg)
+
 # Get the app
 app = st.session_state.app
 
@@ -141,6 +150,8 @@ streamlit_utils.apply_css()
 # Sidebar
 with st.sidebar:
     st.markdown("**⚙️ Subgraph Extraction Settings**")
+    st.empty()
+    # Top-K nodes and edges sliders
     topk_nodes = st.slider(
         "Top-K (Nodes)",
         cfg.reasoning_subgraph_topk_nodes_min,
@@ -199,7 +210,7 @@ with main_col1:
 # Second column
 with main_col2:
     # Chat history panel
-    with st.container(border=True, height=575):
+    with st.container(border=True, height=800):
         st.write("#### 💬 Chat History")
 
         # Display chat messages
@@ -252,7 +263,8 @@ with main_col2:
                 st.empty()
 
             # Auxiliary visualization-related variables
-            graphs_visuals = []
+            # render_flag = False
+            graph_to_be_rendered = None
             with st.chat_message("assistant", avatar="🤖"):
                 # with st.spinner("Fetching response ..."):
                 with st.spinner():
@@ -278,13 +290,17 @@ with main_col2:
                             model=st.session_state.llm_model,
                             temperature=cfg.temperature,
                         )
-                        emb_model = OpenAIEmbeddings(model=cfg.openai_embeddings[0])
                     else:
                         llm_model = ChatOllama(
                             model=st.session_state.llm_model,
                             temperature=cfg.temperature,
                         )
+
+                    if cfg.default_embedding_model == "ollama":
+                        # For IBD BioBridge data, we still use Ollama embeddings
                         emb_model = OllamaEmbeddings(model=cfg.ollama_embeddings[0])
+                    else:
+                        emb_model = OpenAIEmbeddings(model=cfg.openai_embeddings[0])
 
                     # Create config for the agent
                     config = {"configurable": {"thread_id": st.session_state.unique_id}}
@@ -299,9 +315,10 @@ with main_col2:
                             "topk_edges": st.session_state.topk_edges,
                             "dic_source_graph": [
                                 {
-                                    "name": st.session_state.config["kg_name"],
-                                    "kg_pyg_path": st.session_state.config["kg_pyg_path"],
-                                    "kg_text_path": st.session_state.config["kg_text_path"],
+                                    "name": cfg.milvus_db.database_name,
+                                    # "edge_index": st.session_state.edge_index,
+                                    # "kg_pyg_path": st.session_state.config["kg_pyg_path"],
+                                    # "kg_text_path": st.session_state.config["kg_text_path"],
                                 }
                             ],
                         },
@@ -384,24 +401,23 @@ with main_col2:
                                 len(current_state.values["dic_extracted_graph"]),
                                 "subgraph_extraction",
                             )
-                            # Add the graph into the visuals list
-                            latest_graph = current_state.values["dic_extracted_graph"][
-                                -1
-                            ]
-                            if current_state.values["dic_extracted_graph"]:
-                                graphs_visuals.append(
-                                    {
-                                        "content": latest_graph["graph_dict"],
-                                        "key": "subgraph_" + uniq_msg_id,
-                                    }
-                                )
+                            # Add the graph to be rendered
+                            latest_graph = current_state.values["dic_extracted_graph"][-1]
+                            graph_to_be_rendered = {
+                                "content": latest_graph["graph_dict"],
+                                "key": "subgraph_" + uniq_msg_id,
+                            }
 
             # Visualize the graph
-            if len(graphs_visuals) > 0:
-                for count, graph in enumerate(graphs_visuals):
-                    streamlit_utils.render_graph(
-                        graph_dict=graph["content"], key=graph["key"], save_graph=True
-                    )
+            if graph_to_be_rendered:
+                streamlit_utils.render_graph(
+                    graph_dict=graph_to_be_rendered["content"], 
+                    key=graph_to_be_rendered["key"], 
+                    save_graph=True
+                )
+                st.empty()
+                # Remove the graph to be rendered
+                graph_to_be_rendered = None
 
         # Collect feedback and display the thumbs feedback
         if st.session_state.get("run_id"):
@@ -411,3 +427,4 @@ with main_col2:
                 on_submit=streamlit_utils.submit_feedback,
                 key=f"feedback_{st.session_state.run_id}",
             )
+            st.empty()

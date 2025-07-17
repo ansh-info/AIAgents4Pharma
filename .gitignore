@@ -170,3 +170,6 @@ experiment/web/vectordb
 
 # milvus volumes
 volumes/
+
+# CTD chemicals file
+docs/notebooks/talk2knowledgegraphs/CTD_chemicals.tsv.gz

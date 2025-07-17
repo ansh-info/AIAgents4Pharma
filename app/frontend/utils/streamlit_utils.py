@@ -28,6 +28,9 @@ from langchain_openai import ChatOpenAI
 from langchain_openai.embeddings import OpenAIEmbeddings
 from langsmith import Client
 
+import glob
+import re
+from pymilvus import db, connections, Collection
 
 def submit_feedback(user_response):
     """
@@ -291,9 +294,7 @@ def update_state_t2b(st):
 
 def update_state_t2kg(st):
     dic = {
-        "embedding_model": get_text_embedding_model(
-            st.session_state.text_embedding_model
-        ),
+        "embedding_model": st.session_state.t2kg_emb_model,
         "uploaded_files": st.session_state.uploaded_files,
         "topk_nodes": st.session_state.topk_nodes,
         "topk_edges": st.session_state.topk_edges,
@@ -758,34 +759,56 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
         key: The key for the graph
         save_graph: Whether to save the graph in the chat history
     """
-    # Create a directed graph
-    graph = nx.DiGraph()
+    def extract_inner_html(html):
+        match = re.search(r"<body[^>]*>(.*?)</body>", html, re.DOTALL)
+        return match.group(1) if match else html
 
-    # Add nodes with attributes
-    for node, attrs in graph_dict["nodes"]:
-        graph.add_node(node, **attrs)
+    figures_inner_html = ""
 
-    # Add edges with attributes
-    for source, target, attrs in graph_dict["edges"]:
-        graph.add_edge(source, target, **attrs)
+    for name, subgraph_nodes, subgraph_edges in zip(graph_dict["name"],
+                                                    graph_dict["nodes"],
+                                                    graph_dict["edges"]):
+        # Create a directed graph
+        graph = nx.DiGraph()
 
-    # print("Graph nodes:", graph.nodes(data=True))
-    # print("Graph edges:", graph.edges(data=True))
+        # Add nodes with attributes
+        for node, attrs in subgraph_nodes:
+            graph.add_node(node, **attrs)
 
-    # Render the graph
-    fig = gravis.d3(
-        graph,
-        node_size_factor=3.0,
-        show_edge_label=True,
-        edge_label_data_source="label",
-        edge_curvature=0.25,
-        zoom_factor=1.0,
-        many_body_force_strength=-500,
-        many_body_force_theta=0.3,
-        node_hover_neighborhood=True,
-        # layout_algorithm_active=True,
-    )
-    components.html(fig.to_html(), height=475)
+        # Add edges with attributes
+        for source, target, attrs in subgraph_edges:
+            graph.add_edge(source, target, **attrs)
+
+        # print("Graph nodes:", graph.nodes(data=True))
+        # print("Graph edges:", graph.edges(data=True))
+
+        # Render the graph
+        fig = gravis.d3(
+            graph,
+            node_size_factor=3.0,
+            show_edge_label=True,
+            edge_label_data_source="label",
+            edge_curvature=0.25,
+            zoom_factor=1.0,
+            many_body_force_strength=-500,
+            many_body_force_theta=0.3,
+            node_hover_neighborhood=True,
+            # layout_algorithm_active=True,
+        )
+        # components.html(fig.to_html(), height=475)
+        inner_html = extract_inner_html(fig.to_html())
+        wrapped_html = f'''
+        <div class="graph-content">
+            {inner_html}
+        </div>
+        '''
+
+        figures_inner_html += f'''
+        <div class="graph-box">
+            <h3 class="graph-title">{name}</h3>
+            {wrapped_html}
+        </div>
+        '''
 
     if save_graph:
         # Add data to the chat history
@@ -797,6 +820,116 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
             }
         )
 
+    full_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        html, body {{
+            margin: 0;
+            padding: 0;
+            overflow-y: hidden;
+            height: 100%;
+        }}
+        .scroll-container {{
+            display: flex;
+            overflow-x: auto;
+            overflow-y: hidden;
+            gap: 1rem;
+            padding: 1rem;
+            background: #f5f5f5;
+            height: 100%;
+            box-sizing: border-box;
+        }}
+        .graph-box {{
+            flex: 0 0 auto;
+            width: 500px;
+            height: 515px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background: white;
+            padding: 0.5rem;
+            box-sizing: border-box;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }}
+        .graph-title {{
+            margin: 0 0 16px 0;  /* Increased bottom margin */
+            font-family: Arial, sans-serif;
+            font-weight: 600;
+            font-size: 1.1rem;
+            text-align: center;
+        }}
+        .graph-content {{
+            width: 100%;
+            flex-grow: 1;
+        }}
+        .graph-box svg, .graph-box canvas {{
+            max-width: 100% !important;
+            max-height: 100% !important;
+            height: 100% !important;
+            width: 100% !important;
+        }}
+    </style>
+    </head>
+    <body>
+    <div class="scroll-container">
+        {figures_inner_html}
+    </div>
+    </body>
+    </html>
+    """
+    components.html(full_html, height=550, scrolling=False)
+
+# def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
+#     """
+#     Function to render the graph in the chat.
+
+#     Args:
+#         graph_dict: The graph dictionary
+#         key: The key for the graph
+#         save_graph: Whether to save the graph in the chat history
+#     """
+#     # Create a directed graph
+#     graph = nx.DiGraph()
+
+#     # Add nodes with attributes
+#     for node, attrs in graph_dict["nodes"]:
+#         graph.add_node(node, **attrs)
+
+#     # Add edges with attributes
+#     for source, target, attrs in graph_dict["edges"]:
+#         graph.add_edge(source, target, **attrs)
+
+#     # print("Graph nodes:", graph.nodes(data=True))
+#     # print("Graph edges:", graph.edges(data=True))
+
+#     # Render the graph
+#     fig = gravis.d3(
+#         graph,
+#         node_size_factor=3.0,
+#         show_edge_label=True,
+#         edge_label_data_source="label",
+#         edge_curvature=0.25,
+#         zoom_factor=1.0,
+#         many_body_force_strength=-500,
+#         many_body_force_theta=0.3,
+#         node_hover_neighborhood=True,
+#         # layout_algorithm_active=True,
+#     )
+#     components.html(fig.to_html(), height=475)
+
+#     if save_graph:
+#         # Add data to the chat history
+#         st.session_state.messages.append(
+#             {
+#                 "type": "graph",
+#                 "content": graph_dict,
+#                 "key": key,
+#             }
+#         )
 
 def get_text_embedding_model(model_name) -> Embeddings:
     """
@@ -984,7 +1117,9 @@ def get_file_type_icon(file_type: str) -> str:
     Returns:
         str: The icon for the file type.
     """
-    return {"drug_data": "💊", "multimodal": "📦"}.get(file_type)
+    return {"article": "📜",
+            "drug_data": "💊",
+            "multimodal": "📦"}.get(file_type)
 
 
 @st.fragment
@@ -1006,8 +1141,9 @@ def get_t2b_uploaded_files(app):
         help="Upload a PDF article to ask questions.",
         accept_multiple_files=False,
         type=["pdf"],
-        key="article",
+        key=f"article_{st.session_state.t2b_article_key}",
     )
+    
     # Update the agent state with the uploaded article
     if article:
         # print (article.name)
@@ -1017,6 +1153,39 @@ def get_t2b_uploaded_files(app):
         config = {"configurable": {"thread_id": st.session_state.unique_id}}
         # Update the agent state with the selected LLM model
         app.update_state(config, {"pdf_file_name": f.name})
+
+        if article.name not in [
+            uf["file_name"] for uf in st.session_state.t2b_uploaded_files
+        ]:
+            st.session_state.t2b_uploaded_files.append(
+                {
+                    "file_name": article.name,
+                    "file_path": f.name,
+                    "file_type": "article",
+                    "uploaded_by": st.session_state.current_user,
+                    "uploaded_timestamp": datetime.datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                }
+            )
+            article = None
+
+        # Display the uploaded article
+        for uploaded_file in st.session_state.t2b_uploaded_files:
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.write(
+                    get_file_type_icon(uploaded_file["file_type"])
+                    + uploaded_file["file_name"]
+                )
+            with col2:
+                if st.button("🗑️", key=uploaded_file["file_path"]):
+                    with st.spinner("Removing uploaded file ..."):
+                        st.session_state.t2b_uploaded_files.remove(uploaded_file)
+                        st.cache_data.clear()
+                        st.session_state.t2b_article_key += 1
+                        st.rerun(scope="fragment")
+
     # Return the uploaded file
     return uploaded_sbml_file
 
@@ -1029,12 +1198,14 @@ def initialize_selections() -> None:
     Args:
         cfg: The configuration object.
     """
-    with open(st.session_state.config["kg_pyg_path"], "rb") as f:
-        pyg_graph = pickle.load(f)
+    # with open(st.session_state.config["kg_pyg_path"], "rb") as f:
+        # pyg_graph = pickle.load(f)
+    # graph_nodes = pd.read_parquet(st.session_state.config["kg_nodes_path"])
+    node_types = st.session_state.config["kg_node_types"]
 
     # Populate the selections based on the node type from the graph
     selections = {}
-    for i in np.unique(np.array(pyg_graph.node_type)):
+    for i in node_types:
         selections[i] = []
 
     return selections
@@ -1057,8 +1228,8 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
     )
 
     multimodal_files = st.file_uploader(
-        "📦 Upload multimodal data package",
-        help="A spread sheet containing multimodal data package (e.g., genes, drugs, etc.)",
+        "📦 Upload multimodal endotype/phenotype data package",
+        help="A spread sheet containing multimodal endotype/phenotype data package (e.g., genes, drugs, etc.)",
         accept_multiple_files=True,
         type=cfg.multimodal_allowed_file_types,
         key=f"uploader_multimodal_{st.session_state.multimodal_key}",
@@ -1123,3 +1294,64 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
                     st.session_state.data_package_key += 1
                     st.session_state.multimodal_key += 1
                     st.rerun(scope="fragment")
+
+def setup_milvus(cfg: dict):
+    """
+    Function to connect to the Milvus database.
+
+    Args:
+        cfg: The configuration dictionary containing Milvus connection details.
+    """
+    # Check if the connection already exists
+    if not connections.has_connection(cfg.milvus_db.alias):
+        # Create a new connection to Milvus
+        # Connect to Milvus
+        connections.connect(
+            alias=cfg.milvus_db.alias,
+            host=cfg.milvus_db.host,
+            port=cfg.milvus_db.port,
+            user=cfg.milvus_db.user,
+            password=cfg.milvus_db.password
+        )
+        print("Connected to Milvus database.")
+    else:
+        print("Already connected to Milvus database.")
+
+    # Use a predefined Milvus database
+    db.using_database(cfg.milvus_db.database_name)
+
+    return connections.get_connection_addr(cfg.milvus_db.alias)
+
+def get_cache_edge_index(cfg: dict):
+    """
+    Function to get the edge index of the knowledge graph in the Milvus collection.
+    Due to massive records that we should query to get edge index from the Milvus database,
+    we pre-loaded this information when the app is started and stored it in a state.
+
+    Args:
+        cfg: The configuration dictionary containing the path to the edge index file.
+
+    Returns:
+        The edge index.
+    """
+    # Load collection
+    coll = Collection(f"{cfg.milvus_db.database_name}_edges")
+    coll.load()
+
+    batch_size = cfg.milvus_db.query_batch_size
+    head_list = []
+    tail_list = []
+    for start in range(0, coll.num_entities, batch_size):
+        end = min(start + batch_size, coll.num_entities)
+        print(f"Processing triplet_index range: {start} to {end}")
+        batch = coll.query(
+            expr=f"triplet_index >= {start} and triplet_index < {end}",
+            output_fields=["head_index", "tail_index"],
+        )
+        head_list.extend([r["head_index"] for r in batch])
+        tail_list.extend([r["tail_index"] for r in batch])
+    edge_index = [head_list, tail_list]
+
+    # Save the edge index to a file
+    with open(cfg.milvus_db.cache_edge_index_path, "wb") as f:
+        pickle.dump(edge_index, f)

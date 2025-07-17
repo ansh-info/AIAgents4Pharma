@@ -1,35 +1,21 @@
 # talk2aiagents4pharma
 services:
-  ollama:
-    image: "${OLLAMA_IMAGE:-ollama/ollama:latest}"
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      "ollama serve"
-    networks:
-      - app-network
-
   talk2aiagents4pharma:
     platform: linux/amd64
-    image: virtualpatientengine/talk2aiagents4pharma:latest
+    image: vpatientengine/talk2aiagents4pharma:latest
     container_name: talk2aiagents4pharma
     ports:
       - "8501:8501"
+    environment:
+      - MILVUS_HOST=milvus-standalone
+      - MILVUS_PORT=19530
     env_file:
       - .env
     restart: unless-stopped
     networks:
-      - app-network
-
-volumes:
-  ollama_data:
+      - milvus
 
 networks:
-  app-network:
+  milvus:
     external: true
-    name: app-network
+    name: milvus

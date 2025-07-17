@@ -50,6 +50,10 @@ Choose your agent below for detailed Docker instructions:
 - [Talk2BioModels](aiagents4pharma/talk2biomodels/install.md)
 - [Talk2Scholars](aiagents4pharma/talk2scholars/install.md)
 
+If your machine has NVIDIA GPU(s), please install the following this:
+- [nvidia-cuda-toolkit](https://developer.nvidia.com/cuda-toolkit)
+- [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.17.8/install-guide.html) (required for GPU support with Docker; enables containers to access NVIDIA GPUs for accelerated computing). After installing `nvidia-container-toolkit`, please restart Docker to ensure GPU support is enabled.
+
 #### Option 2: git (for developers and contributors)
 
 ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FVirtualPatientEngine%2FAIAgents4Pharma%2Frefs%2Fheads%2Fmain%2Fpyproject.toml)
@@ -78,7 +82,6 @@ export ZOTERO_USER_ID=....          # Required for T2S
 export LANGCHAIN_TRACING_V2=true    # Optional for all agents
 export LANGCHAIN_API_KEY=...        # Optional for all agents
 ```
-
 4. **Launch the app:**
 
 ```sh
@@ -109,6 +112,9 @@ To use **Talk2AIAgents4Pharma** or **Talk2KnowledgeGraphs**, you must have **Oll
 >
 > Additionally on **Windows**, the `pcst_fast 1.0.10` library requires **Microsoft Visual C++ 14.0 or greater**.
 > You can download the **Microsoft C++ Build Tools** [here](https://visualstudio.microsoft.com/visual-cpp-build-tools/).
+
+📝 By default, `talk2knowledgegraphs` includes a small subset of the PrimeKG knowledge graph, allowing users to start interacting with it out of the box.  
+To switch to a different knowledge graph or use your own, refer to the [deployment guide](https://virtualpatientengine.github.io/AIAgents4Pharma/talk2knowledgegraphs/deployment/).
 
 **LangSmith** support is optional. To enable it, create an API key [here](https://docs.smith.langchain.com/administration/how_to_guides/organization_management/create_account_api_key).
 
@@ -165,7 +171,7 @@ git push origin feat/your-feature-name
 #### Contacts for contributions
 
 - **Talk2Biomodels**: [@lilijap](https://github.com/lilijap), [@gurdeep330](https://github.com/gurdeep330)
-- **Talk2Cells**: [@gurdeep330](https://github.com/gurdeep330)
+- **Talk2Cells**: [@tAndreaniSanofi](https://github.com/tAndreaniSanofi), [@gurdeep330](https://github.com/gurdeep330)
 - **Talk2KnowledgeGraphs**: [@awmulyadi](https://github.com/awmulyadi)
 - **Talk2Scholars**: [@ansh-info](https://github.com/ansh-info), [@gurdeep330](https://github.com/gurdeep330)
 
