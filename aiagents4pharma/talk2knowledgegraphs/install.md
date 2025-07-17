@@ -1,4 +1,15 @@
-# Talk2KnowledgeGraphs
+**Talk2KnowledgeGraphs** is an AI agent designed to interact with biomedical knowledge graphs. Biomedical knowledge graphs contains crucial information in the form of entities (nodes) and their relationships (edges). These graphs are used to represent complex biological systems, such as metabolic pathways, protein-protein interactions, and gene regulatory networks. In order to easily interact with this information, Talk2KnowledgeGraphs uses natural language processing (NLP) to enable users to ask questions and make requests. By simply asking questions or making requests, users can:
+
+- Dataset loading: load knowledge graph from datasets.
+- Embedding: embed entities and relationships in the knowledge graph.
+- Knowledge graph construction: construct a knowledge graph from dataframes.
+- Subgraph extraction: extract subgraphs from the initial knowledge graph.
+- Retrieval: retrieve information from the (sub-) knowledge graph.
+- Reasoning: reason over the (sub-) knowledge graph.
+- Visualization: visualize the (sub-) knowledge graph.
+
+📝 By default, `talk2knowledgegraphs` includes a small subset of the PrimeKG knowledge graph, allowing users to start interacting with it out of the box.  
+To switch to a different knowledge graph or use your own, refer to the [deployment guide](https://virtualpatientengine.github.io/AIAgents4Pharma/talk2knowledgegraphs/deployment/).
 
 ## Installation
 
@@ -8,6 +19,7 @@ _This agent is available on Docker Hub._
 
 **Prerequisites**
 
+- If your machine has NVIDIA GPU(s), please install [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.17.8/install-guide.html) (required for GPU support with Docker; enables containers to access NVIDIA GPUs for accelerated computing). After installing `nvidia-container-toolkit`, please restart Docker to ensure GPU support is enabled.
 - [Ollama](https://ollama.com/) (for embedding models like `nomic-embed-text`)
 
 ---
@@ -98,3 +110,9 @@ When executed, the script will:
 - Launch the Ollama container with correct runtime options.
 - Pull the embedding model (`nomic-embed-text`).
 - Start the agent once the model is ready.
+
+#### Option 2: PyPI _(coming soon)_
+
+```bash
+pip install aiagents4pharma
+```

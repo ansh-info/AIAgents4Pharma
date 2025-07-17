@@ -51,6 +51,7 @@ Choose your agent below for detailed Docker instructions:
 - [Talk2Scholars](aiagents4pharma/talk2scholars/install.md)
 
 If your machine has NVIDIA GPU(s), please install the following this:
+
 - [nvidia-cuda-toolkit](https://developer.nvidia.com/cuda-toolkit)
 - [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.17.8/install-guide.html) (required for GPU support with Docker; enables containers to access NVIDIA GPUs for accelerated computing). After installing `nvidia-container-toolkit`, please restart Docker to ensure GPU support is enabled.
 
@@ -82,6 +83,7 @@ export ZOTERO_USER_ID=....          # Required for T2S
 export LANGCHAIN_TRACING_V2=true    # Optional for all agents
 export LANGCHAIN_API_KEY=...        # Optional for all agents
 ```
+
 4. **Launch the app:**
 
 ```sh
