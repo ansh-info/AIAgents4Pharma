@@ -8,7 +8,7 @@ _This agent is available on Docker Hub._
 
 **Prerequisites**
 
-- [Ollama](https://ollama.com/) (for embedding models like `nomic-embed-text`)
+- [Milvus](https://milvus.io) (for a vector database)
 
 ---
 
@@ -32,7 +32,6 @@ Edit `.env` with your API keys:
 ```env
 OPENAI_API_KEY=...                  # Required
 NVIDIA_API_KEY=...                  # Required
-OLLAMA_HOST=http://ollama:11434     # Required for embedding models
 LANGCHAIN_TRACING_V2=true           # Optional
 LANGCHAIN_API_KEY=...               # Optional
 ```
@@ -94,7 +93,4 @@ To resolve for permission issues, you can:
 Run the startup script. It will:
 
 - Detect your hardware configuration (NVIDIA GPU, AMD GPU, or CPU). Apple Metal is unavailable inside Docker, and Intel SIMD optimizations are automatically handled without special configuration.
-- Choose the correct Ollama image (`latest` or `rocm`).
-- Launch the Ollama container with appropriate runtime settings.
-- Pull the required embedding model (`nomic-embed-text`).
 - Start the agent after the model is available.

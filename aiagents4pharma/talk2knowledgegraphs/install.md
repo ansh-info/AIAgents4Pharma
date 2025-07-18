@@ -20,7 +20,8 @@ _This agent is available on Docker Hub._
 **Prerequisites**
 
 - If your machine has NVIDIA GPU(s), please install [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.17.8/install-guide.html) (required for GPU support with Docker; enables containers to access NVIDIA GPUs for accelerated computing). After installing `nvidia-container-toolkit`, please restart Docker to ensure GPU support is enabled.
-- [Ollama](https://ollama.com/) (for embedding models like `nomic-embed-text`)
+
+- [Milvus](https://milvus.io) (for a vector database)
 
 ---
 
@@ -44,7 +45,6 @@ Edit `.env` with your API keys:
 ```env
 OPENAI_API_KEY=...                  # Required for agent
 NVIDIA_API_KEY=...                  # Required for embedding models
-OLLAMA_HOST=http://ollama:11434     # Required for embedding models
 LANGCHAIN_TRACING_V2=true           # Optional tracing
 LANGCHAIN_API_KEY=...               # Optional tracing
 ```
@@ -106,9 +106,6 @@ To resolve permission issues, you can:
 When executed, the script will:
 
 - Detect NVIDIA, AMD, or CPU hardware (Apple Metal unsupported inside Docker).
-- Select the appropriate Ollama image (`latest` or `rocm`).
-- Launch the Ollama container with correct runtime options.
-- Pull the embedding model (`nomic-embed-text`).
 - Start the agent once the model is ready.
 
 #### Option 2: PyPI _(coming soon)_

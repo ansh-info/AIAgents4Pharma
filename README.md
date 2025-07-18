@@ -102,16 +102,6 @@ To use the **Agents**, you need a free **NVIDIA API key**. Create an account and
 
 **Talk2Scholars** requires Milvus to be set up as the vector database — install Milvus depending on your setup by following the official instructions for [CPU](https://milvus.io/docs/install_standalone-docker-compose.md) or [GPU](https://milvus.io/docs/install_standalone-docker-compose-gpu.md). You will also need a **Zotero API key**, which you can generate [here](https://www.zotero.org/user/login#applications). _(The Zotero key is only required for Talk2Scholars; all other agents do not need it.)_
 
-To use **Talk2AIAgents4Pharma** or **Talk2KnowledgeGraphs**, you must have **Ollama** installed. Follow installation instructions for your OS [here](https://ollama.com/download).
-
-> After installing, pull the `nomic-embed-text` model and start the server by running:
->
-> ```sh
-> ollama pull nomic-embed-text && ollama serve
-> ```
->
-> More details about the model are available [here](https://ollama.com/library/nomic-embed-text).
->
 > Additionally on **Windows**, the `pcst_fast 1.0.10` library requires **Microsoft Visual C++ 14.0 or greater**.
 > You can download the **Microsoft C++ Build Tools** [here](https://visualstudio.microsoft.com/visual-cpp-build-tools/).
 
