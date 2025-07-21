@@ -50,11 +50,6 @@ Choose your agent below for detailed Docker instructions:
 - [Talk2BioModels](aiagents4pharma/talk2biomodels/install.md)
 - [Talk2Scholars](aiagents4pharma/talk2scholars/install.md)
 
-If your machine has NVIDIA GPU(s), please install the following this:
-
-- [nvidia-cuda-toolkit](https://developer.nvidia.com/cuda-toolkit)
-- [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.17.8/install-guide.html) (required for GPU support with Docker; enables containers to access NVIDIA GPUs for accelerated computing). After installing `nvidia-container-toolkit`, please restart Docker to ensure GPU support is enabled.
-
 #### Option 2: git (for developers and contributors)
 
 ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FVirtualPatientEngine%2FAIAgents4Pharma%2Frefs%2Fheads%2Fmain%2Fpyproject.toml)
@@ -97,6 +92,11 @@ _Replace `<agent>` with the agent name you are interested to launch:_
 - `talk2knowledgegraphs`
 - `talk2scholars`
 - `talk2cells`
+
+If your machine has NVIDIA GPU(s), please install the following this:
+
+- [nvidia-cuda-toolkit](https://developer.nvidia.com/cuda-toolkit)
+- [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.17.8/install-guide.html) (required for GPU support with Docker; enables containers to access NVIDIA GPUs for accelerated computing). After installing `nvidia-container-toolkit`, please restart Docker to ensure GPU support is enabled.
 
 To use the **Agents**, you need a free **NVIDIA API key**. Create an account and apply for free credits [here](https://build.nvidia.com/explore/discover).
 

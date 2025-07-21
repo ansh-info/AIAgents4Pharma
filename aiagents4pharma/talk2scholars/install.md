@@ -2,6 +2,9 @@
 
 ## Installation
 
+- [nvidia-cuda-toolkit](https://developer.nvidia.com/cuda-toolkit)
+- [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.17.8/install-guide.html) (required for GPU support with Docker; enables containers to access NVIDIA GPUs for accelerated computing). After installing `nvidia-container-toolkit`, please restart Docker to ensure GPU support is enabled.
+
 ### Docker (stable-release)
 
 **Prerequisites**
