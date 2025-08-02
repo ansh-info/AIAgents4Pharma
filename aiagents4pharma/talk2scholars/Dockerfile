@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
   g++ \
   build-essential \
   cmake \
+  curl \
   libopenblas-dev \
   libomp-dev \
   ninja-build \
