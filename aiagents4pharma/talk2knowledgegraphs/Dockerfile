@@ -33,6 +33,12 @@ COPY app /app/app
 # # Copy the data loader script to the correct location
 # COPY milvus_data_dump.py /app/aiagents4pharma/talk2knowledgegraphs/
 
+# Create cache directory structure
+RUN mkdir -p /app/aiagents4pharma/talk2knowledgegraphs/tests/files
+
+# Set Python path to include the app directory
+ENV PYTHONPATH="/app"
+
 # Copy and set up the entrypoint script
 COPY aiagents4pharma/talk2knowledgegraphs/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
