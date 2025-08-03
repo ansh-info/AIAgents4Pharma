@@ -1,6 +1,31 @@
-version: '1.0'
+version: "1.0.0"
 
 services:
+  # talk2scholars
+  talk2scholars:
+    container_name: talk2scholars
+    image: vpatientengine/talk2scholars:latest
+    platform: linux/amd64
+    ports:
+      - "8501:8501"
+    environment:
+      - MILVUS_HOST=milvus-standalone
+      - MILVUS_PORT=19530
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      milvus-standalone:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - milvus
+
   # Milvus Dependencies
   etcd:
     container_name: milvus-etcd
@@ -69,31 +94,6 @@ services:
       etcd:
         condition: service_healthy
       minio:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - milvus
-
-  # talk2scholars
-  talk2scholars:
-    container_name: talk2scholars
-    image: vpatientengine/talk2scholars:latest
-    platform: linux/amd64
-    ports:
-      - "8501:8501"
-    environment:
-      - MILVUS_HOST=milvus-standalone
-      - MILVUS_PORT=19530
-    env_file:
-      - .env
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    depends_on:
-      milvus-standalone:
         condition: service_healthy
     restart: unless-stopped
     networks:

@@ -1,6 +1,41 @@
-version: '1.0'
+version: "1.0.0"
 
 services:
+  # talk2aiagents4pharma with automatic data loading via entrypoint
+  talk2aiagents4pharma:
+    container_name: talk2aiagents4pharma
+    image: vpatientengine/talk2aiagents4pharma:latest
+    platform: linux/amd64
+    ports:
+      - "8501:8501"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: ["gpu"]
+              device_ids: ["0"]
+    environment:
+      - MILVUS_HOST=milvus-standalone
+      - MILVUS_PORT=19530
+    env_file:
+      - .env
+    volumes:
+      # Mount external data directory if DATA_DIR is specified in .env
+      - ${DATA_DIR:-./default_data}:/mnt/external_data:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s # Allow time for data loading
+    depends_on:
+      milvus-standalone:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - milvus
+
   # Milvus Dependencies
   etcd:
     container_name: milvus-etcd
@@ -77,41 +112,6 @@ services:
       etcd:
         condition: service_healthy
       minio:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - milvus
-
-  # talk2aiagents4pharma with automatic data loading via entrypoint
-  talk2aiagents4pharma:
-    container_name: talk2aiagents4pharma
-    image: vpatientengine/talk2aiagents4pharma:latest
-    platform: linux/amd64
-    ports:
-      - "8501:8501"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              capabilities: ["gpu"]
-              device_ids: ["0"]
-    environment:
-      - MILVUS_HOST=milvus-standalone
-      - MILVUS_PORT=19530
-    env_file:
-      - .env
-    volumes:
-      # Mount external data directory if DATA_DIR is specified in .env
-      - ${DATA_DIR:-./default_data}:/mnt/external_data:ro
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s  # Allow time for data loading
-    depends_on:
-      milvus-standalone:
         condition: service_healthy
     restart: unless-stopped
     networks:
