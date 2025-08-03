@@ -30,8 +30,18 @@ COPY aiagents4pharma/talk2knowledgegraphs /app/aiagents4pharma/talk2knowledgegra
 COPY docs /app/docs
 COPY app /app/app
 
+# # Copy the data loader script to the correct location
+# COPY milvus_data_dump.py /app/aiagents4pharma/talk2knowledgegraphs/
+
+# Copy and set up the entrypoint script
+COPY aiagents4pharma/talk2knowledgegraphs/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Expose the default Streamlit port
 EXPOSE 8501
 
-# Run the Streamlit application
-CMD ["streamlit", "run", "app/frontend/streamlit_app_talk2knowledgegraphs.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# Set the entrypoint
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+# Default command (can be overridden)
+CMD ["streamlit", "run", "/app/app/frontend/streamlit_app_talk2knowledgegraphs.py", "--server.port=8501", "--server.address=0.0.0.0"]
