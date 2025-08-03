@@ -56,15 +56,15 @@ services:
       MINIO_ADDRESS: minio:9000
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/milvus:/var/lib/milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 30s
       start_period: 90s
       timeout: 20s
       retries: 3
-    ports:
-      - "19530:19530"
-      - "9091:9091"
     depends_on:
       etcd:
         condition: service_healthy
@@ -74,7 +74,7 @@ services:
     networks:
       - milvus
 
-  # talk2aiagents4pharma
+  # talk2aiagents4pharma with automatic data loading via entrypoint
   talk2aiagents4pharma:
     container_name: talk2aiagents4pharma
     image: vpatientengine/talk2aiagents4pharma:latest
@@ -86,12 +86,15 @@ services:
       - MILVUS_PORT=19530
     env_file:
       - .env
+    volumes:
+      # Mount external data directory if DATA_DIR is specified in .env
+      - ${DATA_DIR:-./default_data}:/mnt/external_data:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8501/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 120s  # Allow time for data loading
     depends_on:
       milvus-standalone:
         condition: service_healthy
