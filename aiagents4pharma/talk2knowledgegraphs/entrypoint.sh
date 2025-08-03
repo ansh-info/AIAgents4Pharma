@@ -131,6 +131,7 @@ if [ "$RUN_DATA_LOADER" = "true" ]; then
         echo "SKIPPED" > /tmp/data_loading_status
     else
         log "No existing data found, starting data loading process..."
+        echo "IN_PROGRESS" > /tmp/data_loading_status
         
         # Verify data directory contents
         if [ ! -d "$DATA_DIR" ]; then
