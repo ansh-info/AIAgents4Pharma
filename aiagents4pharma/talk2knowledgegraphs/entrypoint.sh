@@ -5,7 +5,7 @@ set -e
 
 # Function to log with timestamp
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ENTRYPOINT] $1"
+	echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ENTRYPOINT] $1"
 }
 
 log "=== talk2knowledgegraphs Container Starting ==="
@@ -13,10 +13,10 @@ log "Container hostname: $(hostname)"
 
 # Show GPU info if available
 if command -v nvidia-smi >/dev/null 2>&1; then
-    log "Available GPUs:"
-    nvidia-smi -L 2>/dev/null || log "nvidia-smi failed"
+	log "Available GPUs:"
+	nvidia-smi -L 2>/dev/null || log "nvidia-smi failed"
 else
-    log "nvidia-smi not available"
+	log "nvidia-smi not available"
 fi
 
 # Set default values for data loader environment variables
@@ -36,21 +36,21 @@ export RUN_DATA_LOADER=${RUN_DATA_LOADER:-true}
 # 2. Environment variable DATA_DIR
 # 3. Default internal path
 if [ -d "/mnt/external_data" ] && [ "$(ls -A /mnt/external_data 2>/dev/null)" ]; then
-    export DATA_DIR="/mnt/external_data"
-    log "Using external data directory: $DATA_DIR"
+	export DATA_DIR="/mnt/external_data"
+	log "Using external data directory: $DATA_DIR"
 elif [ -n "$DATA_DIR" ] && [ -d "$DATA_DIR" ]; then
-    log "Using specified data directory: $DATA_DIR"
+	log "Using specified data directory: $DATA_DIR"
 elif [ -d "/app/aiagents4pharma/talk2knowledgegraphs/tests/files/biobridge_multimodal/" ]; then
-    export DATA_DIR="/app/aiagents4pharma/talk2knowledgegraphs/tests/files/biobridge_multimodal/"
-    log "Using default internal data directory: $DATA_DIR"
+	export DATA_DIR="/app/aiagents4pharma/talk2knowledgegraphs/tests/files/biobridge_multimodal/"
+	log "Using default internal data directory: $DATA_DIR"
 else
-    log "WARNING: No valid data directory found!"
-    log "Checked:"
-    log "  - External mount: /mnt/external_data"
-    log "  - Environment DATA_DIR: ${DATA_DIR:-not set}"
-    log "  - Default internal: /app/aiagents4pharma/talk2knowledgegraphs/tests/files/biobridge_multimodal/"
-    log "Continuing without data loading..."
-    export RUN_DATA_LOADER="false"
+	log "WARNING: No valid data directory found!"
+	log "Checked:"
+	log "  - External mount: /mnt/external_data"
+	log "  - Environment DATA_DIR: ${DATA_DIR:-not set}"
+	log "  - Default internal: /app/aiagents4pharma/talk2knowledgegraphs/tests/files/biobridge_multimodal/"
+	log "Continuing without data loading..."
+	export RUN_DATA_LOADER="false"
 fi
 
 # Display configuration
@@ -65,7 +65,7 @@ log "RUN_DATA_LOADER: $RUN_DATA_LOADER"
 
 # Function to check if Milvus is ready
 check_milvus() {
-    python3 -c "
+	python3 -c "
 import sys
 try:
     from pymilvus import connections
@@ -79,7 +79,7 @@ except Exception:
 
 # Function to check if data already exists
 check_existing_data() {
-    python3 -c "
+	python3 -c "
 import sys
 try:
     from pymilvus import connections, utility, db
@@ -102,69 +102,69 @@ except Exception:
 
 # Wait for Milvus to be ready (only if data loader is enabled)
 if [ "$RUN_DATA_LOADER" = "true" ]; then
-    log "Waiting for Milvus to be ready..."
-    max_attempts=30
-    attempt=1
+	log "Waiting for Milvus to be ready..."
+	max_attempts=30
+	attempt=1
 
-    while [ $attempt -le $max_attempts ]; do
-        if check_milvus; then
-            log "Milvus is ready!"
-            break
-        else
-            log "Milvus not ready yet (attempt $attempt/$max_attempts), waiting 10 seconds..."
-            sleep 10
-            attempt=$((attempt + 1))
-        fi
-    done
+	while [ $attempt -le $max_attempts ]; do
+		if check_milvus; then
+			log "Milvus is ready!"
+			break
+		else
+			log "Milvus not ready yet (attempt $attempt/$max_attempts), waiting 10 seconds..."
+			sleep 10
+			attempt=$((attempt + 1))
+		fi
+	done
 
-    if [ $attempt -gt $max_attempts ]; then
-        log "ERROR: Milvus failed to become ready after $max_attempts attempts"
-        log "Continuing without data loading..."
-        export RUN_DATA_LOADER="false"
-    fi
+	if [ $attempt -gt $max_attempts ]; then
+		log "ERROR: Milvus failed to become ready after $max_attempts attempts"
+		log "Continuing without data loading..."
+		export RUN_DATA_LOADER="false"
+	fi
 fi
 
 # Run data loader if enabled and Milvus is ready
 if [ "$RUN_DATA_LOADER" = "true" ]; then
-    if check_existing_data; then
-        log "Data already exists in Milvus, skipping data loading"
-        echo "SKIPPED" > /tmp/data_loading_status
-    else
-        log "No existing data found, starting data loading process..."
-        echo "IN_PROGRESS" > /tmp/data_loading_status
-        
-        # Verify data directory contents
-        if [ ! -d "$DATA_DIR" ]; then
-            log "ERROR: Data directory does not exist: $DATA_DIR"
-            echo "FAILED" > /tmp/data_loading_status
-        else
-            log "Data directory contents preview:"
-            find "$DATA_DIR" -name "*.parquet*" | head -5 | while read file; do
-                log "  Found: $file"
-            done
-            
-            # Check if data loader script exists
-            if [ -f "/app/aiagents4pharma/talk2knowledgegraphs/milvus_data_dump.py" ]; then
-                log "Starting Milvus data loader..."
-                cd /app/aiagents4pharma/talk2knowledgegraphs
-                
-                if python3 milvus_data_dump.py; then
-                    log "Data loading completed successfully!"
-                    echo "SUCCESS" > /tmp/data_loading_status
-                else
-                    log "ERROR: Data loading failed! Continuing with application startup..."
-                    echo "FAILED" > /tmp/data_loading_status
-                fi
-            else
-                log "ERROR: Data loader script not found at /app/aiagents4pharma/talk2knowledgegraphs/milvus_data_dump.py"
-                log "Continuing with application startup..."
-                echo "FAILED" > /tmp/data_loading_status
-            fi
-        fi
-    fi
+	if check_existing_data; then
+		log "Data already exists in Milvus, skipping data loading"
+		echo "SKIPPED" >/tmp/data_loading_status
+	else
+		log "No existing data found, starting data loading process..."
+		echo "IN_PROGRESS" >/tmp/data_loading_status
+
+		# Verify data directory contents
+		if [ ! -d "$DATA_DIR" ]; then
+			log "ERROR: Data directory does not exist: $DATA_DIR"
+			echo "FAILED" >/tmp/data_loading_status
+		else
+			log "Data directory contents preview:"
+			find "$DATA_DIR" -name "*.parquet*" | head -5 | while read file; do
+				log "  Found: $file"
+			done
+
+			# Check if data loader script exists
+			if [ -f "/app/aiagents4pharma/talk2knowledgegraphs/milvus_data_dump.py" ]; then
+				log "Starting Milvus data loader..."
+				cd /app/aiagents4pharma/talk2knowledgegraphs
+
+				if python3 milvus_data_dump.py; then
+					log "Data loading completed successfully!"
+					echo "SUCCESS" >/tmp/data_loading_status
+				else
+					log "ERROR: Data loading failed! Continuing with application startup..."
+					echo "FAILED" >/tmp/data_loading_status
+				fi
+			else
+				log "ERROR: Data loader script not found at /app/aiagents4pharma/talk2knowledgegraphs/milvus_data_dump.py"
+				log "Continuing with application startup..."
+				echo "FAILED" >/tmp/data_loading_status
+			fi
+		fi
+	fi
 else
-    log "Data loader disabled"
-    echo "DISABLED" > /tmp/data_loading_status
+	log "Data loader disabled"
+	echo "DISABLED" >/tmp/data_loading_status
 fi
 
 # Start the main application
@@ -176,8 +176,8 @@ export PYTHONPATH="/app:${PYTHONPATH}"
 # Create cache directory and set path for container
 cache_dir="/app/aiagents4pharma/talk2knowledgegraphs/tests/files"
 if [ ! -d "$cache_dir" ]; then
-    log "Creating cache directory: $cache_dir"
-    mkdir -p "$cache_dir"
+	log "Creating cache directory: $cache_dir"
+	mkdir -p "$cache_dir"
 fi
 
 # Set container-specific cache path
