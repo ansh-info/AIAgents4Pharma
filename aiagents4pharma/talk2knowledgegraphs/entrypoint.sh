@@ -128,12 +128,14 @@ fi
 if [ "$RUN_DATA_LOADER" = "true" ]; then
     if check_existing_data; then
         log "Data already exists in Milvus, skipping data loading"
+        echo "SKIPPED" > /tmp/data_loading_status
     else
         log "No existing data found, starting data loading process..."
         
         # Verify data directory contents
         if [ ! -d "$DATA_DIR" ]; then
             log "ERROR: Data directory does not exist: $DATA_DIR"
+            echo "FAILED" > /tmp/data_loading_status
         else
             log "Data directory contents preview:"
             find "$DATA_DIR" -name "*.parquet*" | head -5 | while read file; do
@@ -147,20 +149,41 @@ if [ "$RUN_DATA_LOADER" = "true" ]; then
                 
                 if python3 milvus_data_dump.py; then
                     log "Data loading completed successfully!"
+                    echo "SUCCESS" > /tmp/data_loading_status
                 else
                     log "ERROR: Data loading failed! Continuing with application startup..."
+                    echo "FAILED" > /tmp/data_loading_status
                 fi
             else
                 log "ERROR: Data loader script not found at /app/aiagents4pharma/talk2knowledgegraphs/milvus_data_dump.py"
                 log "Continuing with application startup..."
+                echo "FAILED" > /tmp/data_loading_status
             fi
         fi
     fi
 else
     log "Data loader disabled"
+    echo "DISABLED" > /tmp/data_loading_status
 fi
 
 # Start the main application
+log "Data loading phase completed. Starting main application..."
+
+# Ensure Python path includes the app directory
+export PYTHONPATH="/app:${PYTHONPATH}"
+
+# Create cache directory and set path for container
+cache_dir="/app/aiagents4pharma/talk2knowledgegraphs/tests/files"
+if [ ! -d "$cache_dir" ]; then
+    log "Creating cache directory: $cache_dir"
+    mkdir -p "$cache_dir"
+fi
+
+# Set container-specific cache path
+export CACHE_EDGE_INDEX_PATH="/app/aiagents4pharma/talk2knowledgegraphs/tests/files/t2kg_primekg_edge_index.pkl"
+
 log "Starting main application..."
+log "Python path: $PYTHONPATH"
+log "Cache edge index path: $CACHE_EDGE_INDEX_PATH"
 log "Executing command: $@"
 exec "$@"
