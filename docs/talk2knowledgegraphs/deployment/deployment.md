@@ -139,3 +139,17 @@ This starts the backend (Milvus, API server) and frontend (Streamlit UI) in cont
 ```bash
 docker compose up -d
 ```
+
+## 🧹 Optional: Reset and Clean Up Docker Containers
+
+### Stop containers
+
+```bash
+sudo docker compose down -v
+```
+
+### Remove local volumes (stored graph/embedding data)
+
+```bash
+sudo rm -rf volumes
+```
