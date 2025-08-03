@@ -15,9 +15,20 @@
 
 #### 1. Download files
 
+Choose the appropriate version of the `docker-compose.yml` file based on your system:
+
+**For GPU:**
+
 ```sh
-wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2scholars/docker-compose.yml \
-     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2scholars/.env.example \
+wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2scholars/docker-compose/gpu/docker-compose.yml \
+     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2scholars/docker-compose/gpu/.env.example
+```
+
+**For CPU:**
+
+```sh
+wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2scholars/docker-compose/cpu/docker-compose.yml \
+     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2scholars/docker-compose/cpu/.env.example
 ```
 
 #### 2. Setup environment variables
