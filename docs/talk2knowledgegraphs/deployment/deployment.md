@@ -110,38 +110,5 @@ cp .env.example .env
 This starts the backend (Milvus, API server) and frontend (Streamlit UI) in containers.
 
 ```bash
-chmod +x startup.sh
-./startup.sh
-```
-
----
-
-## 🧹 Optional: Reset and Clean Up Docker Containers
-
-If you're facing issues or want to reset your environment, these commands will stop and remove all related containers and volumes.
-
-⚠️ Use with **caution** if other Docker containers are also running.
-
-### Stop containers
-
-```bash
-sudo docker stop milvus-etcd milvus-minio milvus-standalone talk2knowledgegraphs
-```
-
-### Remove containers
-
-```bash
-sudo docker rm milvus-etcd milvus-minio milvus-standalone talk2knowledgegraphs
-```
-
-### Remove Docker network for Milvus
-
-```bash
-sudo docker network rm milvus
-```
-
-### Remove local volumes (stored graph/embedding data)
-
-```bash
-sudo rm -rf volumes
+docker compose up -d
 ```
