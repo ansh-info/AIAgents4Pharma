@@ -45,11 +45,31 @@ else:
     cfg = st.session_state.config
 
 
-# st.logo(
-#     image='docs/VPE.png',
-#     size='large',
-#     link='https://github.com/VirtualPatientEngine'
-# )
+# Set the logo, detect if we're in container or local development
+def get_logo_path():
+    container_path = '/app/docs/assets/VPE.png'
+    local_path = 'docs/assets/VPE.png'
+    
+    if os.path.exists(container_path):
+        return container_path
+    elif os.path.exists(local_path):
+        return local_path
+    else:
+        # Fallback: try to find it relative to script location
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        relative_path = os.path.join(script_dir, '../../docs/assets/VPE.png')
+        if os.path.exists(relative_path):
+            return relative_path
+    
+    return None  # File not found
+
+logo_path = get_logo_path()
+if logo_path:
+    st.logo(
+        image=logo_path,
+        size='large',
+        link='https://github.com/VirtualPatientEngine'
+    )
 
 # Check if env variable OPENAI_API_KEY exists
 if "OPENAI_API_KEY" not in os.environ:

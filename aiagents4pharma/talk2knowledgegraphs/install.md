@@ -32,11 +32,20 @@ _This agent is available on Docker Hub._
 
 #### 1. Download files
 
+Choose the appropriate version of the `docker-compose.yml` file based on your system:
+
+**For GPU:**
+
 ```sh
-mkdir talk2knowledgegraphs && cd talk2knowledgegraphs
-wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/docker-compose.yml \
-     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/.env.example \
-     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/startup.sh
+wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/docker-compose/gpu/docker-compose.yml \
+     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/docker-compose/gpu/.env.example
+```
+
+**For CPU:**
+
+```sh
+wget https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/docker-compose/cpu/docker-compose.yml \
+     https://raw.githubusercontent.com/VirtualPatientEngine/AIAgents4Pharma/main/aiagents4pharma/talk2knowledgegraphs/docker-compose/cpu/.env.example
 ```
 
 #### 2. Setup environment variables
@@ -48,10 +57,29 @@ cp .env.example .env
 Edit `.env` with your API keys:
 
 ```env
-OPENAI_API_KEY=...                  # Required for agent
-NVIDIA_API_KEY=...                  # Required for embedding models
-LANGCHAIN_TRACING_V2=true           # Optional tracing
-LANGCHAIN_API_KEY=...               # Optional tracing
+# .env.example (DO NOT put actual API keys here, read the README.md)
+
+# OPENAI API KEY
+OPENAI_API_KEY=your_openai_api_key_here
+
+# LangSmith API KEY
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your_langchain_api_key_here
+
+# NVIDIA API KEY
+NVIDIA_API_KEY=your_nvidia_api_key_here
+
+# Set environment variables for data loader
+MILVUS_HOST=localhost
+MILVUS_PORT=19530
+MILVUS_USER=root
+MILVUS_PASSWORD=Milvus
+MILVUS_DATABASE=your_database_name_here
+
+# Specify the data directory for multimodal data to your own data directory
+# DATA_DIR=/your_absolute_path_to_your_data_dir/
+
+BATCH_SIZE=500
 ```
 
 ---
@@ -59,8 +87,7 @@ LANGCHAIN_API_KEY=...               # Optional tracing
 #### 3. Start the agent
 
 ```sh
-chmod +x startup.sh
-./startup.sh        # Add --cpu flag to force CPU-only mode if needed
+docker compose up -d
 ```
 
 ---
@@ -72,6 +99,14 @@ Once started, open:
 ```
 http://localhost:8501
 ```
+
+> In the background, the BioBridge multimodal embeddings will be inserted into the Milvus database, and the `talk2knowledgegraphs` service will start. Once the data is fully inserted, the application will be in a healthy state and accessible at the above address.
+>
+> You can monitor the process using:
+>
+> ```sh
+> docker logs -f talk2knowledgegraphs
+> ```
 
 ---
 
@@ -103,18 +138,3 @@ To resolve permission issues, you can:
 
 - Review the official Docker documentation on [Windows permission requirements](https://docs.docker.com/desktop/setup/install/windows-permission-requirements/).
 - Alternatively, follow the community discussion and solutions on [Docker Community Forums](https://forums.docker.com/t/error-when-trying-to-run-windows-containers-docker-client-must-be-run-with-elevated-privileges/136619).
-
----
-
-## About `startup.sh`
-
-When executed, the script will:
-
-- Detect NVIDIA, AMD, or CPU hardware (Apple Metal unsupported inside Docker).
-- Start the agent once the model is ready.
-
-#### Option 2: PyPI _(coming soon)_
-
-```bash
-pip install aiagents4pharma
-```
