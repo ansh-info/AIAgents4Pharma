@@ -25,9 +25,6 @@ services:
     depends_on:
       milvus-standalone:
         condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - milvus
 
   # Milvus Dependencies
   etcd:
@@ -46,9 +43,6 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-    restart: unless-stopped
-    networks:
-      - milvus
 
   minio:
     container_name: milvus-minio
@@ -67,9 +61,6 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-    restart: unless-stopped
-    networks:
-      - milvus
 
   # Milvus Vector Database (CPU-only)
   milvus-standalone:
@@ -94,23 +85,9 @@ services:
       timeout: 20s
       retries: 3
     depends_on:
-      etcd:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - milvus
+      - "etcd"
+      - "minio"
 
 networks:
   milvus:
     name: milvus
-    driver: bridge
-
-volumes:
-  etcd_data:
-    name: milvus_etcd_data
-  minio_data:
-    name: milvus_minio_data
-  milvus_data:
-    name: milvus_standalone_data
