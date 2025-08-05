@@ -1,0 +1,4 @@
+id_converter_url: "https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles"
+oa_api_url: "https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi"
+request_timeout: 10
+chunk_size: 1024
