@@ -50,11 +50,11 @@ def fetch_pmcid_metadata(
 
 
 def fetch_pdf_url(oa_api_url: str, pmcid: str, request_timeout: int) -> str:
-    """Fetch PDF URL from OA API if available."""
+    """Fetch PDF URL from OA API if available, with FTP-to-HTTPS conversion."""
     if not pmcid or pmcid == "N/A":
         return ""
 
-    query_url = f"{oa_api_url}?id={pmcid}&format=pdf"
+    query_url = f"{oa_api_url}?id={pmcid}"  # removed ?format=pdf which is invalid
     try:
         response = requests.get(query_url, timeout=request_timeout)
         response.raise_for_status()
@@ -65,7 +65,16 @@ def fetch_pdf_url(oa_api_url: str, pmcid: str, request_timeout: int) -> str:
         # Look for PDF link
         pdf_link = root.find(".//link[@format='pdf']")
         if pdf_link is not None:
-            return pdf_link.get("href", "")
+            pdf_url = pdf_link.get("href", "")
+
+            # Convert FTP links to HTTPS
+            if pdf_url.startswith("ftp://ftp.ncbi.nlm.nih.gov"):
+                pdf_url = pdf_url.replace(
+                    "ftp://ftp.ncbi.nlm.nih.gov", "https://ftp.ncbi.nlm.nih.gov"
+                )
+                logger.info("Converted FTP to HTTPS for %s: %s", pmcid, pdf_url)
+
+            return pdf_url
 
         return ""
     except Exception as e:
