@@ -1,2 +1,4 @@
-api_url: "https://api.biorxiv.org/details/biorxiv/"
-request_timeout: 20
+api_url: "https://api.biorxiv.org/details"
+request_timeout: 10
+chunk_size: 1024
+pdf_base_url: "https://www.biorxiv.org/content/10.1101/"
