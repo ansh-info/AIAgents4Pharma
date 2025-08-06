@@ -6,11 +6,11 @@ Tool for downloading PubMed paper metadata and downloading PDFs to temporary fil
 import logging
 import tempfile
 import xml.etree.ElementTree as ET
-from typing import Annotated, Any, List
+from typing import Annotated, Any, List, cast
 
 import hydra
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
@@ -80,10 +80,15 @@ def try_alternative_pdf_sources(pmcid: str, request_timeout: int, cfg: Any) -> s
 
         # Look for citation_pdf_url meta tag
         pdf_meta = soup.find("meta", attrs={"name": "citation_pdf_url"})
-        if pdf_meta and pdf_meta.get("content"):
-            pdf_url = pdf_meta.get("content")
-            logger.info("Found citation_pdf_url meta tag for %s: %s", pmcid, pdf_url)
-            return pdf_url
+        if pdf_meta is not None:
+            # Cast to Tag to help type checker understand this is a BeautifulSoup Tag object
+            meta_tag = cast(Tag, pdf_meta)
+            content = meta_tag.get("content")
+            if content:
+                logger.info(
+                    "Found citation_pdf_url meta tag for %s: %s", pmcid, content
+                )
+                return str(content)
 
     except Exception as e:
         logger.info("PMC page scraping failed for %s: %s", pmcid, str(e))
