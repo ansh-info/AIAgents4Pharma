@@ -57,7 +57,7 @@ def fetch_pmcid_metadata(
 def try_alternative_pdf_sources(pmcid: str, request_timeout: int, cfg: Any) -> str:
     """Try alternative PDF sources when OA API fails."""
 
-    # Strategy 1: Europe PMC Service
+    # Strategy 1: Europe PMC Service (most reliable fallback)
     europe_pmc_url = f"{cfg.europe_pmc_base_url}?accid={pmcid}&blobtype=pdf"
     logger.info("Trying Europe PMC service for %s: %s", pmcid, europe_pmc_url)
     try:
@@ -88,7 +88,7 @@ def try_alternative_pdf_sources(pmcid: str, request_timeout: int, cfg: Any) -> s
     except Exception as e:
         logger.info("PMC page scraping failed for %s: %s", pmcid, str(e))
 
-    # Strategy 3: Direct PMC PDF URL pattern
+    # Strategy 3: Direct PMC PDF URL pattern (least reliable)
     direct_pmc_url = f"{cfg.direct_pmc_pdf_base_url}/{pmcid}/pdf/"
     logger.info("Trying direct PMC PDF URL for %s: %s", pmcid, direct_pmc_url)
     try:
@@ -164,7 +164,7 @@ def fetch_pdf_url(oa_api_url: str, pmcid: str, request_timeout: int, cfg: Any) -
 
 
 def download_pdf_to_temp(
-    pdf_url: str, pmid: str, request_timeout: int, chunk_size: int = 8192
+    pdf_url: str, pmid: str, request_timeout: int, cfg: Any, chunk_size: int = 8192
 ) -> tuple[str, str] | None:
     """
     Download PDF from URL to a temporary file.
@@ -176,26 +176,47 @@ def download_pdf_to_temp(
 
     try:
         logger.info("Downloading PDF for PMID %s from %s", pmid, pdf_url)
-        response = requests.get(pdf_url, timeout=request_timeout, stream=True)
+
+        # Use proper headers for better compatibility
+        headers = {"User-Agent": cfg.user_agent}
+        response = requests.get(
+            pdf_url, headers=headers, timeout=request_timeout, stream=True
+        )
         response.raise_for_status()
 
         # Download to a temporary file first
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
             for chunk in response.iter_content(chunk_size=chunk_size):
-                temp_file.write(chunk)
+                if chunk:  # Filter out keep-alive chunks
+                    temp_file.write(chunk)
             temp_file_path = temp_file.name
 
         logger.info("PubMed PDF downloaded to temporary file: %s", temp_file_path)
 
         # Determine filename from Content-Disposition header or default
-        if "filename=" in response.headers.get("Content-Disposition", ""):
-            filename = (
-                response.headers.get("Content-Disposition", "")
-                .split("filename=")[-1]
-                .strip('"')
-            )
-        else:
-            filename = f"pmid_{pmid}.pdf"
+        filename = f"pmid_{pmid}.pdf"  # Default fallback
+
+        content_disposition = response.headers.get("Content-Disposition", "")
+        if "filename=" in content_disposition:
+            # Extract filename from Content-Disposition header
+            try:
+                import re
+
+                filename_match = re.search(
+                    r'filename[*]?=(?:"([^"]+)"|([^;]+))', content_disposition
+                )
+                if filename_match:
+                    extracted_filename = filename_match.group(
+                        1
+                    ) or filename_match.group(2)
+                    extracted_filename = extracted_filename.strip().strip('"')
+                    if extracted_filename and extracted_filename.endswith(".pdf"):
+                        filename = extracted_filename
+                        logger.info("Extracted filename from header: %s", filename)
+            except Exception as e:
+                logger.warning(
+                    "Failed to extract filename from Content-Disposition: %s", e
+                )
 
         return temp_file_path, filename
 
@@ -346,7 +367,7 @@ def download_pubmed_paper(
             pdf_download_result = None
             if pdf_url:
                 pdf_download_result = download_pdf_to_temp(
-                    pdf_url, pmid, request_timeout, chunk_size
+                    pdf_url, pmid, request_timeout, cfg, chunk_size
                 )
 
             # Step 4: Extract and structure metadata
