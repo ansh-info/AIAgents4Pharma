@@ -78,30 +78,8 @@ def download_pdf_to_temp(
 
         logger.info("medRxiv PDF downloaded to temporary file: %s", temp_file_path)
 
-        # Determine filename from Content-Disposition header or default
-        filename = f"{doi.replace('/', '_').replace('.', '_')}.pdf"  # Default fallback
-
-        content_disposition = response.headers.get("Content-Disposition", "")
-        if "filename=" in content_disposition:
-            # Extract filename from Content-Disposition header
-            try:
-                import re
-
-                filename_match = re.search(
-                    r'filename[*]?=(?:"([^"]+)"|([^;]+))', content_disposition
-                )
-                if filename_match:
-                    extracted_filename = filename_match.group(
-                        1
-                    ) or filename_match.group(2)
-                    extracted_filename = extracted_filename.strip().strip('"')
-                    if extracted_filename and extracted_filename.endswith(".pdf"):
-                        filename = extracted_filename
-                        logger.info("Extracted filename from header: %s", filename)
-            except Exception as e:
-                logger.warning(
-                    "Failed to extract filename from Content-Disposition: %s", e
-                )
+        # Determine filename - medRxiv uses DOI-based naming
+        filename = f"{doi.replace('/', '_').replace('.', '_')}.pdf"  # Use sanitized DOI as filename
 
         return temp_file_path, filename
 
