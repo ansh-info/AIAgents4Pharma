@@ -1,4 +1,24 @@
+# arXiv Paper Download Configuration
+# Configuration for downloading arXiv papers with metadata
+
+# Primary API
 api_url: "http://export.arxiv.org/api/query"
-request_timeout: 10
-chunk_size: 1024
+
+# PDF Download
 pdf_base_url: "https://arxiv.org/pdf"
+
+# Request Configuration
+request_timeout: 15 # Increased for reliability
+chunk_size: 8192 # For PDF downloads
+
+# Web Request Configuration
+user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+# Retry and Rate Limiting (optional - for future use)
+max_retries: 3
+retry_delay: 2 # seconds
+batch_size: 10 # number of papers to process before delay
+batch_delay: 5 # seconds between batches
+
+# Debug Configuration
+enable_detailed_logging: true
