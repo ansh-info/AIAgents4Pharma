@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Unified paper download tool for LangGraph.
-Supports downloading papers from arXiv, medRxiv, and PubMed through a single interface.
+Supports downloading papers from arXiv, medRxiv, bioRxiv, and PubMed through a single interface.
 """
 
 import logging
@@ -15,6 +15,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 from .utils.arxiv_downloader import ArxivDownloader
 from .utils.base_paper_downloader import BasePaperDownloader
+from .utils.biorxiv_downloader import BiorxivDownloader
 from .utils.medrxiv_downloader import MedrxivDownloader
 from .utils.pubmed_downloader import PubmedDownloader
 
@@ -26,14 +27,15 @@ logger = logging.getLogger(__name__)
 class UnifiedPaperDownloadInput(BaseModel):
     """Input schema for the unified paper download tool."""
 
-    service: Literal["arxiv", "medrxiv", "pubmed"] = Field(
-        description="Paper service to download from: 'arxiv', 'medrxiv', or 'pubmed'"
+    service: Literal["arxiv", "medrxiv", "biorxiv", "pubmed"] = Field(
+        description="Paper service to download from: 'arxiv', 'medrxiv', 'biorxiv', or 'pubmed'"
     )
     identifiers: List[str] = Field(
         description=(
             "List of paper identifiers. Format depends on service:\n"
             "- arxiv: arXiv IDs (e.g., ['1234.5678', '2301.12345'])\n"
             "- medrxiv: DOIs (e.g., ['10.1101/2020.09.09.20191205'])\n"
+            "- biorxiv: DOIs (e.g., ['10.1101/2020.09.09.20191205'])\n"
             "- pubmed: PMIDs (e.g., ['12345678', '87654321'])"
         )
     )
@@ -53,7 +55,7 @@ class PaperDownloaderFactory:
         Create appropriate downloader instance for the specified service.
 
         Args:
-            service: Service name ('arxiv', 'medrxiv', 'pubmed')
+            service: Service name ('arxiv', 'medrxiv', 'biorxiv', 'pubmed')
 
         Returns:
             Configured downloader instance
@@ -68,11 +70,13 @@ class PaperDownloaderFactory:
             return ArxivDownloader(service_config)
         elif service == "medrxiv":
             return MedrxivDownloader(service_config)
+        elif service == "biorxiv":
+            return BiorxivDownloader(service_config)
         elif service == "pubmed":
             return PubmedDownloader(service_config)
         else:
             supported = getattr(
-                config, "supported_services", ["arxiv", "medrxiv", "pubmed"]
+                config, "supported_services", ["arxiv", "medrxiv", "biorxiv", "pubmed"]
             )
             raise ValueError(f"Unsupported service: {service}. Supported: {supported}")
 
@@ -230,14 +234,14 @@ class PaperDownloaderFactory:
     parse_docstring=True,
 )
 def download_papers(
-    service: Literal["arxiv", "medrxiv", "pubmed"],
+    service: Literal["arxiv", "medrxiv", "biorxiv", "pubmed"],
     identifiers: List[str],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command[Any]:
     """
     Universal paper download tool supporting multiple academic paper services.
 
-    Downloads paper metadata and PDFs from arXiv, medRxiv, or PubMed and stores them
+    Downloads paper metadata and PDFs from arXiv, medRxiv, bioRxiv, or PubMed and stores them
     in temporary files for further processing. The downloaded PDFs can be accessed
     using the temp_file_path in the returned metadata.
 
@@ -245,6 +249,7 @@ def download_papers(
         service: Paper service to download from
             - 'arxiv': For arXiv preprints (requires arXiv IDs)
             - 'medrxiv': For medRxiv preprints (requires DOIs)
+            - 'biorxiv': For bioRxiv preprints (requires DOIs)
             - 'pubmed': For PubMed papers (requires PMIDs)
         identifiers: List of paper identifiers in the format expected by the service
 
@@ -257,6 +262,9 @@ def download_papers(
 
         # Download from medRxiv
         download_papers("medrxiv", ["10.1101/2020.09.09.20191205"])
+
+        # Download from bioRxiv
+        download_papers("biorxiv", ["10.1101/2020.09.09.20191205"])
 
         # Download from PubMed
         download_papers("pubmed", ["12345678", "87654321"])
@@ -279,6 +287,13 @@ def download_medrxiv_papers(
     return _download_papers_impl("medrxiv", dois, tool_call_id)
 
 
+def download_biorxiv_papers(
+    dois: List[str], tool_call_id: Annotated[str, InjectedToolCallId]
+) -> Command[Any]:
+    """Convenience function for downloading bioRxiv papers."""
+    return _download_papers_impl("biorxiv", dois, tool_call_id)
+
+
 def download_pubmed_papers(
     pmids: List[str], tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command[Any]:
@@ -287,7 +302,7 @@ def download_pubmed_papers(
 
 
 def _download_papers_impl(
-    service: Literal["arxiv", "medrxiv", "pubmed"],
+    service: Literal["arxiv", "medrxiv", "biorxiv", "pubmed"],
     identifiers: List[str],
     tool_call_id: str,
 ) -> Command[Any]:

@@ -48,6 +48,26 @@ services:
     identifier_type: "DOI"
     supports_batch: true
 
+  biorxiv:
+    # Primary API
+    api_url: "https://api.biorxiv.org/details"
+
+    # PDF Download (Note: Not used directly, PDF URLs are constructed from DOI + version)
+    pdf_base_url: "https://www.biorxiv.org/content/10.1101/"
+
+    # Templates for landing page & PDF URL
+    landing_url_template: "https://www.biorxiv.org/content/{doi}v{version}"
+    pdf_url_template: "https://www.biorxiv.org/content/{doi}v{version}.full.pdf"
+
+    # Cloudflare-bypass settings
+    cf_clearance_timeout: 30
+    session_reuse: true
+
+    # Service-specific settings
+    service_name: "bioRxiv"
+    identifier_type: "DOI"
+    supports_batch: true
+
   pubmed:
     # Primary APIs
     id_converter_url: "https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles"
@@ -71,8 +91,8 @@ services:
 # Tool configuration
 tool:
   name: "download_papers"
-  description: "Universal paper download tool supporting arXiv, medRxiv, and PubMed"
-  supported_services: ["arxiv", "medrxiv", "pubmed"]
+  description: "Universal paper download tool supporting arXiv, medRxiv, bioRxiv, and PubMed"
+  supported_services: ["arxiv", "medrxiv", "biorxiv", "pubmed"]
   default_service: "arxiv"
 
   # Output configuration
