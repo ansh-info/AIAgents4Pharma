@@ -5,10 +5,16 @@ biorxiv and medrxiv.
 """
 
 # Import modules
-from . import download_arxiv_input
+from . import arxiv_downloader
+from . import base_paper_downloader
+from . import medrxiv_downloader
+from . import paper_downloader
+from . import pubmed_downloader
 
 __all__ = [
-    "download_arxiv_input",
-    "download_biorxiv_input",
-    "download_medrxiv_input",
+    "arxiv_downloader",
+    "base_paper_downloader",
+    "medrxiv_downloader",
+    "paper_downloader",
+    "pubmed_downloader",
 ]
