@@ -13,11 +13,10 @@ from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.types import Command
 from pydantic import BaseModel, Field
-
-from .arxiv_downloader import ArxivDownloader
-from .base_paper_downloader import BasePaperDownloader
-from .medrxiv_downloader import MedrxivDownloader
-from .pubmed_downloader import PubmedDownloader
+from .utils.arxiv_downloader import ArxivDownloader
+from .utils.base_paper_downloader import BasePaperDownloader
+from .utils.medrxiv_downloader import MedrxivDownloader
+from .utils.pubmed_downloader import PubmedDownloader
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
