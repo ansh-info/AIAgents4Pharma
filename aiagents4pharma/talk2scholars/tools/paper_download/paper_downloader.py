@@ -165,8 +165,10 @@ class PaperDownloaderFactory:
                 from omegaconf import OmegaConf
 
                 common_dict = OmegaConf.to_container(common_config, resolve=True)
-                for key, value in common_dict.items():
-                    setattr(config_obj, key, value)
+                if isinstance(common_dict, dict):
+                    for key, value in common_dict.items():
+                        if isinstance(key, str):  # Type guard for key
+                            setattr(config_obj, key, value)
             # Method 2: Try direct attribute access
             elif hasattr(common_config, "__dict__"):
                 for key, value in common_config.__dict__.items():
@@ -175,7 +177,8 @@ class PaperDownloaderFactory:
             # Method 3: Try items() method
             elif hasattr(common_config, "items"):
                 for key, value in common_config.items():
-                    setattr(config_obj, key, value)
+                    if isinstance(key, str):  # Type guard for key
+                        setattr(config_obj, key, value)
             else:
                 # Method 4: Try dir() approach as fallback
                 for key in dir(common_config):
@@ -194,17 +197,22 @@ class PaperDownloaderFactory:
                 from omegaconf import OmegaConf
 
                 service_dict = OmegaConf.to_container(service_config, resolve=True)
-                for key, value in service_dict.items():
-                    setattr(config_obj, key, value)
+                if isinstance(service_dict, dict):
+                    for key, value in service_dict.items():
+                        if isinstance(key, str):  # Type guard for key
+                            setattr(config_obj, key, value)
             # Method 2: Try direct attribute access
             elif hasattr(service_config, "__dict__"):
                 for key, value in service_config.__dict__.items():
                     if not key.startswith("_"):
                         setattr(config_obj, key, value)
             # Method 3: Try items() method
-            elif hasattr(service_config, "items"):
+            elif hasattr(service_config, "items") and callable(
+                getattr(service_config, "items")
+            ):
                 for key, value in service_config.items():
-                    setattr(config_obj, key, value)
+                    if isinstance(key, str):  # Type guard for key
+                        setattr(config_obj, key, value)
             else:
                 # Method 4: Try dir() approach as fallback
                 for key in dir(service_config):
