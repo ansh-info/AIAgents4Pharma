@@ -44,6 +44,10 @@ class UnifiedPaperDownloadInput(BaseModel):
 class PaperDownloaderFactory:
     """Factory class for creating paper downloader instances."""
 
+    # Class-level cache for configuration
+    _cached_config = None
+    _config_lock = None
+
     @staticmethod
     def create(service: str) -> BasePaperDownloader:
         """
@@ -68,32 +72,71 @@ class PaperDownloaderFactory:
         elif service == "pubmed":
             return PubmedDownloader(service_config)
         else:
-            supported = config.tool.supported_services
+            supported = getattr(
+                config, "supported_services", ["arxiv", "medrxiv", "pubmed"]
+            )
             raise ValueError(f"Unsupported service: {service}. Supported: {supported}")
 
     @staticmethod
     def _get_unified_config() -> Any:
         """
-        Load unified paper download configuration using Hydra.
+        Load unified paper download configuration using Hydra with caching.
+        This avoids the GlobalHydra reinitialization issue by caching the config.
 
         Returns:
             Unified configuration object
         """
-        try:
-            with hydra.initialize(version_base=None, config_path="../../configs"):
-                cfg = hydra.compose(
-                    config_name="config", overrides=["tools/paper_download=default"]
-                )
-            return cfg.tools.paper_download
+        # Return cached config if available
+        if PaperDownloaderFactory._cached_config is not None:
+            return PaperDownloaderFactory._cached_config
 
-        except Exception as e:
-            logger.error("Failed to load unified paper download configuration: %s", e)
-            raise RuntimeError(f"Configuration loading failed: {e}")
+        # Initialize lock if not exists
+        if PaperDownloaderFactory._config_lock is None:
+            import threading
+
+            PaperDownloaderFactory._config_lock = threading.Lock()
+
+        # Thread-safe config loading
+        with PaperDownloaderFactory._config_lock:
+            # Double-check pattern - another thread might have loaded it
+            if PaperDownloaderFactory._cached_config is not None:
+                return PaperDownloaderFactory._cached_config
+
+            try:
+                from hydra.core.global_hydra import GlobalHydra
+
+                # Clear if already initialized
+                if GlobalHydra().is_initialized():
+                    logger.info(
+                        "GlobalHydra already initialized, clearing for config load"
+                    )
+                    GlobalHydra.instance().clear()
+
+                # Load configuration
+                with hydra.initialize(version_base=None, config_path="../../configs"):
+                    cfg = hydra.compose(
+                        config_name="config", overrides=["tools/paper_download=default"]
+                    )
+
+                # Cache the configuration
+                PaperDownloaderFactory._cached_config = cfg.tools.paper_download
+                logger.info(
+                    "Successfully loaded and cached paper download configuration"
+                )
+
+                return PaperDownloaderFactory._cached_config
+
+            except Exception as e:
+                logger.error(
+                    "Failed to load unified paper download configuration: %s", e
+                )
+                raise RuntimeError(f"Configuration loading failed: {e}")
 
     @staticmethod
     def _build_service_config(unified_config: Any, service: str) -> Any:
         """
         Build service-specific configuration by merging common and service settings.
+        Handles Hydra's OmegaConf objects properly.
 
         Args:
             unified_config: The unified configuration object
@@ -102,21 +145,77 @@ class PaperDownloaderFactory:
         Returns:
             Service-specific configuration object
         """
-        if service not in unified_config.services:
+        if (
+            not hasattr(unified_config, "services")
+            or service not in unified_config.services
+        ):
             raise ValueError(f"Service '{service}' not found in configuration")
 
         # Create a simple config object that combines common and service-specific settings
         class ServiceConfig:
-            def __init__(self, common_config, service_config):
-                # Add all common settings
+            pass
+
+        config_obj = ServiceConfig()
+
+        # Handle common config - try multiple approaches
+        common_config = unified_config.common
+        try:
+            # Method 1: Try OmegaConf conversion
+            if hasattr(common_config, "_content"):  # OmegaConf object
+                from omegaconf import OmegaConf
+
+                common_dict = OmegaConf.to_container(common_config, resolve=True)
+                for key, value in common_dict.items():
+                    setattr(config_obj, key, value)
+            # Method 2: Try direct attribute access
+            elif hasattr(common_config, "__dict__"):
+                for key, value in common_config.__dict__.items():
+                    if not key.startswith("_"):
+                        setattr(config_obj, key, value)
+            # Method 3: Try items() method
+            elif hasattr(common_config, "items"):
                 for key, value in common_config.items():
-                    setattr(self, key, value)
+                    setattr(config_obj, key, value)
+            else:
+                # Method 4: Try dir() approach as fallback
+                for key in dir(common_config):
+                    if not key.startswith("_"):
+                        value = getattr(common_config, key)
+                        if not callable(value):
+                            setattr(config_obj, key, value)
+        except Exception as e:
+            logger.warning(f"Failed to process common config: {e}")
 
-                # Add all service-specific settings (these override common if there's overlap)
+        # Handle service-specific config - try multiple approaches
+        service_config = unified_config.services[service]
+        try:
+            # Method 1: Try OmegaConf conversion
+            if hasattr(service_config, "_content"):  # OmegaConf object
+                from omegaconf import OmegaConf
+
+                service_dict = OmegaConf.to_container(service_config, resolve=True)
+                for key, value in service_dict.items():
+                    setattr(config_obj, key, value)
+            # Method 2: Try direct attribute access
+            elif hasattr(service_config, "__dict__"):
+                for key, value in service_config.__dict__.items():
+                    if not key.startswith("_"):
+                        setattr(config_obj, key, value)
+            # Method 3: Try items() method
+            elif hasattr(service_config, "items"):
                 for key, value in service_config.items():
-                    setattr(self, key, value)
+                    setattr(config_obj, key, value)
+            else:
+                # Method 4: Try dir() approach as fallback
+                for key in dir(service_config):
+                    if not key.startswith("_"):
+                        value = getattr(service_config, key)
+                        if not callable(value):
+                            setattr(config_obj, key, value)
+        except Exception as e:
+            logger.warning(f"Failed to process service config for {service}: {e}")
 
-        return ServiceConfig(unified_config.common, unified_config.services[service])
+        return config_obj
 
 
 @tool(
