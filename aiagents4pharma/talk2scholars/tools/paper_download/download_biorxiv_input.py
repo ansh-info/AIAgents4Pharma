@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Tool for downloading bioRxiv paper metadata and downloading PDFs to temporary files.
+Tool for downloading bioRxiv paper metadata and downloading PDFs to temporary files,
+with shared cloudscraper session and CF-challenge timeout.
 """
 
 import logging
@@ -8,7 +9,7 @@ import tempfile
 from typing import Annotated, Any, List
 
 import hydra
-import requests
+import cloudscraper
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
@@ -23,15 +24,12 @@ logger = logging.getLogger(__name__)
 class DownloadBiorxivPaperInput(BaseModel):
     """Input schema for the bioRxiv paper download tool."""
 
-    dois: List[str] = Field(
-        description="List of DOIs for bioRxiv papers (e.g., '10.1101/2020.09.09.20191205')"
-    )
+    dois: List[str] = Field(description="List of DOIs for bioRxiv papers")
     tool_call_id: Annotated[str, InjectedToolCallId]
 
 
-# Helper to load bioRxiv download configuration
 def _get_biorxiv_config() -> Any:
-    """Load bioRxiv download configuration."""
+    """Load bioRxiv download configuration via Hydra."""
     with hydra.initialize(version_base=None, config_path="../../configs"):
         cfg = hydra.compose(
             config_name="config", overrides=["tools/download_biorxiv_paper=default"]
@@ -39,158 +37,132 @@ def _get_biorxiv_config() -> Any:
     return cfg.tools.download_biorxiv_paper
 
 
-def fetch_biorxiv_metadata(api_url: str, doi: str, request_timeout: int) -> dict:
-    """Fetch and parse metadata from the bioRxiv API."""
-    # Note: bioRxiv API uses 'biorxiv' as the server parameter
-    query_url = f"{api_url}/biorxiv/{doi}/na/json"
-    logger.info("Fetching metadata for DOI %s from: %s", doi, query_url)
-    response = requests.get(query_url, timeout=request_timeout)
-    response.raise_for_status()
-    return response.json()
+def fetch_biorxiv_metadata(api_url: str, doi: str, timeout: int) -> dict:
+    """Fetch metadata from bioRxiv 'details' API using cloudscraper too."""
+    url = f"{api_url}/biorxiv/{doi}/na/json"
+    logger.info("Fetching metadata for DOI %s from %s", doi, url)
+    # We can reuse CF-bypass session here too if desired, but metadata endpoints rarely block
+    resp = cloudscraper.create_scraper().get(url, timeout=timeout)
+    resp.raise_for_status()
+    return resp.json()
 
 
 def download_pdf_to_temp(
-    pdf_url: str, doi: str, request_timeout: int, cfg: Any, chunk_size: int = 8192
+    cfg: Any,
+    scraper: cloudscraper.CloudScraper,
+    doi: str,
+    version: str,
+    timeout: int,
+    chunk_size: int,
 ) -> tuple[str, str] | None:
     """
-    Download PDF from URL to a temporary file.
-    Returns tuple of (temp_file_path, filename) or None if failed.
+    Download PDF via a shared cloudscraper session.
+    Returns (temp_path, filename) or None on failure.
     """
-    if not pdf_url:
-        logger.info("No PDF URL available for DOI %s", doi)
-        return None
+    landing = cfg.landing_url_template.format(doi=doi, version=version)
+    pdf_url = cfg.pdf_url_template.format(doi=doi, version=version)
 
+    logger.info("Downloading PDF for %s via %s", doi, pdf_url)
     try:
-        logger.info("Downloading PDF for DOI %s from %s", doi, pdf_url)
+        # 1) Hit landing page so CF JS-challenge is solved
+        r1 = scraper.get(landing, timeout=timeout)
+        r1.raise_for_status()
 
-        # Use proper headers for better compatibility
-        headers = {"User-Agent": cfg.user_agent}
-        response = requests.get(
-            pdf_url, headers=headers, timeout=request_timeout, stream=True
-        )
-        response.raise_for_status()
+        # 2) Stream the .full.pdf
+        r2 = scraper.get(pdf_url, timeout=timeout, stream=True)
+        r2.raise_for_status()
 
-        # Download to a temporary file first
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-            for chunk in response.iter_content(chunk_size=chunk_size):
-                if chunk:  # Filter out keep-alive chunks
-                    temp_file.write(chunk)
-            temp_file_path = temp_file.name
+        # 3) Write into temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            for chunk in r2.iter_content(chunk_size=chunk_size):
+                if chunk:
+                    tmp.write(chunk)
+            temp_path = tmp.name
 
-        logger.info("bioRxiv PDF downloaded to temporary file: %s", temp_file_path)
+        filename = doi.replace("/", "_").replace(".", "_") + ".pdf"
+        logger.info("Saved PDF to %s", temp_path)
+        return temp_path, filename
 
-        # Determine filename - bioRxiv uses DOI-based naming
-        filename = f"{doi.replace('/', '_').replace('.', '_')}.pdf"  # Use sanitized DOI as filename
-
-        return temp_file_path, filename
-
-    except (requests.exceptions.RequestException, OSError) as e:
-        logger.error("Failed to download PDF for DOI %s: %s", doi, e)
+    except Exception as exc:
+        logger.error("Failed to download %s: %s", doi, exc)
         return None
 
 
 def extract_metadata(
-    paper_data: dict, doi: str, pdf_download_result: tuple[str, str] | None
+    paper_data: dict, doi: str, pdf_result: tuple[str, str] | None
 ) -> dict:
-    """Extract metadata from the JSON response and include download info."""
-    # The API returns a collection with papers in a 'collection' key
-    if "collection" not in paper_data or not paper_data["collection"]:
-        raise RuntimeError(f"No paper data found for DOI {doi}")
+    """Parse JSON and attach PDF download info."""
+    coll = paper_data.get("collection", [])
+    if not coll:
+        raise RuntimeError(f"No data for DOI {doi}")
+    paper = coll[0]
 
-    paper = paper_data["collection"][0]  # Get first (and should be only) paper
-
+    # Basic fields
     title = paper.get("title", "N/A").strip()
-
-    # Authors are typically in a semicolon-separated string
-    authors_str = paper.get("authors", "")
-    authors = (
-        [author.strip() for author in authors_str.split(";") if author.strip()]
-        if authors_str
-        else []
-    )
-
+    authors = [a.strip() for a in paper.get("authors", "").split(";") if a.strip()]
     abstract = paper.get("abstract", "N/A").strip()
-    pub_date = paper.get("date", "N/A").strip()
+    date = paper.get("date", "N/A").strip()
     category = paper.get("category", "N/A").strip()
     version = paper.get("version", "N/A")
 
-    # Handle PDF download results
-    if pdf_download_result:
-        temp_file_path, filename = pdf_download_result
-        pdf_url = temp_file_path  # Use local temp file path
-        access_type = "open_access_downloaded"
+    if pdf_result:
+        temp_path, filename = pdf_result
+        access = "open_access_downloaded"
     else:
-        temp_file_path = ""
-        filename = f"{doi.replace('/', '_').replace('.', '_')}.pdf"
-        pdf_url = ""
-        access_type = "download_failed"
+        temp_path, filename = "", doi.replace("/", "_").replace(".", "_") + ".pdf"
+        access = "download_failed"
 
     return {
         "Title": title,
         "Authors": authors,
         "Abstract": abstract,
-        "Publication Date": pub_date,
+        "Publication Date": date,
         "DOI": doi,
         "Category": category,
         "Version": version,
-        "URL": pdf_url,  # Now points to local temp file or empty
-        "pdf_url": pdf_url,  # Same as URL
+        "URL": temp_path,
+        "pdf_url": temp_path,
         "filename": filename,
         "source": "biorxiv",
         "server": "biorxiv",
-        "access_type": access_type,
-        "temp_file_path": temp_file_path,  # Explicit temp file path for cleanup if needed
+        "access_type": access,
+        "temp_file_path": temp_path,
     }
 
 
-def _get_snippet(abstract: str) -> str:
-    """Extract the first one or two sentences from an abstract."""
-    if not abstract or abstract == "N/A":
+def _get_snippet(text: str) -> str:
+    if not text or text == "N/A":
         return ""
-    sentences = abstract.split(". ")
-    snippet_sentences = sentences[:2]
-    snippet = ". ".join(snippet_sentences)
+    sents = text.split(". ")
+    snippet = ". ".join(sents[:2])
     if not snippet.endswith("."):
         snippet += "."
     return snippet
 
 
-def _build_summary(article_data: dict[str, Any]) -> str:
-    """Build a summary string for up to three papers with snippets."""
-    top = list(article_data.values())[:3]
-    lines: list[str] = []
-    downloaded_count = sum(
-        1
-        for paper in article_data.values()
-        if paper.get("access_type") == "open_access_downloaded"
+def _build_summary(data: dict[str, Any]) -> str:
+    top = list(data.values())[:3]
+    downloaded = sum(
+        1 for x in data.values() if x["access_type"] == "open_access_downloaded"
     )
-
-    for idx, paper in enumerate(top):
-        title = paper.get("Title", "N/A")
-        pub_date = paper.get("Publication Date", "N/A")
-        doi = paper.get("DOI", "N/A")
-        category = paper.get("Category", "N/A")
-        access_type = paper.get("access_type", "N/A")
-        temp_file_path = paper.get("temp_file_path", "")
-        snippet = _get_snippet(paper.get("Abstract", ""))
-
-        line = f"{idx+1}. {title} (DOI:{doi}, {pub_date})"
-        if category != "N/A":
-            line += f"\n   Category: {category}"
-        line += f"\n   Access: {access_type}"
-        if temp_file_path:
-            line += f"\n   Downloaded to: {temp_file_path}"
-        if snippet:
-            line += f"\n   Abstract snippet: {snippet}"
-        lines.append(line)
-
-    summary = "\n".join(lines)
+    lines = []
+    for i, p in enumerate(top, start=1):
+        snippet = _get_snippet(p["Abstract"])
+        lines.append(
+            f"{i}. {p['Title']} (DOI:{p['DOI']}, {p['Publication Date']})\n"
+            f"   Category: {p['Category']}\n"
+            f"   Access: {p['access_type']}\n"
+            + (
+                f"   Downloaded to: {p['temp_file_path']}\n"
+                if p["temp_file_path"]
+                else ""
+            )
+            + (f"   Abstract snippet: {snippet}" if snippet else "")
+        )
     return (
-        "Download was successful from bioRxiv. Papers metadata are attached as an artifact. "
-        "Here is a summary of the results:\n"
-        f"Number of papers found: {len(article_data)}\n"
-        f"PDFs successfully downloaded: {downloaded_count}\n"
-        "Top 3 papers:\n" + summary
+        "Download completed. Metadata attached as an artifact.\n"
+        f"Total papers: {len(data)}, PDFs downloaded: {downloaded}\n"
+        "Top 3:\n" + "\n".join(lines)
     )
 
 
@@ -203,83 +175,56 @@ def download_biorxiv_paper(
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command[Any]:
     """
-    Get metadata and download PDFs for one or more bioRxiv papers using their DOIs.
-
-    Args:
-        dois: List of DOI strings (e.g., ['10.1101/2020.09.09.20191205'])
+    Get metadata + download PDFs for one or more bioRxiv DOIs.
     """
-    logger.info(
-        "Fetching metadata and downloading PDFs from bioRxiv for DOIs: %s", dois
-    )
-
-    # Load configuration
+    logger.info("Starting download for DOIs: %s", dois)
     cfg = _get_biorxiv_config()
     api_url = cfg.api_url
-    request_timeout = cfg.request_timeout
-    chunk_size = getattr(cfg, "chunk_size", 8192)  # Default chunk size
+    timeout = cfg.request_timeout
+    chunk_size = cfg.chunk_size
+    reuse_session = getattr(cfg, "session_reuse", True)
+    cf_timeout = getattr(cfg, "cf_clearance_timeout", 10)
 
-    # Aggregate results
-    article_data: dict[str, Any] = {}
+    # Build a shared scraper if desired
+    scraper = None
+    if reuse_session:
+        scraper = cloudscraper.create_scraper(
+            browser={"custom": cfg.user_agent}, delay=cf_timeout
+        )
+
+    results: dict[str, Any] = {}
     for doi in dois:
-        logger.info("Processing DOI: %s from bioRxiv", doi)
         try:
-            # Step 1: Fetch and parse metadata
-            paper_data = fetch_biorxiv_metadata(api_url, doi, request_timeout)
+            # 1) metadata
+            meta = fetch_biorxiv_metadata(api_url, doi, timeout)
+            version = meta["collection"][0].get("version", "1")
 
-            if "collection" not in paper_data or not paper_data["collection"]:
-                logger.warning("No paper data found for DOI %s", doi)
-                # Add error entry
-                article_data[doi] = {
-                    "Title": "Error fetching paper",
-                    "Authors": [],
-                    "Abstract": "No paper data found in bioRxiv API response",
-                    "Publication Date": "N/A",
-                    "DOI": doi,
-                    "Category": "N/A",
-                    "Version": "N/A",
-                    "URL": "",
-                    "pdf_url": "",
-                    "filename": f"{doi.replace('/', '_').replace('.', '_')}.pdf",
-                    "source": "biorxiv",
-                    "server": "biorxiv",
-                    "access_type": "error",
-                    "temp_file_path": "",
-                    "error": "No paper data found in bioRxiv API response",
-                }
-                continue
+            # 2) choose or build a scraper for PDF
+            pdf_scraper = scraper or cloudscraper.create_scraper(
+                browser={"custom": cfg.user_agent}, delay=cf_timeout
+            )
 
-            # Step 2: Extract version from metadata for PDF URL construction
-            paper = paper_data["collection"][0]
-            version = paper.get("version", "1")  # Default to version 1
+            # 3) download
+            pdf_res = download_pdf_to_temp(
+                cfg, pdf_scraper, doi, version, timeout, chunk_size
+            )
 
-            # Step 3: Construct bioRxiv PDF URL
-            # Format: https://www.biorxiv.org/content/{DOI}v{version}.full.pdf
-            pdf_url = f"https://www.biorxiv.org/content/{doi}v{version}.full.pdf"
-
-            # Step 4: Download PDF if URL is available
-            pdf_download_result = None
-            if pdf_url:
-                pdf_download_result = download_pdf_to_temp(
-                    pdf_url, doi, request_timeout, cfg, chunk_size
-                )
-
-            # Step 5: Extract and structure metadata
-            article_data[doi] = extract_metadata(paper_data, doi, pdf_download_result)
+            # 4) record
+            results[doi] = extract_metadata(meta, doi, pdf_res)
 
         except Exception as e:
-            logger.warning("Error processing DOI %s: %s", doi, str(e))
-            # Add placeholder data for failed DOIs
-            article_data[doi] = {
-                "Title": "Error fetching paper",
+            logger.warning("Error for %s: %s", doi, e)
+            results[doi] = {
+                "Title": "Error fetching",
                 "Authors": [],
-                "Abstract": f"Error: {str(e)}",
+                "Abstract": str(e),
                 "Publication Date": "N/A",
                 "DOI": doi,
                 "Category": "N/A",
                 "Version": "N/A",
                 "URL": "",
                 "pdf_url": "",
-                "filename": f"{doi.replace('/', '_').replace('.', '_')}.pdf",
+                "filename": doi.replace("/", "_").replace(".", "_") + ".pdf",
                 "source": "biorxiv",
                 "server": "biorxiv",
                 "access_type": "error",
@@ -287,16 +232,15 @@ def download_biorxiv_paper(
                 "error": str(e),
             }
 
-    # Build and return summary
-    content = _build_summary(article_data)
+    summary = _build_summary(results)
     return Command(
         update={
-            "article_data": article_data,
+            "article_data": results,
             "messages": [
                 ToolMessage(
-                    content=content,
+                    content=summary,
                     tool_call_id=tool_call_id,
-                    artifact=article_data,
+                    artifact=results,
                 )
             ],
         }
