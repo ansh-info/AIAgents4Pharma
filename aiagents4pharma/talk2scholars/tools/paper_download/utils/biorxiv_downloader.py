@@ -4,10 +4,12 @@ BioRxiv paper downloader implementation.
 """
 
 import logging
+import re
 import tempfile
 from typing import Any, Dict, Optional, Tuple
 
 import cloudscraper
+import requests
 
 from .base_paper_downloader import BasePaperDownloader
 
@@ -122,66 +124,72 @@ class BiorxivDownloader(BasePaperDownloader):
         try:
             logger.info("Downloading PDF for DOI %s from %s", identifier, pdf_url)
 
-            # Get or create scraper for this download
-            scraper = self._scraper or cloudscraper.create_scraper(
-                browser={"custom": self.user_agent}, delay=self.cf_clearance_timeout
-            )
+            # Get scraper and visit landing page if needed
+            scraper = self._get_scraper()
+            self._visit_landing_page(scraper, pdf_url, identifier)
 
-            # Extract version from PDF URL to construct landing page URL
-            # PDF URL format: https://www.biorxiv.org/content/{doi}v{version}.full.pdf
-            # Landing URL format: https://www.biorxiv.org/content/{doi}v{version}
-            if ".full.pdf" in pdf_url:
-                landing_url = pdf_url.replace(".full.pdf", "")
-                logger.info("Visiting landing page first: %s", landing_url)
-
-                # Step 1: Visit landing page to solve CF JS-challenge
-                landing_response = scraper.get(
-                    landing_url, timeout=self.request_timeout
-                )
-                landing_response.raise_for_status()
-                logger.info("Successfully accessed landing page for %s", identifier)
-
-            # Step 2: Download the PDF using the same session
+            # Download and save PDF
             response = scraper.get(pdf_url, timeout=self.request_timeout, stream=True)
             response.raise_for_status()
 
-            # Step 3: Save to temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-                for chunk in response.iter_content(chunk_size=self.chunk_size):
-                    if chunk:  # Filter out keep-alive chunks
-                        temp_file.write(chunk)
-                temp_file_path = temp_file.name
-
-            logger.info("BioRxiv PDF downloaded to temporary file: %s", temp_file_path)
-
-            # Generate filename from DOI
-            filename = self.get_default_filename(identifier)
-
-            # Try to extract filename from Content-Disposition header
-            content_disposition = response.headers.get("Content-Disposition", "")
-            if "filename=" in content_disposition:
-                try:
-                    import re
-
-                    filename_match = re.search(
-                        r'filename[*]?=(?:"([^"]+)"|([^;]+))', content_disposition
-                    )
-                    if filename_match:
-                        extracted_filename = filename_match.group(
-                            1
-                        ) or filename_match.group(2)
-                        extracted_filename = extracted_filename.strip().strip('"')
-                        if extracted_filename and extracted_filename.endswith(".pdf"):
-                            filename = extracted_filename
-                            logger.info("Extracted filename from header: %s", filename)
-                except Exception as e:
-                    logger.warning("Failed to extract filename from header: %s", e)
+            temp_file_path = self._save_pdf_to_temp(response)
+            filename = self._extract_filename(response, identifier)
 
             return temp_file_path, filename
 
-        except Exception as e:
+        except requests.RequestException as e:
             logger.error("Failed to download PDF for DOI %s: %s", identifier, e)
             return None
+
+    def _get_scraper(self):
+        """Get or create CloudScraper instance."""
+        return self._scraper or cloudscraper.create_scraper(
+            browser={"custom": self.user_agent}, delay=self.cf_clearance_timeout
+        )
+
+    def _visit_landing_page(self, scraper, pdf_url: str, identifier: str) -> None:
+        """Visit landing page to handle CloudFlare protection."""
+        if ".full.pdf" in pdf_url:
+            landing_url = pdf_url.replace(".full.pdf", "")
+            logger.info("Visiting landing page first: %s", landing_url)
+
+            landing_response = scraper.get(landing_url, timeout=self.request_timeout)
+            landing_response.raise_for_status()
+            logger.info("Successfully accessed landing page for %s", identifier)
+
+    def _save_pdf_to_temp(self, response) -> str:
+        """Save PDF response to temporary file."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+            for chunk in response.iter_content(chunk_size=self.chunk_size):
+                if chunk:  # Filter out keep-alive chunks
+                    temp_file.write(chunk)
+            temp_file_path = temp_file.name
+
+        logger.info("BioRxiv PDF downloaded to temporary file: %s", temp_file_path)
+        return temp_file_path
+
+    def _extract_filename(self, response, identifier: str) -> str:
+        """Extract filename from response headers or generate default."""
+        filename = self.get_default_filename(identifier)
+
+        content_disposition = response.headers.get("Content-Disposition", "")
+        if "filename=" in content_disposition:
+            try:
+                filename_match = re.search(
+                    r'filename[*]?=(?:"([^"]+)"|([^;]+))', content_disposition
+                )
+                if filename_match:
+                    extracted_filename = filename_match.group(
+                        1
+                    ) or filename_match.group(2)
+                    extracted_filename = extracted_filename.strip().strip('"')
+                    if extracted_filename and extracted_filename.endswith(".pdf"):
+                        filename = extracted_filename
+                        logger.info("Extracted filename from header: %s", filename)
+            except requests.RequestException as e:
+                logger.warning("Failed to extract filename from header: %s", e)
+
+        return filename
 
     def extract_paper_metadata(
         self,
@@ -205,37 +213,31 @@ class BiorxivDownloader(BasePaperDownloader):
 
         paper = metadata["collection"][0]  # Get first (and should be only) paper
 
-        # Extract title
+        # Extract basic metadata
+        basic_metadata = self._extract_basic_metadata(paper, identifier)
+
+        # Handle PDF download results
+        pdf_metadata = self._extract_pdf_metadata(pdf_result, identifier)
+
+        # Combine all metadata
+        return {
+            **basic_metadata,
+            **pdf_metadata,
+        }
+
+    def _extract_basic_metadata(
+        self, paper: Dict[str, Any], identifier: str
+    ) -> Dict[str, Any]:
+        """Extract basic metadata from paper data."""
+        # Extract basic fields
         title = paper.get("title", "N/A").strip()
-
-        # Extract authors - typically in a semicolon-separated string
-        authors_str = paper.get("authors", "")
-        authors = (
-            [author.strip() for author in authors_str.split(";") if author.strip()]
-            if authors_str
-            else []
-        )
-
-        # Extract abstract
         abstract = paper.get("abstract", "N/A").strip()
-
-        # Extract publication date
         pub_date = paper.get("date", "N/A").strip()
-
-        # Extract additional bioRxiv-specific fields
         category = paper.get("category", "N/A").strip()
         version = paper.get("version", "N/A")
 
-        # Handle PDF download results
-        if pdf_result:
-            temp_file_path, filename = pdf_result
-            pdf_url = temp_file_path  # Use local temp file path
-            access_type = "open_access_downloaded"
-        else:
-            temp_file_path = ""
-            filename = self.get_default_filename(identifier)
-            pdf_url = ""
-            access_type = "download_failed"
+        # Extract authors - typically in a semicolon-separated string
+        authors = self._extract_authors(paper.get("authors", ""))
 
         return {
             "Title": title,
@@ -245,13 +247,36 @@ class BiorxivDownloader(BasePaperDownloader):
             "DOI": identifier,
             "Category": category,
             "Version": version,
-            "URL": pdf_url,
-            "pdf_url": pdf_url,
-            "filename": filename,
             "source": "biorxiv",
             "server": "biorxiv",
-            "access_type": access_type,
-            "temp_file_path": temp_file_path,
+        }
+
+    def _extract_authors(self, authors_str: str) -> list:
+        """Extract and clean authors from semicolon-separated string."""
+        if not authors_str:
+            return []
+        return [author.strip() for author in authors_str.split(";") if author.strip()]
+
+    def _extract_pdf_metadata(
+        self, pdf_result: Optional[Tuple[str, str]], identifier: str
+    ) -> Dict[str, Any]:
+        """Extract PDF-related metadata."""
+        if pdf_result:
+            temp_file_path, filename = pdf_result
+            return {
+                "URL": temp_file_path,
+                "pdf_url": temp_file_path,
+                "filename": filename,
+                "access_type": "open_access_downloaded",
+                "temp_file_path": temp_file_path,
+            }
+
+        return {
+            "URL": "",
+            "pdf_url": "",
+            "filename": self.get_default_filename(identifier),
+            "access_type": "download_failed",
+            "temp_file_path": "",
         }
 
     def get_service_name(self) -> str:

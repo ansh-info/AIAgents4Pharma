@@ -5,6 +5,7 @@ Provides common functionality for arXiv, medRxiv, PubMed, and future paper sourc
 """
 
 import logging
+import re
 import tempfile
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
@@ -39,7 +40,7 @@ class BasePaperDownloader(ABC):
         Returns:
             Service-specific metadata object (XML, JSON, etc.)
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def construct_pdf_url(self, metadata: Any, identifier: str) -> str:
@@ -53,7 +54,7 @@ class BasePaperDownloader(ABC):
         Returns:
             PDF URL string (empty if not available)
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def extract_paper_metadata(
@@ -70,22 +71,22 @@ class BasePaperDownloader(ABC):
         Returns:
             Standardized paper metadata dictionary
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_service_name(self) -> str:
         """Return service name (e.g., 'arxiv', 'medrxiv', 'pubmed')."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_identifier_name(self) -> str:
         """Return identifier display name (e.g., 'arXiv ID', 'DOI', 'PMID')."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_default_filename(self, identifier: str) -> str:
         """Generate default filename for the paper PDF."""
-        pass
+        raise NotImplementedError
 
     # Common methods shared by all services
     def download_pdf_to_temp(
@@ -140,7 +141,6 @@ class BasePaperDownloader(ABC):
 
             if "filename=" in content_disposition:
                 try:
-                    import re
 
                     filename_match = re.search(
                         r'filename[*]?=(?:"([^"]+)"|([^;]+))', content_disposition
@@ -153,7 +153,7 @@ class BasePaperDownloader(ABC):
                         if extracted_filename and extracted_filename.endswith(".pdf"):
                             filename = extracted_filename
                             logger.info("Extracted filename from header: %s", filename)
-                except Exception as e:
+                except requests.RequestException as e:
                     logger.warning("Failed to extract filename from header: %s", e)
 
             return temp_file_path, filename
@@ -274,7 +274,7 @@ class BasePaperDownloader(ABC):
         Returns:
             Formatted identifier string (e.g., " (arXiv:1234.5678, 2023-01-01)")
         """
-        pass
+        raise NotImplementedError
 
     def process_identifiers(self, identifiers: List[str]) -> Dict[str, Any]:
         """
@@ -315,7 +315,7 @@ class BasePaperDownloader(ABC):
                     metadata, identifier, pdf_result
                 )
 
-            except Exception as e:
+            except requests.RequestException as e:
                 logger.warning(
                     "Error processing %s %s: %s",
                     self.get_identifier_name(),
@@ -340,4 +340,4 @@ class BasePaperDownloader(ABC):
             entry: Paper entry dictionary to modify
             identifier: Original identifier
         """
-        pass
+        raise NotImplementedError

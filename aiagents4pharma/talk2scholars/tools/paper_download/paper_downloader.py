@@ -5,9 +5,12 @@ Supports downloading papers from arXiv, medRxiv, bioRxiv, and PubMed through a s
 """
 
 import logging
+import threading
 from typing import Annotated, Any, List, Literal
 
 import hydra
+from hydra.core.global_hydra import GlobalHydra
+from omegaconf import OmegaConf
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
@@ -49,6 +52,11 @@ class PaperDownloaderFactory:
     _cached_config = None
     _config_lock = None
 
+    @classmethod
+    def clear_cache(cls) -> None:
+        """Clear cached configuration."""
+        cls._cached_config = None
+
     @staticmethod
     def create(service: str) -> BasePaperDownloader:
         """
@@ -68,17 +76,17 @@ class PaperDownloaderFactory:
 
         if service == "arxiv":
             return ArxivDownloader(service_config)
-        elif service == "medrxiv":
+        if service == "medrxiv":
             return MedrxivDownloader(service_config)
-        elif service == "biorxiv":
+        if service == "biorxiv":
             return BiorxivDownloader(service_config)
-        elif service == "pubmed":
+        if service == "pubmed":
             return PubmedDownloader(service_config)
-        else:
-            supported = getattr(
-                config, "supported_services", ["arxiv", "medrxiv", "biorxiv", "pubmed"]
-            )
-            raise ValueError(f"Unsupported service: {service}. Supported: {supported}")
+
+        supported = getattr(
+            config, "supported_services", ["arxiv", "medrxiv", "biorxiv", "pubmed"]
+        )
+        raise ValueError(f"Unsupported service: {service}. Supported: {supported}")
 
     @staticmethod
     def _get_unified_config() -> Any:
@@ -93,20 +101,19 @@ class PaperDownloaderFactory:
         if PaperDownloaderFactory._cached_config is not None:
             return PaperDownloaderFactory._cached_config
 
-        # Initialize lock if not exists
-        if PaperDownloaderFactory._config_lock is None:
-            import threading
+        # Ensure lock exists and get a local reference
+        lock = PaperDownloaderFactory._config_lock
+        if lock is None:
+            lock = threading.Lock()
+            PaperDownloaderFactory._config_lock = lock
 
-            PaperDownloaderFactory._config_lock = threading.Lock()
-
-        # Thread-safe config loading
-        with PaperDownloaderFactory._config_lock:
+        # Thread-safe config loading with guaranteed non-None lock
+        with lock:
             # Double-check pattern - another thread might have loaded it
             if PaperDownloaderFactory._cached_config is not None:
                 return PaperDownloaderFactory._cached_config
 
             try:
-                from hydra.core.global_hydra import GlobalHydra
 
                 # Clear if already initialized
                 if GlobalHydra().is_initialized():
@@ -133,7 +140,7 @@ class PaperDownloaderFactory:
                 logger.error(
                     "Failed to load unified paper download configuration: %s", e
                 )
-                raise RuntimeError(f"Configuration loading failed: {e}")
+                raise RuntimeError(f"Configuration loading failed: {e}") from e
 
     @staticmethod
     def _build_service_config(unified_config: Any, service: str) -> Any:
@@ -156,77 +163,100 @@ class PaperDownloaderFactory:
 
         # Create a simple config object that combines common and service-specific settings
         class ServiceConfig:
-            pass
+            """Service-specific configuration holder."""
+
+            def get_config_dict(self):
+                """Return configuration as dictionary."""
+                return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+
+            def has_attribute(self, name: str) -> bool:
+                """Check if configuration has a specific attribute."""
+                return hasattr(self, name)
 
         config_obj = ServiceConfig()
 
-        # Handle common config - try multiple approaches
-        common_config = unified_config.common
-        try:
-            # Method 1: Try OmegaConf conversion
-            if hasattr(common_config, "_content"):  # OmegaConf object
-                from omegaconf import OmegaConf
+        # Handle common config (using helper method to reduce branches)
+        PaperDownloaderFactory._apply_config(
+            config_obj, unified_config.common, "common"
+        )
 
-                common_dict = OmegaConf.to_container(common_config, resolve=True)
-                if isinstance(common_dict, dict):
-                    for key, value in common_dict.items():
-                        if isinstance(key, str):  # Type guard for key
-                            setattr(config_obj, key, value)
-            # Method 2: Try direct attribute access
-            elif hasattr(common_config, "__dict__"):
-                for key, value in common_config.__dict__.items():
-                    if not key.startswith("_"):
-                        setattr(config_obj, key, value)
-            # Method 3: Try items() method
-            elif hasattr(common_config, "items"):
-                for key, value in common_config.items():
-                    if isinstance(key, str):  # Type guard for key
-                        setattr(config_obj, key, value)
-            else:
-                # Method 4: Try dir() approach as fallback
-                for key in dir(common_config):
-                    if not key.startswith("_"):
-                        value = getattr(common_config, key)
-                        if not callable(value):
-                            setattr(config_obj, key, value)
-        except Exception as e:
-            logger.warning(f"Failed to process common config: {e}")
-
-        # Handle service-specific config - try multiple approaches
-        service_config = unified_config.services[service]
-        try:
-            # Method 1: Try OmegaConf conversion
-            if hasattr(service_config, "_content"):  # OmegaConf object
-                from omegaconf import OmegaConf
-
-                service_dict = OmegaConf.to_container(service_config, resolve=True)
-                if isinstance(service_dict, dict):
-                    for key, value in service_dict.items():
-                        if isinstance(key, str):  # Type guard for key
-                            setattr(config_obj, key, value)
-            # Method 2: Try direct attribute access
-            elif hasattr(service_config, "__dict__"):
-                for key, value in service_config.__dict__.items():
-                    if not key.startswith("_"):
-                        setattr(config_obj, key, value)
-            # Method 3: Try items() method
-            elif hasattr(service_config, "items") and callable(
-                getattr(service_config, "items")
-            ):
-                for key, value in service_config.items():
-                    if isinstance(key, str):  # Type guard for key
-                        setattr(config_obj, key, value)
-            else:
-                # Method 4: Try dir() approach as fallback
-                for key in dir(service_config):
-                    if not key.startswith("_"):
-                        value = getattr(service_config, key)
-                        if not callable(value):
-                            setattr(config_obj, key, value)
-        except Exception as e:
-            logger.warning(f"Failed to process service config for {service}: {e}")
+        # Handle service-specific config (using helper method to reduce branches)
+        PaperDownloaderFactory._apply_config(
+            config_obj, unified_config.services[service], service
+        )
 
         return config_obj
+
+    @staticmethod
+    def _apply_config(config_obj: Any, source_config: Any, config_type: str) -> None:
+        """
+        Apply configuration from source to target object using multiple fallback methods.
+        This preserves all the original logic but reduces branches in the main method.
+
+        Args:
+            config_obj: Target configuration object
+            source_config: Source configuration to extract from
+            config_type: Type description for logging
+        """
+        try:
+            PaperDownloaderFactory._try_config_extraction(config_obj, source_config)
+        except (AttributeError, TypeError, KeyError) as e:
+            logger.warning("Failed to process %s config: %s", config_type, e)
+
+    @staticmethod
+    def _try_config_extraction(config_obj: Any, source_config: Any) -> None:
+        """Try different methods to extract configuration data."""
+        # Method 1: Try OmegaConf conversion
+        if hasattr(source_config, "_content"):
+            PaperDownloaderFactory._extract_from_omegaconf(config_obj, source_config)
+            return
+
+        # Method 2: Try direct attribute access
+        if hasattr(source_config, "__dict__"):
+            PaperDownloaderFactory._extract_from_dict(
+                config_obj, source_config.__dict__
+            )
+            return
+
+        # Method 3: Try items() method
+        if hasattr(source_config, "items"):
+            PaperDownloaderFactory._extract_from_items(config_obj, source_config)
+            return
+
+        # Method 4: Try dir() approach as fallback
+        PaperDownloaderFactory._extract_from_dir(config_obj, source_config)
+
+    @staticmethod
+    def _extract_from_omegaconf(config_obj: Any, source_config: Any) -> None:
+        """Extract configuration from OmegaConf object."""
+        config_dict = OmegaConf.to_container(source_config, resolve=True)
+        if isinstance(config_dict, dict):
+            for key, value in config_dict.items():
+                if isinstance(key, str):  # Type guard for key
+                    setattr(config_obj, key, value)
+
+    @staticmethod
+    def _extract_from_dict(config_obj: Any, config_dict: dict) -> None:
+        """Extract configuration from dictionary."""
+        for key, value in config_dict.items():
+            if not key.startswith("_"):
+                setattr(config_obj, key, value)
+
+    @staticmethod
+    def _extract_from_items(config_obj: Any, source_config: Any) -> None:
+        """Extract configuration using items() method."""
+        for key, value in source_config.items():
+            if isinstance(key, str):  # Type guard for key
+                setattr(config_obj, key, value)
+
+    @staticmethod
+    def _extract_from_dir(config_obj: Any, source_config: Any) -> None:
+        """Extract configuration using dir() approach as fallback."""
+        for key in dir(source_config):
+            if not key.startswith("_"):
+                value = getattr(source_config, key)
+                if not callable(value):
+                    setattr(config_obj, key, value)
 
 
 @tool(
@@ -374,7 +404,7 @@ def _download_papers_impl(
             }
         )
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         # Handle unexpected errors
         error_msg = f"Unexpected error during paper download: {str(e)}"
         logger.error(error_msg, exc_info=True)

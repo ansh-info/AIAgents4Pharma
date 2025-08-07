@@ -20,7 +20,8 @@ class MedrxivDownloader(BasePaperDownloader):
         """Initialize MedRxiv downloader with configuration."""
         super().__init__(config)
         self.api_url = config.api_url
-        # Note: pdf_base_url from config is not directly used since we construct URLs from DOI + version
+        # Note: pdf_base_url from config is not directly used since we construct
+        # URLs from DOI + version
 
     def fetch_metadata(self, identifier: str) -> Dict[str, Any]:
         """
@@ -95,37 +96,31 @@ class MedrxivDownloader(BasePaperDownloader):
 
         paper = metadata["collection"][0]  # Get first (and should be only) paper
 
-        # Extract title
+        # Extract basic metadata
+        basic_metadata = self._extract_basic_metadata(paper, identifier)
+
+        # Handle PDF download results
+        pdf_metadata = self._extract_pdf_metadata(pdf_result, identifier)
+
+        # Combine all metadata
+        return {
+            **basic_metadata,
+            **pdf_metadata,
+        }
+
+    def _extract_basic_metadata(
+        self, paper: Dict[str, Any], identifier: str
+    ) -> Dict[str, Any]:
+        """Extract basic metadata from paper data."""
+        # Extract basic fields
         title = paper.get("title", "N/A").strip()
-
-        # Extract authors - typically in a semicolon-separated string
-        authors_str = paper.get("authors", "")
-        authors = (
-            [author.strip() for author in authors_str.split(";") if author.strip()]
-            if authors_str
-            else []
-        )
-
-        # Extract abstract
         abstract = paper.get("abstract", "N/A").strip()
-
-        # Extract publication date
         pub_date = paper.get("date", "N/A").strip()
-
-        # Extract additional medRxiv-specific fields
         category = paper.get("category", "N/A").strip()
         version = paper.get("version", "N/A")
 
-        # Handle PDF download results
-        if pdf_result:
-            temp_file_path, filename = pdf_result
-            pdf_url = temp_file_path  # Use local temp file path
-            access_type = "open_access_downloaded"
-        else:
-            temp_file_path = ""
-            filename = self.get_default_filename(identifier)
-            pdf_url = ""
-            access_type = "download_failed"
+        # Extract authors - typically in a semicolon-separated string
+        authors = self._extract_authors(paper.get("authors", ""))
 
         return {
             "Title": title,
@@ -135,13 +130,36 @@ class MedrxivDownloader(BasePaperDownloader):
             "DOI": identifier,
             "Category": category,
             "Version": version,
-            "URL": pdf_url,
-            "pdf_url": pdf_url,
-            "filename": filename,
             "source": "medrxiv",
             "server": "medrxiv",
-            "access_type": access_type,
-            "temp_file_path": temp_file_path,
+        }
+
+    def _extract_authors(self, authors_str: str) -> list:
+        """Extract and clean authors from semicolon-separated string."""
+        if not authors_str:
+            return []
+        return [author.strip() for author in authors_str.split(";") if author.strip()]
+
+    def _extract_pdf_metadata(
+        self, pdf_result: Optional[Tuple[str, str]], identifier: str
+    ) -> Dict[str, Any]:
+        """Extract PDF-related metadata."""
+        if pdf_result:
+            temp_file_path, filename = pdf_result
+            return {
+                "URL": temp_file_path,
+                "pdf_url": temp_file_path,
+                "filename": filename,
+                "access_type": "open_access_downloaded",
+                "temp_file_path": temp_file_path,
+            }
+
+        return {
+            "URL": "",
+            "pdf_url": "",
+            "filename": self.get_default_filename(identifier),
+            "access_type": "download_failed",
+            "temp_file_path": "",
         }
 
     def get_service_name(self) -> str:

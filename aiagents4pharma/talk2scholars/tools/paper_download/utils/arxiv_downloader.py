@@ -108,52 +108,80 @@ class ArxivDownloader(BasePaperDownloader):
         if entry is None:
             raise RuntimeError("No entry found in metadata")
 
-        # Extract title
-        title_elem = entry.find("atom:title", ns)
-        title = (title_elem.text or "").strip() if title_elem is not None else "N/A"
-
-        # Extract authors
-        authors = []
-        for author_elem in entry.findall("atom:author", ns):
-            name_elem = author_elem.find("atom:name", ns)
-            if name_elem is not None and name_elem.text:
-                authors.append(name_elem.text.strip())
-
-        # Extract abstract
-        summary_elem = entry.find("atom:summary", ns)
-        abstract = (
-            (summary_elem.text or "").strip() if summary_elem is not None else "N/A"
-        )
-
-        # Extract publication date
-        published_elem = entry.find("atom:published", ns)
-        pub_date = (
-            (published_elem.text or "").strip() if published_elem is not None else "N/A"
-        )
+        # Extract basic metadata
+        basic_metadata = self._extract_basic_metadata(entry, ns)
 
         # Handle PDF download results
-        if pdf_result:
-            temp_file_path, filename = pdf_result
-            pdf_url = temp_file_path  # Use local temp file path
-            access_type = "open_access_downloaded"
-        else:
-            temp_file_path = ""
-            filename = self.get_default_filename(identifier)
-            pdf_url = ""
-            access_type = "download_failed"
+        pdf_metadata = self._extract_pdf_metadata(pdf_result, identifier)
+
+        # Combine all metadata
+        return {
+            **basic_metadata,
+            **pdf_metadata,
+            "source": "arxiv",
+            "arxiv_id": identifier,
+        }
+
+    def _extract_basic_metadata(self, entry: ET.Element, ns: dict) -> Dict[str, Any]:
+        """Extract basic metadata (title, authors, abstract, date) from entry."""
+        title = self._extract_title(entry, ns)
+        authors = self._extract_authors(entry, ns)
+        abstract = self._extract_abstract(entry, ns)
+        pub_date = self._extract_publication_date(entry, ns)
 
         return {
             "Title": title,
             "Authors": authors,
             "Abstract": abstract,
             "Publication Date": pub_date,
-            "URL": pdf_url,
-            "pdf_url": pdf_url,
-            "filename": filename,
-            "source": "arxiv",
-            "arxiv_id": identifier,
-            "access_type": access_type,
-            "temp_file_path": temp_file_path,
+        }
+
+    def _extract_title(self, entry: ET.Element, ns: dict) -> str:
+        """Extract title from entry."""
+        title_elem = entry.find("atom:title", ns)
+        return (title_elem.text or "").strip() if title_elem is not None else "N/A"
+
+    def _extract_authors(self, entry: ET.Element, ns: dict) -> list:
+        """Extract authors from entry."""
+        authors = []
+        for author_elem in entry.findall("atom:author", ns):
+            name_elem = author_elem.find("atom:name", ns)
+            if name_elem is not None and name_elem.text:
+                authors.append(name_elem.text.strip())
+        return authors
+
+    def _extract_abstract(self, entry: ET.Element, ns: dict) -> str:
+        """Extract abstract from entry."""
+        summary_elem = entry.find("atom:summary", ns)
+        return (summary_elem.text or "").strip() if summary_elem is not None else "N/A"
+
+    def _extract_publication_date(self, entry: ET.Element, ns: dict) -> str:
+        """Extract publication date from entry."""
+        published_elem = entry.find("atom:published", ns)
+        return (
+            (published_elem.text or "").strip() if published_elem is not None else "N/A"
+        )
+
+    def _extract_pdf_metadata(
+        self, pdf_result: Optional[Tuple[str, str]], identifier: str
+    ) -> Dict[str, Any]:
+        """Extract PDF-related metadata."""
+        if pdf_result:
+            temp_file_path, filename = pdf_result
+            return {
+                "URL": temp_file_path,
+                "pdf_url": temp_file_path,
+                "filename": filename,
+                "access_type": "open_access_downloaded",
+                "temp_file_path": temp_file_path,
+            }
+
+        return {
+            "URL": "",
+            "pdf_url": "",
+            "filename": self.get_default_filename(identifier),
+            "access_type": "download_failed",
+            "temp_file_path": "",
         }
 
     def get_service_name(self) -> str:

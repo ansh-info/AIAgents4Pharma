@@ -4,6 +4,7 @@ PubMed paper downloader implementation.
 """
 
 import logging
+import xml.etree.ElementTree as ET
 from typing import Any, Dict, Optional, Tuple, cast
 
 import requests
@@ -132,7 +133,6 @@ class PubmedDownloader(BasePaperDownloader):
             logger.info("OA API response for PMCID %s: %s", pmcid, response.text[:500])
 
             # Parse XML response
-            import xml.etree.ElementTree as ET
 
             root = ET.fromstring(response.text)
 
@@ -161,7 +161,7 @@ class PubmedDownloader(BasePaperDownloader):
 
                 return pdf_url
 
-        except Exception as e:
+        except requests.RequestException as e:
             logger.info("OA API failed for %s: %s", pmcid, str(e))
 
         return ""
@@ -176,7 +176,7 @@ class PubmedDownloader(BasePaperDownloader):
             if response.status_code == 200:
                 logger.info("Europe PMC service works for %s", pmcid)
                 return europe_pmc_url
-        except Exception as e:
+        except requests.RequestException as e:
             logger.info("Europe PMC service failed for %s: %s", pmcid, str(e))
 
         return ""
@@ -209,7 +209,7 @@ class PubmedDownloader(BasePaperDownloader):
                     )
                     return str(content)
 
-        except Exception as e:
+        except requests.RequestException as e:
             logger.info("PMC page scraping failed for %s: %s", pmcid, str(e))
 
         return ""
@@ -224,7 +224,7 @@ class PubmedDownloader(BasePaperDownloader):
             if response.status_code == 200:
                 logger.info("Direct PMC PDF URL works for %s", pmcid)
                 return direct_pmc_url
-        except Exception as e:
+        except requests.RequestException as e:
             logger.info("Direct PMC PDF URL failed for %s: %s", pmcid, str(e))
 
         return ""
@@ -271,7 +271,9 @@ class PubmedDownloader(BasePaperDownloader):
         # For now, we'll use placeholders and focus on the ID conversion functionality
 
         return {
-            "Title": f"PubMed Article {identifier}",  # Placeholder - would need E-utilities for real title
+            "Title": (
+                f"PubMed Article {identifier}"
+            ),  # Placeholder - would need E-utilities for real title
             "Authors": [],  # Placeholder - would need E-utilities for real authors
             "Abstract": "Abstract available in PubMed",  # Placeholder
             "Publication Date": "N/A",  # Would need E-utilities for this
