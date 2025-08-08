@@ -13,7 +13,9 @@ def mock_hydra_fixture():
     """Mocks Hydra configuration for tests."""
     with mock.patch("hydra.initialize"), mock.patch("hydra.compose") as mock_compose:
         cfg_mock = mock.MagicMock()
-        cfg_mock.agents.talk2scholars.paper_download_agent.paper_download_agent = "Test prompt"
+        cfg_mock.agents.talk2scholars.paper_download_agent.paper_download_agent = (
+            "Test prompt"
+        )
         mock_compose.return_value = cfg_mock
         yield mock_compose
 
@@ -86,7 +88,7 @@ def test_paper_download_agent_tools_assignment(
 ):
     """Checks correct tool assignment (download_papers tool)."""
     thread_id = "test_thread_paper_dl"
-    mock_tools = request.getfixturevalue("mock_tools_fixture")
+    request.getfixturevalue("mock_tools_fixture")
     llm_mock = mock.Mock(spec=BaseChatModel)
 
     with (
@@ -103,17 +105,17 @@ def test_paper_download_agent_tools_assignment(
         mock_toolnode.return_value = mock_tool_instance
 
         get_app(thread_id, llm_mock)
-        
         # Verify ToolNode was called with download_papers function
         assert mock_toolnode.called
         # Check that ToolNode was called with a list containing the download_papers tool
-        call_args = mock_toolnode.call_args[0][0]  # Get first positional argument (the tools list)
+        call_args = mock_toolnode.call_args[0][
+            0
+        ]  # Get first positional argument (the tools list)
         assert len(call_args) == 1
-        
         # The tool should be a StructuredTool with name 'download_papers'
         tool = call_args[0]
-        assert hasattr(tool, 'name')
-        assert tool.name == 'download_papers'
+        assert hasattr(tool, "name")
+        assert tool.name == "download_papers"
 
 
 def test_paper_download_agent_hydra_failure():
