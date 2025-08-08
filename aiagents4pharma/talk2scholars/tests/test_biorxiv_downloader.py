@@ -13,6 +13,48 @@ from aiagents4pharma.talk2scholars.tools.paper_download.utils.biorxiv_downloader
 )
 
 
+class BiorxivDownloaderTestShim(BiorxivDownloader):
+    """biorxiv_downloader test shim to expose protected methods."""
+
+    __test__ = False
+
+    def set_scraper(self, scraper):
+        """set_scraper is a public method to set the scraper."""
+        self._scraper = scraper
+
+    def get_scraper_public(self):
+        """get_scraper_public is a public method to access the scraper."""
+        return self._get_scraper()
+
+    def visit_landing_page_public(self, scraper, pdf_url, identifier):
+        """call visit_landing_page with public access."""
+        return self._visit_landing_page(scraper, pdf_url, identifier)
+
+    def save_pdf_to_temp_public(self, response):
+        """save_pdf_to_temp_public is a public method to save PDF response."""
+        return self._save_pdf_to_temp(response)
+
+    def extract_filename_public(self, response, identifier):
+        """extract_filename_public is a public method to extract filename from response."""
+        return self._extract_filename(response, identifier)
+
+    def extract_basic_metadata_public(self, paper, identifier):
+        """extract_basic_metadata_public is a public method to extract basic metadata."""
+        return self._extract_basic_metadata(paper, identifier)
+
+    def extract_authors_public(self, authors_str):
+        """extract_authors_public is a public method to extract authors from a string."""
+        return self._extract_authors(authors_str)
+
+    def get_paper_identifier_info_public(self, paper):
+        """get_paper_identifier_info_public is a public method to get paper identifier info."""
+        return self._get_paper_identifier_info(paper)
+
+    def add_service_identifier_public(self, entry, identifier):
+        """add_service_identifier_public is a public method to add service identifier."""
+        self._add_service_identifier(entry, identifier)
+
+
 class TestBiorxivDownloader(unittest.TestCase):
     """Tests for the BiorxivDownloader class."""
 
@@ -34,8 +76,9 @@ class TestBiorxivDownloader(unittest.TestCase):
         mock_scraper = Mock()
         mock_create_scraper.return_value = mock_scraper
 
-        self.downloader = BiorxivDownloader(self.mock_config)
+        self.downloader = BiorxivDownloaderTestShim(self.mock_config)
         self.initial_scraper = mock_scraper
+        self.downloader.set_scraper(mock_scraper)
 
         # Sample bioRxiv API response
         self.sample_json_response = {
@@ -61,12 +104,9 @@ class TestBiorxivDownloader(unittest.TestCase):
         )
         self.assertEqual(self.downloader.user_agent, "test-agent")
         self.assertEqual(self.downloader.cf_clearance_timeout, 10)
-        self.assertIsNotNone(
-            self.downloader._scraper
-        )  # Session reuse is enabled by default
+        self.assertIsNotNone(self.downloader.get_scraper_public())
 
-    @patch("cloudscraper.create_scraper")
-    def test_fetch_metadata_success(self, mock_create_scraper):
+    def test_fetch_metadata_success(self):
         """Test successful metadata fetching from bioRxiv API."""
         mock_scraper = Mock()
         mock_response = Mock()
@@ -75,7 +115,7 @@ class TestBiorxivDownloader(unittest.TestCase):
         mock_scraper.get.return_value = mock_response
 
         # Mock the existing scraper
-        self.downloader._scraper = mock_scraper
+        self.downloader.set_scraper(mock_scraper)
 
         result = self.downloader.fetch_metadata("10.1101/2023.01.01.123456")
 
@@ -93,7 +133,7 @@ class TestBiorxivDownloader(unittest.TestCase):
         """Test fetch_metadata with network error."""
         mock_scraper = Mock()
         mock_scraper.get.side_effect = requests.RequestException("Network error")
-        self.downloader._scraper = mock_scraper
+        self.downloader.set_scraper(mock_scraper)
 
         with self.assertRaises(requests.RequestException):
             self.downloader.fetch_metadata("10.1101/2023.01.01.123456")
@@ -105,7 +145,7 @@ class TestBiorxivDownloader(unittest.TestCase):
         mock_response.json.return_value = {}  # Empty response
         mock_response.raise_for_status = Mock()
         mock_scraper.get.return_value = mock_response
-        self.downloader._scraper = mock_scraper
+        self.downloader.set_scraper(mock_scraper)
 
         with self.assertRaises(RuntimeError) as context:
             self.downloader.fetch_metadata("10.1101/2023.01.01.123456")
@@ -160,7 +200,7 @@ class TestBiorxivDownloader(unittest.TestCase):
         """Test successful PDF download with CloudScraper."""
         # Setup mock scraper
         mock_scraper = Mock()
-        self.downloader._scraper = mock_scraper
+        self.downloader.set_scraper(mock_scraper)
 
         # Mock landing page response
         mock_landing_response = Mock()
@@ -215,7 +255,7 @@ class TestBiorxivDownloader(unittest.TestCase):
         """Test PDF download with network error."""
         mock_scraper = Mock()
         mock_scraper.get.side_effect = requests.RequestException("Network error")
-        self.downloader._scraper = mock_scraper
+        self.downloader.set_scraper(mock_scraper)
 
         pdf_url = "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1.full.pdf"
         result = self.downloader.download_pdf_to_temp(
@@ -227,13 +267,13 @@ class TestBiorxivDownloader(unittest.TestCase):
     def test_get_scraper_new(self):
         """Test getting new scraper when none exists."""
         # Set scraper to None to test creating new one
-        self.downloader._scraper = None
+        self.downloader.set_scraper(None)
 
         with patch("cloudscraper.create_scraper") as mock_create:
             mock_scraper = Mock()
             mock_create.return_value = mock_scraper
 
-            result = self.downloader._get_scraper()
+            result = self.downloader.get_scraper_public()
 
             self.assertEqual(result, mock_scraper)
             mock_create.assert_called_once_with(
@@ -243,9 +283,9 @@ class TestBiorxivDownloader(unittest.TestCase):
     def test_get_scraper_existing(self):
         """Test getting existing scraper."""
         existing_scraper = Mock()
-        self.downloader._scraper = existing_scraper
+        self.downloader.set_scraper(existing_scraper)
 
-        result = self.downloader._get_scraper()
+        result = self.downloader.get_scraper_public()
 
         self.assertEqual(result, existing_scraper)
 
@@ -258,7 +298,7 @@ class TestBiorxivDownloader(unittest.TestCase):
 
         pdf_url = "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1.full.pdf"
 
-        self.downloader._visit_landing_page(
+        self.downloader.visit_landing_page_public(
             mock_scraper, pdf_url, "10.1101/2023.01.01.123456"
         )
 
@@ -274,7 +314,7 @@ class TestBiorxivDownloader(unittest.TestCase):
 
         pdf_url = "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1"
 
-        self.downloader._visit_landing_page(
+        self.downloader.visit_landing_page_public(
             mock_scraper, pdf_url, "10.1101/2023.01.01.123456"
         )
 
@@ -298,7 +338,7 @@ class TestBiorxivDownloader(unittest.TestCase):
         mock_temp_file.__exit__ = Mock(return_value=None)
         mock_tempfile.return_value = mock_temp_file
 
-        result = self.downloader._save_pdf_to_temp(mock_response)
+        result = self.downloader.save_pdf_to_temp_public(mock_response)
 
         self.assertEqual(result, "/tmp/saved.pdf")
 
@@ -318,7 +358,9 @@ class TestBiorxivDownloader(unittest.TestCase):
         with patch.object(
             self.downloader, "get_default_filename", return_value="default.pdf"
         ):
-            result = self.downloader._extract_filename(mock_response, "10.1101/test")
+            result = self.downloader.extract_filename_public(
+                mock_response, "10.1101/test"
+            )
 
         self.assertEqual(result, "test-paper.pdf")
 
@@ -330,7 +372,9 @@ class TestBiorxivDownloader(unittest.TestCase):
         with patch.object(
             self.downloader, "get_default_filename", return_value="default.pdf"
         ):
-            result = self.downloader._extract_filename(mock_response, "10.1101/test")
+            result = self.downloader.extract_filename_public(
+                mock_response, "10.1101/test"
+            )
 
         self.assertEqual(result, "default.pdf")
 
@@ -342,7 +386,9 @@ class TestBiorxivDownloader(unittest.TestCase):
         with patch.object(
             self.downloader, "get_default_filename", return_value="default.pdf"
         ):
-            result = self.downloader._extract_filename(mock_response, "10.1101/test")
+            result = self.downloader.extract_filename_public(
+                mock_response, "10.1101/test"
+            )
 
         self.assertEqual(result, "default.pdf")
 
@@ -358,7 +404,7 @@ class TestBiorxivDownloader(unittest.TestCase):
             with patch.object(
                 self.downloader, "get_default_filename", return_value="default.pdf"
             ):
-                result = self.downloader._extract_filename(
+                result = self.downloader.extract_filename_public(
                     mock_response, "10.1101/test"
                 )
 
@@ -426,7 +472,7 @@ class TestBiorxivDownloader(unittest.TestCase):
         """Test basic metadata extraction helper method."""
         paper = self.sample_json_response["collection"][0]
 
-        result = self.downloader._extract_basic_metadata(
+        result = self.downloader.extract_basic_metadata_public(
             paper, "10.1101/2023.01.01.123456"
         )
 
@@ -448,14 +494,14 @@ class TestBiorxivDownloader(unittest.TestCase):
         """Test author extraction from semicolon-separated string."""
         authors_str = "John Doe; Jane Smith; Bob Johnson"
 
-        result = self.downloader._extract_authors(authors_str)
+        result = self.downloader.extract_authors_public(authors_str)
 
         expected = ["John Doe", "Jane Smith", "Bob Johnson"]
         self.assertEqual(result, expected)
 
     def test_extract_authors_empty_string(self):
         """Test author extraction from empty string."""
-        result = self.downloader._extract_authors("")
+        result = self.downloader.extract_authors_public("")
 
         self.assertEqual(result, [])
 
@@ -482,7 +528,7 @@ class TestBiorxivDownloader(unittest.TestCase):
             "Category": "Biology",
         }
 
-        result = self.downloader._get_paper_identifier_info(paper)
+        result = self.downloader.get_paper_identifier_info_public(paper)
 
         self.assertIn("10.1101/2023.01.01.123456", result)
         self.assertIn("2023-01-01", result)
@@ -492,7 +538,9 @@ class TestBiorxivDownloader(unittest.TestCase):
         """Test _add_service_identifier method."""
         entry = {}
 
-        self.downloader._add_service_identifier(entry, "10.1101/2023.01.01.123456")
+        self.downloader.add_service_identifier_public(
+            entry, "10.1101/2023.01.01.123456"
+        )
 
         self.assertEqual(entry["DOI"], "10.1101/2023.01.01.123456")
         self.assertEqual(entry["server"], "biorxiv")
@@ -519,7 +567,7 @@ class TestBiorxivDownloaderIntegration(unittest.TestCase):
         mock_scraper = Mock()
         mock_create_scraper.return_value = mock_scraper
 
-        self.downloader = BiorxivDownloader(self.mock_config)
+        self.downloader = BiorxivDownloaderTestShim(self.mock_config)
 
         self.sample_response = {
             "collection": [
@@ -559,7 +607,7 @@ class TestBiorxivDownloaderIntegration(unittest.TestCase):
             mock_landing_response,
             mock_pdf_response,
         ]
-        self.downloader._scraper = mock_scraper
+        self.downloader.set_scraper(mock_scraper)
 
         # Mock temporary file
         mock_temp_file = Mock()
@@ -591,10 +639,6 @@ class TestBiorxivDownloaderIntegration(unittest.TestCase):
         self.assertEqual(paper_data["access_type"], "open_access_downloaded")
         self.assertEqual(paper_data["temp_file_path"], "/tmp/integration.pdf")
 
-        # Verify method calls
-        expected_metadata_url = (
-            "https://api.biorxiv.org/details/biorxiv/10.1101/2023.01.01.123456/na/json"
-        )
         expected_pdf_url = (
             "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1.full.pdf"
         )
@@ -614,7 +658,7 @@ class TestBiorxivDownloaderIntegration(unittest.TestCase):
         mock_response.raise_for_status = Mock()
         existing_scraper.get.return_value = mock_response
 
-        self.downloader._scraper = existing_scraper
+        self.downloader.set_scraper(existing_scraper)
 
         identifier = "10.1101/2023.01.01.123456"
         metadata = self.downloader.fetch_metadata(identifier)
@@ -632,7 +676,7 @@ class TestBiorxivDownloaderIntegration(unittest.TestCase):
             mock_pdf.headers = {}
             existing_scraper.get.side_effect = [mock_landing, mock_pdf]
 
-            result = self.downloader.download_pdf_to_temp(pdf_url, identifier)
+            self.downloader.download_pdf_to_temp(pdf_url, identifier)
 
         # Should have used existing scraper for landing + PDF (2 calls)
         self.assertEqual(existing_scraper.get.call_count, 2)
@@ -659,17 +703,17 @@ class TestBiorxivCloudFlareHandling(unittest.TestCase):
         mock_scraper = Mock()
         mock_create_scraper.return_value = mock_scraper
 
-        self.downloader = BiorxivDownloader(self.mock_config)
+        self.downloader = BiorxivDownloaderTestShim(self.mock_config)
 
     @patch("cloudscraper.create_scraper")
     def test_cloudscraper_configuration(self, mock_create_scraper):
         """Test CloudScraper is configured with proper parameters."""
         # Set scraper to None so we create a new one
-        self.downloader._scraper = None
+        self.downloader.set_scraper(None)
         mock_scraper = Mock()
         mock_create_scraper.return_value = mock_scraper
 
-        scraper = self.downloader._get_scraper()
+        scraper = self.downloader.get_scraper_public()
 
         mock_create_scraper.assert_called_once_with(
             browser={"custom": "Mozilla/5.0 (compatible; test-agent)"}, delay=15
@@ -680,7 +724,7 @@ class TestBiorxivCloudFlareHandling(unittest.TestCase):
     def test_landing_page_visit_before_pdf_download(self, mock_tempfile):
         """Test that landing page is visited before PDF download for CloudFlare bypass."""
         mock_scraper = Mock()
-        self.downloader._scraper = mock_scraper
+        self.downloader.set_scraper(mock_scraper)
 
         # Mock responses
         mock_landing_response = Mock()
@@ -701,9 +745,7 @@ class TestBiorxivCloudFlareHandling(unittest.TestCase):
         mock_tempfile.return_value = mock_temp_file
 
         pdf_url = "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1.full.pdf"
-        result = self.downloader.download_pdf_to_temp(
-            pdf_url, "10.1101/2023.01.01.123456"
-        )
+        self.downloader.download_pdf_to_temp(pdf_url, "10.1101/2023.01.01.123456")
 
         # Verify landing page was visited first
         landing_url = "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1"
