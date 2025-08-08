@@ -3,10 +3,9 @@ Unit tests for MedrxivDownloader.
 Tests JSON API interaction, PDF URL construction, and metadata extraction.
 """
 
+import json
 import unittest
 from unittest.mock import Mock, patch
-from typing import Dict, Any, Optional, Tuple
-import json
 
 import requests
 

@@ -3,14 +3,10 @@ Unit tests for BiorxivDownloader.
 Tests CloudScraper integration, JSON API interaction, and PDF download with CloudFlare protection.
 """
 
-import tempfile
 import unittest
-from unittest.mock import Mock, MagicMock, patch, mock_open
-from typing import Dict, Any, Optional, Tuple
-import json
+from unittest.mock import Mock, patch
 
 import requests
-import cloudscraper
 
 from aiagents4pharma.talk2scholars.tools.paper_download.utils.biorxiv_downloader import (
     BiorxivDownloader,

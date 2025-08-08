@@ -5,7 +5,6 @@ Tests PMID to PMCID conversion, XML parsing, and PDF URL extraction from multipl
 
 import unittest
 from unittest.mock import Mock, patch
-from typing import Dict, Any, Optional, Tuple
 
 import requests
 
@@ -693,5 +692,3 @@ class TestPubmedDownloaderIntegration(unittest.TestCase):
         # Verify all sources were tried
         self.assertEqual(mock_get.call_count, 3)  # ID converter + OA API + scraping
         mock_head.assert_called_once()  # Europe PMC
-
-

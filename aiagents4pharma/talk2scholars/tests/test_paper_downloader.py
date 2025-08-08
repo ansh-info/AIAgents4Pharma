@@ -3,23 +3,20 @@ Unit tests for the unified paper downloader functionality.
 Tests the main download_papers tool and PaperDownloaderFactory.
 """
 
-import threading
 import unittest
-from unittest.mock import MagicMock, Mock, patch, call
-from typing import Dict, Any
+from unittest.mock import Mock, patch
 
-import pytest
 from langchain_core.messages import ToolMessage
 from langgraph.types import Command
 
 from aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader import (
     PaperDownloaderFactory,
-    download_papers,
-    download_arxiv_papers,
-    download_medrxiv_papers,
-    download_biorxiv_papers,
-    download_pubmed_papers,
     _download_papers_impl,
+    download_arxiv_papers,
+    download_biorxiv_papers,
+    download_medrxiv_papers,
+    download_papers,
+    download_pubmed_papers,
 )
 
 
@@ -589,7 +586,7 @@ class TestConfigurationExtraction(unittest.TestCase):
         PaperDownloaderFactory._extract_from_dict(config_obj, dict_source)
         self.assertEqual(config_obj.dict_attr, "dict_value")
 
-        # Test items() method directly (lines 221-224)  
+        # Test items() method directly (lines 221-224)
         config_obj2 = TestConfig()
         items_source = Mock()
         items_source.items.return_value = [("items_key", "items_value")]
@@ -598,11 +595,12 @@ class TestConfigurationExtraction(unittest.TestCase):
 
         # Test dir() method directly (lines 226-227)
         config_obj3 = TestConfig()
+
         class DirSource:
             def __init__(self):
                 self.dir_attr = "dir_value"
                 self._private = "private_value"
-        
+
         dir_source = DirSource()
         PaperDownloaderFactory._extract_from_dir(config_obj3, dir_source)
         self.assertEqual(config_obj3.dir_attr, "dir_value")
@@ -616,56 +614,62 @@ class TestConfigurationExtraction(unittest.TestCase):
 
         # Test items() fallback path (lines 222-224)
         config_obj2 = TestConfig()
-        
-        # Mock hasattr to force items() path  
-        with patch('aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr') as mock_hasattr:
+
+        # Mock hasattr to force items() path
+        with patch(
+            "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr"
+        ) as mock_hasattr:
+
             def hasattr_side_effect(obj, attr):
-                if attr == '_content':
+                if attr == "_content":
                     return False  # Skip OmegaConf path
-                elif attr == '__dict__':
+                elif attr == "__dict__":
                     return False  # Skip __dict__ path
-                elif attr == 'items':
-                    return True   # Use items() fallback
+                elif attr == "items":
+                    return True  # Use items() fallback
                 # No default return needed for this test
-            
+
             mock_hasattr.side_effect = hasattr_side_effect
-            
+
             # Create source with items method
             source_config = Mock()
             source_config.items.return_value = [("items_attr", "items_value")]
-            
+
             PaperDownloaderFactory._try_config_extraction(config_obj2, source_config)
-            
+
             # Should have extracted using items()
             self.assertTrue(hasattr(config_obj2, "items_attr"))
             self.assertEqual(config_obj2.items_attr, "items_value")
 
         # Test dir() fallback path (lines 226-227)
         config_obj3 = TestConfig()
-        
+
         # Mock hasattr to force dir() path
-        with patch('aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr') as mock_hasattr:
+        with patch(
+            "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr"
+        ) as mock_hasattr:
+
             def hasattr_side_effect(obj, attr):
-                if attr == '_content':
+                if attr == "_content":
                     return False  # Skip OmegaConf path
-                elif attr == '__dict__':
+                elif attr == "__dict__":
                     return False  # Skip __dict__ path
-                elif attr == 'items':
+                elif attr == "items":
                     return False  # Skip items() path - forces dir() fallback
                 # No default return needed for this test
-            
+
             mock_hasattr.side_effect = hasattr_side_effect
-            
+
             # Create source for dir() approach
             class DirSource:
                 def __init__(self):
                     self.dir_attr = "dir_value"
                     self._private = "private"
-            
+
             source_config = DirSource()
-            
+
             PaperDownloaderFactory._try_config_extraction(config_obj3, source_config)
-            
+
             # Should have extracted using dir()
             self.assertTrue(hasattr(config_obj3, "dir_attr"))
             self.assertEqual(config_obj3.dir_attr, "dir_value")
@@ -678,57 +682,63 @@ class TestConfigurationExtraction(unittest.TestCase):
             pass
 
         config_obj = TestConfig()
-        
+
         # Mock hasattr to force __dict__ access path
-        with patch('aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr') as mock_hasattr:
+        with patch(
+            "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr"
+        ) as mock_hasattr:
+
             def hasattr_side_effect(obj, attr):
-                if attr == '_content':
+                if attr == "_content":
                     return False  # Skip OmegaConf path
-                elif attr == '__dict__':
-                    return True   # Use __dict__ access - lines 215-219
+                elif attr == "__dict__":
+                    return True  # Use __dict__ access - lines 215-219
                 # No default return needed for this test
-            
+
             mock_hasattr.side_effect = hasattr_side_effect
-            
+
             # Create source with __dict__ attribute
             class DictSource:
                 def __init__(self):
                     self.test_attr = "test_value"
-            
+
             source_config = DictSource()
-            
+
             PaperDownloaderFactory._try_config_extraction(config_obj, source_config)
-            
+
             # Should have extracted using __dict__ access
             self.assertTrue(hasattr(config_obj, "test_attr"))
             self.assertEqual(config_obj.test_attr, "test_value")
 
     def test_hasattr_side_effect_coverage(self):
         """Test to ensure all paths in hasattr_side_effect functions are covered."""
-        
+
         class TestConfig:
             pass
-        
+
         # Test to ensure all return paths in hasattr side effects are covered
         config_obj = TestConfig()
-        
+
         # This will test the 'return True' path (line 629)
-        with patch('aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr') as mock_hasattr:
+        with patch(
+            "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr"
+        ) as mock_hasattr:
+
             def hasattr_side_effect(obj, attr):
-                if attr == '_content':
+                if attr == "_content":
                     return False
-                elif attr == '__dict__':
-                    return False  
-                elif attr == 'items':
+                elif attr == "__dict__":
                     return False
-                # No default return needed for this test  
-            
+                elif attr == "items":
+                    return False
+                # No default return needed for this test
+
             mock_hasattr.side_effect = hasattr_side_effect
-            
+
             class TestSource:
                 def __init__(self):
                     self.attr = "value"
-            
+
             source = TestSource()
             PaperDownloaderFactory._try_config_extraction(config_obj, source)
             self.assertTrue(hasattr(config_obj, "attr"))

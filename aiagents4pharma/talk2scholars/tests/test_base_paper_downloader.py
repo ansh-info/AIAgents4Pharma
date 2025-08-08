@@ -3,11 +3,9 @@ Unit tests for BasePaperDownloader.
 Tests the abstract base class functionality and common methods.
 """
 
-import tempfile
 import unittest
-from unittest.mock import Mock, MagicMock, patch, mock_open
-from typing import Any, Dict, List, Optional, Tuple
-from abc import ABC
+from typing import Any, Dict, Optional, Tuple
+from unittest.mock import Mock, patch
 
 import requests
 

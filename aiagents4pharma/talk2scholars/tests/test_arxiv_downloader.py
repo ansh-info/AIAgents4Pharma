@@ -5,8 +5,7 @@ Tests XML parsing, PDF URL construction, and metadata extraction.
 
 import unittest
 import xml.etree.ElementTree as ET
-from unittest.mock import Mock, MagicMock, patch
-from typing import Optional, Tuple
+from unittest.mock import Mock, patch
 
 import requests
 
@@ -104,7 +103,7 @@ class TestArxivDownloader(unittest.TestCase):
             <opensearch:totalResults>0</opensearch:totalResults>
             <opensearch:startIndex>0</opensearch:startIndex>
         </feed>"""
-        
+
         mock_response = Mock()
         mock_response.text = empty_xml
         mock_response.raise_for_status = Mock()
@@ -112,7 +111,7 @@ class TestArxivDownloader(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as context:
             self.downloader.fetch_metadata("1234.5678")
-        
+
         self.assertIn("No entry found in arXiv API response", str(context.exception))
 
     def test_construct_pdf_url_from_metadata(self):
