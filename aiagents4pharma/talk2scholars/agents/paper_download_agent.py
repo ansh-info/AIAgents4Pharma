@@ -13,11 +13,6 @@ from langgraph.prebuilt.chat_agent_executor import create_react_agent
 from langgraph.prebuilt.tool_node import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 from ..state.state_talk2scholars import Talk2Scholars
-
-# from ..tools.paper_download.download_arxiv_input import download_arxiv_paper
-# from ..tools.paper_download.download_medrxiv_input import download_medrxiv_paper
-# from ..tools.paper_download.download_biorxiv_input import download_biorxiv_paper
-# from ..tools.paper_download.download_pubmed_input import download_pubmed_paper
 from ..tools.paper_download.paper_downloader import download_papers
 
 
@@ -58,10 +53,6 @@ def get_app(uniq_id, llm_model: BaseChatModel):
     # Define tools properly
     tools = ToolNode(
         [
-            # download_arxiv_paper,
-            # download_medrxiv_paper,
-            # download_biorxiv_paper,
-            # download_pubmed_paper,
             download_papers,
         ]
     )
