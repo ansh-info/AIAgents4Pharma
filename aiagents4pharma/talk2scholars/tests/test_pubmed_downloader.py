@@ -5,6 +5,7 @@ from multiple sources. Uses a public shim to avoid accessing protected
 members in tests.
 """
 
+# pylint: disable=too-many-lines
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -12,6 +13,7 @@ from unittest.mock import Mock, patch
 import requests
 
 from aiagents4pharma.talk2scholars.tools.paper_download.utils.pubmed_downloader import (
+    BasePaperDownloader,
     PubmedDownloader,
 )
 
@@ -69,6 +71,10 @@ class PubmedDownloaderTestShim(PubmedDownloader):
     def add_service_identifier_public(self, entry, identifier):
         """Public wrapper for _add_service_identifier method."""
         return self._add_service_identifier(entry, identifier)
+
+    def fetch_pdf_url_with_fallbacks_production(self, pmcid: str) -> str:
+        """Public wrapper for _fetch_pdf_url_with_fallbacks method."""
+        return self._fetch_pdf_url_with_fallbacks(pmcid)
 
 
 class TestPubmedDownloaderBasics(unittest.TestCase):
@@ -183,7 +189,6 @@ class TestPubmedDownloaderBasics(unittest.TestCase):
         self.assertEqual(out, "")
 
 
-# ------------------------ OA API ----------------------------------------------------
 class TestPubmedDownloaderOAAPI(unittest.TestCase):
     """Tests for OA API and FTP->HTTPS conversion."""
 
@@ -269,7 +274,6 @@ class TestPubmedDownloaderOAAPI(unittest.TestCase):
         self.assertIn("test.pdf", result)
 
 
-# ------------------------ Europe PMC ------------------------------------------------
 class TestPubmedDownloaderEuropePMC(unittest.TestCase):
     """Europe PMC link checking."""
 
@@ -317,7 +321,6 @@ class TestPubmedDownloaderEuropePMC(unittest.TestCase):
         self.assertEqual(self.downloader.try_europe_pmc_public("PMC123456"), "")
 
 
-# ------------------------ PMC Page Scraping ----------------------------------------
 class TestPubmedDownloaderPMCScrape(unittest.TestCase):
     """Scraping from PMC page."""
 
@@ -376,7 +379,6 @@ class TestPubmedDownloaderPMCScrape(unittest.TestCase):
         self.assertEqual(self.downloader.try_pmc_page_scraping_public("PMC123456"), "")
 
 
-# ------------------------ Direct PMC PDF -------------------------------------------
 class TestPubmedDownloaderDirectPMC(unittest.TestCase):
     """Direct PMC PDF attempts."""
 
@@ -562,7 +564,6 @@ class TestPubmedDownloaderConstructAndFallbacks(unittest.TestCase):
         )
 
 
-# ------------------------ Integration-ish paths ------------------------------------
 class TestPubmedDownloaderIntegration(unittest.TestCase):
     """Integration tests for PubmedDownloader workflow."""
 
@@ -621,6 +622,10 @@ class TestPubmedDownloaderIntegration(unittest.TestCase):
         self.assertIn("idconv", mock_get.call_args_list[0][0][0])
         self.assertIn("oa.fcgi", mock_get.call_args_list[1][0][0])
 
+        # Test the None return path in get_side_effect
+        result = get_side_effect("https://unknown-api.com/test")
+        self.assertIsNone(result)
+
     @patch("requests.get")
     def test_workflow_with_fallback_sources(self, mock_get):
         """Test workflow with fallback to alternative sources."""
@@ -660,3 +665,403 @@ class TestPubmedDownloaderIntegration(unittest.TestCase):
         )
         self.assertEqual(mock_get.call_count, 3)
         mock_head.assert_called_once()
+
+
+class TestPubmedDownloaderOAAPINoLink(unittest.TestCase):
+    """Test OA API responses without PDF links."""
+
+    def setUp(self):
+        """Set up test configuration."""
+        cfg = SimpleNamespace(
+            id_converter_url="",
+            oa_api_url="https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi",
+            europe_pmc_base_url="",
+            pmc_page_base_url="",
+            direct_pmc_pdf_base_url="",
+            ftp_base_url="ftp://ftp.ncbi.nlm.nih.gov/pub/pmc",
+            https_base_url="https://www.ncbi.nlm.nih.gov/pmc",
+            user_agent="Mozilla/5.0 (compatible; test-agent)",
+            request_timeout=30,
+            chunk_size=8192,
+        )
+        self.downloader = PubmedDownloaderTestShim(cfg)
+
+    @patch("requests.get")
+    def test_oa_api_ok_but_no_pdf_link_returns_empty(self, mock_get):
+        """Covers OA API response that has no <link format='pdf'>."""
+        resp = Mock()
+        resp.text = """<?xml version="1.0"?>
+        <OA><records><record><link format="tgz" href="https://x/y.tgz"/></record></records></OA>"""
+        resp.raise_for_status = Mock()
+        mock_get.return_value = resp
+        out = self.downloader.try_oa_api_public("PMCNOPOINTER")
+        self.assertEqual(out, "")
+
+
+class TestPubmedDownloaderExtractMetadata(unittest.TestCase):
+    """Test extract_paper_metadata method functionality."""
+
+    def setUp(self):
+        """Set up test configuration for extract metadata tests."""
+        cfg = SimpleNamespace(
+            id_converter_url="",
+            oa_api_url="",
+            europe_pmc_base_url="",
+            pmc_page_base_url="",
+            direct_pmc_pdf_base_url="",
+            ftp_base_url="",
+            https_base_url="",
+            user_agent="ua",
+            request_timeout=5,
+            chunk_size=1024,
+        )
+        self.downloader = PubmedDownloaderTestShim(cfg)
+
+    def test_extract_metadata_raises_when_no_records(self):
+        """Test that extract_metadata raises RuntimeError when no records."""
+        with self.assertRaises(RuntimeError):
+            self.downloader.extract_paper_metadata({}, "123", None)
+
+    def test_extract_metadata_with_pdf_result(self):
+        """Test extract_metadata with PDF result tuple."""
+        metadata = {"records": [{"pmcid": "PMC1", "doi": "10.1/x"}]}
+        pdf_result = ("/tmp/file.pdf", "custom.pdf")
+        out = self.downloader.extract_paper_metadata(metadata, "12345678", pdf_result)
+        self.assertEqual(out["access_type"], "open_access_downloaded")
+        self.assertEqual(out["URL"], "/tmp/file.pdf")
+        self.assertEqual(out["pdf_url"], "/tmp/file.pdf")
+        self.assertEqual(out["filename"], "custom.pdf")
+        self.assertEqual(out["PMCID"], "PMC1")
+        self.assertEqual(out["PMID"], "12345678")
+
+    def test_extract_metadata_without_pdf_with_pmcid(self):
+        """Test extract_metadata without PDF but with valid PMCID."""
+        metadata = {"records": [{"pmcid": "PMC9", "doi": "10.1/x"}]}
+        out = self.downloader.extract_paper_metadata(metadata, "42", None)
+        self.assertEqual(out["access_type"], "abstract_only")
+        self.assertEqual(out["filename"], "pmid_42.pdf")
+        self.assertEqual(out["URL"], "")
+        self.assertEqual(out["pdf_url"], "")
+
+    def test_extract_metadata_without_pdf_no_pmcid(self):
+        """Test extract_metadata without PDF and no PMCID."""
+        metadata = {"records": [{"pmcid": "N/A", "doi": "10.1/x"}]}
+        out = self.downloader.extract_paper_metadata(metadata, "42", None)
+        self.assertEqual(out["access_type"], "no_pmcid")
+        self.assertEqual(out["filename"], "pmid_42.pdf")
+
+
+class TestPubmedDownloaderHelpers(unittest.TestCase):
+    """Test helper methods and utility functions."""
+
+    def setUp(self):
+        """Set up test configuration with helper downloader."""
+        cfg = SimpleNamespace(
+            id_converter_url="",
+            oa_api_url="",
+            europe_pmc_base_url="",
+            pmc_page_base_url="",
+            direct_pmc_pdf_base_url="",
+            ftp_base_url="",
+            https_base_url="",
+            user_agent="ua",
+            request_timeout=5,
+            chunk_size=1024,
+        )
+        self.downloader = PubmedDownloaderTestShim(cfg)
+
+    def test_service_and_identifier_names_and_default_filename(self):
+        """Test service name, identifier name, and default filename generation."""
+        self.assertEqual(self.downloader.get_service_name(), "PubMed")
+        self.assertEqual(self.downloader.get_identifier_name(), "PMID")
+        self.assertEqual(self.downloader.get_default_filename("777"), "pmid_777.pdf")
+
+    def test_get_snippet_placeholders_return_empty(self):
+        """Test that placeholder abstracts return empty snippets."""
+        self.assertEqual(self.downloader.get_snippet(""), "")
+        self.assertEqual(self.downloader.get_snippet("N/A"), "")
+        self.assertEqual(
+            self.downloader.get_snippet("Abstract available in PubMed"), ""
+        )
+
+    def test_get_snippet_non_placeholder_delegates_to_base(self):
+        """Test that non-placeholder abstracts delegate to base class."""
+        with patch.object(BasePaperDownloader, "get_snippet", return_value="SNIP") as p:
+            out = self.downloader.get_snippet("Real abstract text")
+        p.assert_called_once_with("Real abstract text")
+        self.assertEqual(out, "SNIP")
+
+    def test_get_paper_identifier_info_without_pmcid_line(self):
+        """Test paper identifier info formatting without PMCID."""
+        info = self.downloader.get_paper_identifier_info_public(
+            {"PMID": "999", "PMCID": "N/A"}
+        )
+        self.assertIn("(PMID: 999)", info)
+        self.assertNotIn("PMCID:", info)
+
+
+class TestPubmedDownloaderMissingLineCoverage(unittest.TestCase):
+    """Tests to cover missing lines 77-87 and 99-122."""
+
+    def setUp(self):
+        cfg = SimpleNamespace(
+            id_converter_url="https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0",
+            oa_api_url="https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi",
+            europe_pmc_base_url="https://www.ebi.ac.uk/europepmc/webservices/rest",
+            pmc_page_base_url="https://www.ncbi.nlm.nih.gov/pmc/articles",
+            direct_pmc_pdf_base_url="https://www.ncbi.nlm.nih.gov/pmc/articles",
+            ftp_base_url="ftp://ftp.ncbi.nlm.nih.gov/pub/pmc",
+            https_base_url="https://www.ncbi.nlm.nih.gov/pmc",
+            user_agent="Mozilla/5.0 (compatible; test-agent)",
+            request_timeout=30,
+            chunk_size=8192,
+        )
+        self.downloader = PubmedDownloaderTestShim(cfg)
+
+    def test_construct_pdf_url_empty_records_list(self):
+        """Test construct_pdf_url with empty records list (covers line 77-78)."""
+        metadata = {"records": []}
+        result = self.downloader.construct_pdf_url(metadata, "12345678")
+        self.assertEqual(result, "")
+
+    def test_construct_pdf_url_missing_records_key(self):
+        """Test construct_pdf_url with missing records key (covers line 77-78)."""
+        metadata = {"other_key": "value"}
+        result = self.downloader.construct_pdf_url(metadata, "12345678")
+        self.assertEqual(result, "")
+
+    def test_construct_pdf_url_empty_pmcid_string(self):
+        """Test construct_pdf_url with empty pmcid string (covers line 83-85)."""
+        metadata = {"records": [{"pmcid": "", "doi": "10.1/x"}]}
+        result = self.downloader.construct_pdf_url(metadata, "12345678")
+        self.assertEqual(result, "")
+
+    def test_construct_pdf_url_missing_pmcid_key(self):
+        """Test construct_pdf_url with missing pmcid key (covers line 81, 83-85)."""
+        metadata = {"records": [{"doi": "10.1/x"}]}
+        result = self.downloader.construct_pdf_url(metadata, "12345678")
+        self.assertEqual(result, "")
+
+    @patch.object(PubmedDownloaderTestShim, "_fetch_pdf_url_with_fallbacks")
+    def test_fetch_pdf_url_with_fallbacks_logging_and_return(self, mock_fallbacks):
+        """Test _fetch_pdf_url_with_fallbacks method logging (covers lines 99-122)."""
+        mock_fallbacks.return_value = "http://test.pdf"
+
+        # Use the public wrapper for testing
+        result = self.downloader.fetch_pdf_url_with_fallbacks_production("PMC123456")
+
+        mock_fallbacks.assert_called_once_with("PMC123456")
+        self.assertEqual(result, "http://test.pdf")
+
+    def test_fetch_pdf_url_with_fallbacks_all_fail_with_logging(self):
+        """Test _fetch_pdf_url_with_fallbacks when all methods fail with warning log."""
+        with (
+            patch.object(self.downloader, "_try_oa_api", return_value=""),
+            patch.object(self.downloader, "_try_europe_pmc", return_value=""),
+            patch.object(self.downloader, "_try_pmc_page_scraping", return_value=""),
+            patch.object(self.downloader, "_try_direct_pmc_url", return_value=""),
+            patch(
+                "aiagents4pharma.talk2scholars.tools.paper_download.utils."
+                "pubmed_downloader.logger"
+            ) as mock_logger,
+        ):
+
+            result = self.downloader.fetch_pdf_url_with_fallbacks_production(
+                "PMC123456"
+            )
+
+            self.assertEqual(result, "")
+            # Verify the warning log is called
+            mock_logger.warning.assert_called_once_with(
+                "All PDF URL strategies failed for PMCID: %s", "PMC123456"
+            )
+
+    def test_fetch_pdf_url_with_fallbacks_oa_api_success_early_return(self):
+        """Test _fetch_pdf_url_with_fallbacks when OA API succeeds on first try."""
+        with (
+            patch.object(
+                self.downloader, "_try_oa_api", return_value="http://oa.pdf"
+            ) as mock_oa,
+            patch.object(self.downloader, "_try_europe_pmc") as mock_eu,
+            patch.object(self.downloader, "_try_pmc_page_scraping") as mock_scr,
+            patch.object(self.downloader, "_try_direct_pmc_url") as mock_dir,
+            patch(
+                "aiagents4pharma.talk2scholars.tools.paper_download.utils."
+                "pubmed_downloader.logger"
+            ) as mock_logger,
+        ):
+
+            result = self.downloader.fetch_pdf_url_with_fallbacks_production(
+                "PMC123456"
+            )
+
+            self.assertEqual(result, "http://oa.pdf")
+            mock_oa.assert_called_once_with("PMC123456")
+            mock_eu.assert_not_called()
+            mock_scr.assert_not_called()
+            mock_dir.assert_not_called()
+            # Verify the initial info log is called
+            mock_logger.info.assert_called_with(
+                "Fetching PDF URL for PMCID: %s", "PMC123456"
+            )
+
+    def test_fetch_pdf_url_with_fallbacks_europe_pmc_success_after_oa_fail(self):
+        """Test _fetch_pdf_url_with_fallbacks when Europe PMC succeeds after OA API fails."""
+        with (
+            patch.object(self.downloader, "_try_oa_api", return_value="") as mock_oa,
+            patch.object(
+                self.downloader, "_try_europe_pmc", return_value="http://eu.pdf"
+            ) as mock_eu,
+            patch.object(self.downloader, "_try_pmc_page_scraping") as mock_scr,
+            patch.object(self.downloader, "_try_direct_pmc_url") as mock_dir,
+        ):
+
+            result = self.downloader.fetch_pdf_url_with_fallbacks_production(
+                "PMC123456"
+            )
+
+            self.assertEqual(result, "http://eu.pdf")
+            mock_oa.assert_called_once_with("PMC123456")
+            mock_eu.assert_called_once_with("PMC123456")
+            mock_scr.assert_not_called()
+            mock_dir.assert_not_called()
+
+    def test_fetch_pdf_url_with_fallbacks_pmc_scraping_success_after_previous_fail(
+        self,
+    ):
+        """Test _fetch_pdf_url_with_fallbacks when PMC scraping succeeds."""
+        with (
+            patch.object(self.downloader, "_try_oa_api", return_value="") as mock_oa,
+            patch.object(
+                self.downloader, "_try_europe_pmc", return_value=""
+            ) as mock_eu,
+            patch.object(
+                self.downloader, "_try_pmc_page_scraping", return_value="http://scr.pdf"
+            ) as mock_scr,
+            patch.object(self.downloader, "_try_direct_pmc_url") as mock_dir,
+        ):
+
+            result = self.downloader.fetch_pdf_url_with_fallbacks_production(
+                "PMC123456"
+            )
+
+            self.assertEqual(result, "http://scr.pdf")
+            mock_oa.assert_called_once_with("PMC123456")
+            mock_eu.assert_called_once_with("PMC123456")
+            mock_scr.assert_called_once_with("PMC123456")
+            mock_dir.assert_not_called()
+
+    def test_fetch_pdf_url_with_fallbacks_direct_pmc_success_last_resort(self):
+        """Test _fetch_pdf_url_with_fallbacks when direct PMC succeeds as last resort."""
+        with (
+            patch.object(self.downloader, "_try_oa_api", return_value="") as mock_oa,
+            patch.object(
+                self.downloader, "_try_europe_pmc", return_value=""
+            ) as mock_eu,
+            patch.object(
+                self.downloader, "_try_pmc_page_scraping", return_value=""
+            ) as mock_scr,
+            patch.object(
+                self.downloader, "_try_direct_pmc_url", return_value="http://dir.pdf"
+            ) as mock_dir,
+        ):
+
+            result = self.downloader.fetch_pdf_url_with_fallbacks_production(
+                "PMC123456"
+            )
+
+            self.assertEqual(result, "http://dir.pdf")
+            mock_oa.assert_called_once_with("PMC123456")
+            mock_eu.assert_called_once_with("PMC123456")
+            mock_scr.assert_called_once_with("PMC123456")
+            mock_dir.assert_called_once_with("PMC123456")
+
+
+class TestPubmedDownloaderProductionConstructPdfUrl(unittest.TestCase):
+    """Test production construct_pdf_url method to hit the actual lines 77-87."""
+
+    def setUp(self):
+        cfg = SimpleNamespace(
+            id_converter_url="https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0",
+            oa_api_url="https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi",
+            europe_pmc_base_url="https://www.ebi.ac.uk/europepmc/webservices/rest",
+            pmc_page_base_url="https://www.ncbi.nlm.nih.gov/pmc/articles",
+            direct_pmc_pdf_base_url="https://www.ncbi.nlm.nih.gov/pmc/articles",
+            ftp_base_url="ftp://ftp.ncbi.nlm.nih.gov/pub/pmc",
+            https_base_url="https://www.ncbi.nlm.nih.gov/pmc",
+            user_agent="Mozilla/5.0 (compatible; test-agent)",
+            request_timeout=30,
+            chunk_size=8192,
+        )
+        # Use the actual production class, not the test shim
+        self.downloader = PubmedDownloader(cfg)
+
+    def test_production_construct_pdf_url_no_records_key(self):
+        """Test production construct_pdf_url with no records key (covers line 77-78)."""
+        metadata = {"other_key": "value"}
+        result = self.downloader.construct_pdf_url(metadata, "12345678")
+        self.assertEqual(result, "")
+
+    def test_production_construct_pdf_url_empty_records_list(self):
+        """Test production construct_pdf_url with empty records list (covers line 77-78)."""
+        metadata = {"records": []}
+        result = self.downloader.construct_pdf_url(metadata, "12345678")
+        self.assertEqual(result, "")
+
+    def test_production_construct_pdf_url_missing_pmcid_key(self):
+        """Test production construct_pdf_url with missing pmcid key."""
+        metadata = {"records": [{"doi": "10.1/x"}]}
+        with patch(
+            "aiagents4pharma.talk2scholars.tools.paper_download.utils."
+            "pubmed_downloader.logger"
+        ) as mock_logger:
+            result = self.downloader.construct_pdf_url(metadata, "12345678")
+
+        self.assertEqual(result, "")
+        # Should log the "No PMCID available" message
+        mock_logger.info.assert_called_once_with(
+            "No PMCID available for PDF fetch: PMID %s", "12345678"
+        )
+
+    def test_production_construct_pdf_url_empty_pmcid(self):
+        """Test production construct_pdf_url with empty pmcid."""
+        metadata = {"records": [{"pmcid": "", "doi": "10.1/x"}]}
+        with patch(
+            "aiagents4pharma.talk2scholars.tools.paper_download.utils."
+            "pubmed_downloader.logger"
+        ) as mock_logger:
+            result = self.downloader.construct_pdf_url(metadata, "12345678")
+
+        self.assertEqual(result, "")
+        # Should log the "No PMCID available" message
+        mock_logger.info.assert_called_once_with(
+            "No PMCID available for PDF fetch: PMID %s", "12345678"
+        )
+
+    def test_production_construct_pdf_url_na_pmcid(self):
+        """Test production construct_pdf_url with N/A pmcid."""
+        metadata = {"records": [{"pmcid": "N/A", "doi": "10.1/x"}]}
+        with patch(
+            "aiagents4pharma.talk2scholars.tools.paper_download.utils."
+            "pubmed_downloader.logger"
+        ) as mock_logger:
+            result = self.downloader.construct_pdf_url(metadata, "12345678")
+
+        self.assertEqual(result, "")
+        # Should log the "No PMCID available" message
+        mock_logger.info.assert_called_once_with(
+            "No PMCID available for PDF fetch: PMID %s", "12345678"
+        )
+
+    def test_production_construct_pdf_url_valid_pmcid_calls_fallbacks(self):
+        """Test production construct_pdf_url with valid pmcid calls fallbacks."""
+        metadata = {"records": [{"pmcid": "PMC123456", "doi": "10.1/x"}]}
+        with patch.object(
+            self.downloader,
+            "_fetch_pdf_url_with_fallbacks",
+            return_value="http://test.pdf",
+        ) as mock_fallbacks:
+            result = self.downloader.construct_pdf_url(metadata, "12345678")
+
+        self.assertEqual(result, "http://test.pdf")
+        mock_fallbacks.assert_called_once_with("PMC123456")
