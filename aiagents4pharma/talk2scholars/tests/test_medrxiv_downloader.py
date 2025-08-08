@@ -14,6 +14,33 @@ from aiagents4pharma.talk2scholars.tools.paper_download.utils.medrxiv_downloader
 )
 
 
+# ---- Test-only shim to access protected helpers without pylint W0212 ----
+class MedrxivDownloaderTestShim(MedrxivDownloader):
+    """mock class to access protected methods for testing."""
+
+    __test__ = False  # prevent pytest collection
+
+    def extract_basic_metadata_public(self, paper, identifier):
+        """extract basic metadata from a paper."""
+        return self._extract_basic_metadata(paper, identifier)
+
+    def extract_authors_public(self, authors_str):
+        """extract authors from a semicolon-separated string."""
+        return self._extract_authors(authors_str)
+
+    def extract_pdf_metadata_public(self, pdf_result, identifier):
+        """extract PDF metadata from the download result."""
+        return self._extract_pdf_metadata(pdf_result, identifier)
+
+    def get_paper_identifier_info_public(self, paper):
+        """get paper identifier info for public use."""
+        return self._get_paper_identifier_info(paper)
+
+    def add_service_identifier_public(self, entry, identifier):
+        """add service identifier to an entry."""
+        self._add_service_identifier(entry, identifier)
+
+
 class TestMedrxivDownloader(unittest.TestCase):
     """Tests for the MedrxivDownloader class."""
 
@@ -24,7 +51,7 @@ class TestMedrxivDownloader(unittest.TestCase):
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
 
-        self.downloader = MedrxivDownloader(self.mock_config)
+        self.downloader = MedrxivDownloaderTestShim(self.mock_config)
 
         # Sample medRxiv API response
         self.sample_json_response = {
@@ -86,51 +113,35 @@ class TestMedrxivDownloader(unittest.TestCase):
         with self.assertRaises(json.JSONDecodeError):
             self.downloader.fetch_metadata("10.1101/2023.01.01.123456")
 
-    def test_construct_pdf_url_success(self):
-        """Test successful PDF URL construction."""
-        metadata = self.sample_json_response
-
-        result = self.downloader.construct_pdf_url(
-            metadata, "10.1101/2023.01.01.123456"
+    def test_construct_pdf_url_variants(self):
+        """PDF URL construction: normal, missing/empty collection, custom version."""
+        # Success
+        self.assertEqual(
+            self.downloader.construct_pdf_url(
+                self.sample_json_response, "10.1101/2023.01.01.123456"
+            ),
+            "https://www.medrxiv.org/content/10.1101/2023.01.01.123456v1.full.pdf",
         )
-
-        expected_url = (
-            "https://www.medrxiv.org/content/10.1101/2023.01.01.123456v1.full.pdf"
+        # No collection
+        self.assertEqual(
+            self.downloader.construct_pdf_url({}, "10.1101/2023.01.01.123456"),
+            "",
         )
-        self.assertEqual(result, expected_url)
-
-    def test_construct_pdf_url_no_collection(self):
-        """Test PDF URL construction with missing collection."""
-        metadata = {}
-
-        result = self.downloader.construct_pdf_url(
-            metadata, "10.1101/2023.01.01.123456"
+        # Empty collection
+        self.assertEqual(
+            self.downloader.construct_pdf_url(
+                {"collection": []}, "10.1101/2023.01.01.123456"
+            ),
+            "",
         )
-
-        self.assertEqual(result, "")
-
-    def test_construct_pdf_url_empty_collection(self):
-        """Test PDF URL construction with empty collection."""
-        metadata = {"collection": []}
-
-        result = self.downloader.construct_pdf_url(
-            metadata, "10.1101/2023.01.01.123456"
+        # Custom version
+        self.assertEqual(
+            self.downloader.construct_pdf_url(
+                {"collection": [{"title": "Test Paper", "version": "3"}]},
+                "10.1101/2023.01.01.123456",
+            ),
+            "https://www.medrxiv.org/content/10.1101/2023.01.01.123456v3.full.pdf",
         )
-
-        self.assertEqual(result, "")
-
-    def test_construct_pdf_url_custom_version(self):
-        """Test PDF URL construction with custom version."""
-        metadata = {"collection": [{"title": "Test Paper", "version": "3"}]}
-
-        result = self.downloader.construct_pdf_url(
-            metadata, "10.1101/2023.01.01.123456"
-        )
-
-        expected_url = (
-            "https://www.medrxiv.org/content/10.1101/2023.01.01.123456v3.full.pdf"
-        )
-        self.assertEqual(result, expected_url)
 
     def test_extract_paper_metadata_success(self):
         """Test successful paper metadata extraction."""
@@ -187,15 +198,14 @@ class TestMedrxivDownloader(unittest.TestCase):
 
         self.assertIn("No collection data found", str(context.exception))
 
-    def test_extract_basic_metadata(self):
-        """Test basic metadata extraction helper method."""
-        paper = self.sample_json_response["collection"][0]
-
-        result = self.downloader._extract_basic_metadata(
-            paper, "10.1101/2023.01.01.123456"
+    def test_extract_basic_metadata_variants(self):
+        """Basic metadata extraction: complete and missing fields."""
+        # Complete
+        paper_full = self.sample_json_response["collection"][0]
+        got_full = self.downloader.extract_basic_metadata_public(
+            paper_full, "10.1101/2023.01.01.123456"
         )
-
-        expected = {
+        expected_full = {
             "Title": "Test MedRxiv Paper",
             "Authors": ["John Doe", "Jane Smith"],
             "Abstract": "This is a test abstract for medRxiv paper.",
@@ -206,94 +216,70 @@ class TestMedrxivDownloader(unittest.TestCase):
             "source": "medrxiv",
             "server": "medrxiv",
         }
+        self.assertEqual(got_full, expected_full)
 
-        self.assertEqual(result, expected)
+        # Missing fields
+        paper_missing = {"title": "Test Paper"}  # Missing others
+        got_missing = self.downloader.extract_basic_metadata_public(
+            paper_missing, "10.1101/test"
+        )
+        self.assertEqual(got_missing["Title"], "Test Paper")
+        self.assertEqual(got_missing["Authors"], [])
+        self.assertEqual(got_missing["Abstract"], "N/A")
+        self.assertEqual(got_missing["Category"], "N/A")
 
-    def test_extract_basic_metadata_missing_fields(self):
-        """Test basic metadata extraction with missing fields."""
-        paper = {
-            "title": "Test Paper"
-            # Missing other fields
-        }
+    def test_extract_authors_variants(self):
+        """Author parsing from semicolon string, empty, and whitespace-heavy inputs."""
+        self.assertEqual(
+            self.downloader.extract_authors_public("John Doe; Jane Smith; Bob Johnson"),
+            ["John Doe", "Jane Smith", "Bob Johnson"],
+        )
+        self.assertEqual(self.downloader.extract_authors_public(""), [])
+        self.assertEqual(
+            self.downloader.extract_authors_public("  John Doe  ;  Jane Smith  ; "),
+            ["John Doe", "Jane Smith"],
+        )
 
-        result = self.downloader._extract_basic_metadata(paper, "10.1101/test")
-
-        self.assertEqual(result["Title"], "Test Paper")
-        self.assertEqual(result["Authors"], [])  # Empty when no authors
-        self.assertEqual(result["Abstract"], "N/A")  # Default when missing
-        self.assertEqual(result["Category"], "N/A")  # Default when missing
-
-    def test_extract_authors_semicolon_separated(self):
-        """Test author extraction from semicolon-separated string."""
-        authors_str = "John Doe; Jane Smith; Bob Johnson"
-
-        result = self.downloader._extract_authors(authors_str)
-
-        expected = ["John Doe", "Jane Smith", "Bob Johnson"]
-        self.assertEqual(result, expected)
-
-    def test_extract_authors_empty_string(self):
-        """Test author extraction from empty string."""
-        result = self.downloader._extract_authors("")
-
-        self.assertEqual(result, [])
-
-    def test_extract_authors_whitespace_handling(self):
-        """Test author extraction with extra whitespace."""
-        authors_str = "  John Doe  ;  Jane Smith  ; "
-
-        result = self.downloader._extract_authors(authors_str)
-
-        expected = ["John Doe", "Jane Smith"]
-        self.assertEqual(result, expected)
-
-    def test_extract_pdf_metadata_with_result(self):
-        """Test PDF metadata extraction with download result."""
+    def test_extract_pdf_metadata_variants(self):
+        """PDF metadata: with and without download result."""
+        # With result
         pdf_result = ("/tmp/test.pdf", "paper.pdf")
-
-        result = self.downloader._extract_pdf_metadata(pdf_result, "10.1101/test")
-
-        expected = {
+        expected_with = {
             "URL": "/tmp/test.pdf",
             "pdf_url": "/tmp/test.pdf",
             "filename": "paper.pdf",
             "access_type": "open_access_downloaded",
             "temp_file_path": "/tmp/test.pdf",
         }
+        self.assertEqual(
+            self.downloader.extract_pdf_metadata_public(pdf_result, "10.1101/test"),
+            expected_with,
+        )
 
-        self.assertEqual(result, expected)
-
-    def test_extract_pdf_metadata_without_result(self):
-        """Test PDF metadata extraction without download result."""
+        # Without result
         with patch.object(
             self.downloader, "get_default_filename", return_value="default.pdf"
         ):
-            result = self.downloader._extract_pdf_metadata(None, "10.1101/test")
+            expected_without = {
+                "URL": "",
+                "pdf_url": "",
+                "filename": "default.pdf",
+                "access_type": "download_failed",
+                "temp_file_path": "",
+            }
+            self.assertEqual(
+                self.downloader.extract_pdf_metadata_public(None, "10.1101/test"),
+                expected_without,
+            )
 
-        expected = {
-            "URL": "",
-            "pdf_url": "",
-            "filename": "default.pdf",
-            "access_type": "download_failed",
-            "temp_file_path": "",
-        }
-
-        self.assertEqual(result, expected)
-
-    def test_get_service_name(self):
-        """Test get_service_name method."""
-        result = self.downloader.get_service_name()
-        self.assertEqual(result, "medRxiv")
-
-    def test_get_identifier_name(self):
-        """Test get_identifier_name method."""
-        result = self.downloader.get_identifier_name()
-        self.assertEqual(result, "DOI")
-
-    def test_get_default_filename(self):
-        """Test get_default_filename method."""
-        result = self.downloader.get_default_filename("10.1101/2023.01.01.123456")
-        self.assertEqual(result, "10_1101_2023_01_01_123456.pdf")
+    def test_service_and_identifier_helpers(self):
+        """Service, identifier, and default filename helpers."""
+        self.assertEqual(self.downloader.get_service_name(), "medRxiv")
+        self.assertEqual(self.downloader.get_identifier_name(), "DOI")
+        self.assertEqual(
+            self.downloader.get_default_filename("10.1101/2023.01.01.123456"),
+            "10_1101_2023_01_01_123456.pdf",
+        )
 
     def test_get_paper_identifier_info(self):
         """Test _get_paper_identifier_info method."""
@@ -303,7 +289,7 @@ class TestMedrxivDownloader(unittest.TestCase):
             "Category": "Medicine",
         }
 
-        result = self.downloader._get_paper_identifier_info(paper)
+        result = self.downloader.get_paper_identifier_info_public(paper)
 
         self.assertIn("10.1101/2023.01.01.123456", result)
         self.assertIn("2023-01-01", result)
@@ -312,9 +298,9 @@ class TestMedrxivDownloader(unittest.TestCase):
     def test_add_service_identifier(self):
         """Test _add_service_identifier method."""
         entry = {}
-
-        self.downloader._add_service_identifier(entry, "10.1101/2023.01.01.123456")
-
+        self.downloader.add_service_identifier_public(
+            entry, "10.1101/2023.01.01.123456"
+        )
         self.assertEqual(entry["DOI"], "10.1101/2023.01.01.123456")
         self.assertEqual(entry["server"], "medrxiv")
 
@@ -329,7 +315,7 @@ class TestMedrxivDownloaderIntegration(unittest.TestCase):
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
 
-        self.downloader = MedrxivDownloader(self.mock_config)
+        self.downloader = MedrxivDownloaderTestShim(self.mock_config)
 
         self.sample_response = {
             "collection": [
@@ -346,7 +332,8 @@ class TestMedrxivDownloaderIntegration(unittest.TestCase):
         }
 
     @patch(
-        "aiagents4pharma.talk2scholars.tools.paper_download.utils.medrxiv_downloader.MedrxivDownloader.download_pdf_to_temp"
+        "aiagents4pharma.talk2scholars.tools.paper_download.utils."
+        "medrxiv_downloader.MedrxivDownloader.download_pdf_to_temp"
     )
     @patch("requests.get")
     def test_full_paper_processing_workflow(self, mock_get, mock_download):
@@ -453,7 +440,9 @@ class TestMedrxivDownloaderIntegration(unittest.TestCase):
 
         for identifier in identifiers:
             metadata = self.downloader.fetch_metadata(identifier)
-            pdf_url = self.downloader.construct_pdf_url(metadata, identifier)
+            _ = self.downloader.construct_pdf_url(
+                metadata, identifier
+            )  # ensure path covered
             paper_data = self.downloader.extract_paper_metadata(
                 metadata, identifier, None
             )
@@ -485,7 +474,7 @@ class TestMedrxivSpecialCases(unittest.TestCase):
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
 
-        self.downloader = MedrxivDownloader(self.mock_config)
+        self.downloader = MedrxivDownloaderTestShim(self.mock_config)
 
     def test_filename_generation_special_characters(self):
         """Test filename generation with special characters in DOI."""
