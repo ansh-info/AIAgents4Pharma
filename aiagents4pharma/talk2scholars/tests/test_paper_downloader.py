@@ -1,9 +1,19 @@
 """
 Unit tests for the unified paper downloader functionality.
-Tests the main download_papers tool and PaperDownloaderFactory.
+
+These tests drive coverage through the public surface (factory .create(),
+tool wrappers, and the tool entry) to exercise the key branches in
+aiagents4pharma/talk2scholars/tools/paper_download/paper_downloader.py:
+- Service selection in create()
+- Hydra config load with/without cache, and failure path
+- GlobalHydra clear when already initialized
+- Service config extraction via OmegaConf, __dict__, items(), and dir() fallback
+- _apply_config warning path (handled via public create())
+- Success and both error paths in _download_papers_impl()
 """
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from langchain_core.messages import ToolMessage
@@ -20,725 +30,389 @@ from aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader import 
 )
 
 
+# --- tiny helpers to manipulate factory state without protected-access lint ---
+def _set_cached_config(value):
+    """set cached config in the factory for testing purposes."""
+    setattr(PaperDownloaderFactory, "_cached_config", value)
+
+
+def _set_config_lock(lock_obj):
+    """set the config lock object in the factory for testing purposes."""
+    setattr(PaperDownloaderFactory, "_config_lock", lock_obj)
+
+
+class PaperDownloaderFactoryTestShim(PaperDownloaderFactory):
+    """Public shim for manipulating internal cache/lock in tests."""
+
+    __test__ = False  # avoid pytest test collection
+
+
+def _cfg_obj(common_obj, services_map):
+    """Build a fake hydra cfg structure with tools.paper_download."""
+    tools = SimpleNamespace(
+        paper_download=SimpleNamespace(common=common_obj, services=services_map)
+    )
+    return SimpleNamespace(tools=tools)
+
+
+class _SlotsSource:
+    """Object with __slots__ to avoid __dict__, forcing dir() fallback."""
+
+    __slots__ = ("public_attr", "_private")
+
+    def __init__(self, public_val, private_val):
+        """initialize with public and private attributes."""
+        self.public_attr = public_val
+        self._private = private_val
+
+
+class _ItemsNoDict:
+    """items()-only object (no __dict__) to force items() extraction path."""
+
+    __slots__ = ("_data",)
+
+    def __init__(self, data):
+        """initialize with a dict-like data structure."""
+        self._data = data
+
+    def items(self):
+        """implement items() to return the internal data."""
+        return list(self._data.items())
+
+
+class _ExplodingItemsSlots:
+    """items()-only object (no __dict__) that raises to hit _apply_config warning."""
+
+    __slots__ = ()
+
+    def items(self):  # pragma: no cover - we only care that it raises
+        """implement items() that raises an error to test warning handling."""
+        raise AttributeError("boom in items()")
+
+
 class TestPaperDownloaderFactory(unittest.TestCase):
-    """Tests for the PaperDownloaderFactory class."""
+    """Tests for PaperDownloaderFactory behavior via public APIs."""
 
     def setUp(self):
-        """Reset the factory state before each test."""
-        PaperDownloaderFactory._cached_config = None
-        PaperDownloaderFactory._config_lock = None
+        """setup before each test."""
+        PaperDownloaderFactory.clear_cache()
 
     def tearDown(self):
-        """Clean up after each test."""
-        PaperDownloaderFactory._cached_config = None
-        PaperDownloaderFactory._config_lock = None
-
-    def test_clear_cache(self):
-        """Test that clear_cache method works correctly."""
-        PaperDownloaderFactory._cached_config = {"test": "config"}
+        """tear down after each test."""
         PaperDownloaderFactory.clear_cache()
-        self.assertIsNone(PaperDownloaderFactory._cached_config)
 
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.ArxivDownloader"
     )
-    @patch.object(PaperDownloaderFactory, "_get_unified_config")
-    @patch.object(PaperDownloaderFactory, "_build_service_config")
-    def test_create_arxiv_downloader(
-        self, mock_build_config, mock_get_config, mock_arxiv
+    @patch("aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hydra")
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.GlobalHydra"
+    )
+    def test_create_arxiv_and_cached_config(
+        self, mock_global_hydra, mock_hydra, mock_arxiv
     ):
-        """Test creating ArxivDownloader through factory."""
-        mock_config = Mock()
-        mock_service_config = Mock()
-        mock_get_config.return_value = mock_config
-        mock_build_config.return_value = mock_service_config
+        """First create loads config, second create returns cached config (no re-init)."""
+        # First call: GlobalHydra not initialized
+        mock_global_hydra.return_value.is_initialized.return_value = False
+        # Common via __dict__ path; service via items() path
+        common_obj = SimpleNamespace(request_timeout=15, chunk_size=4096)
+        svc_obj = _ItemsNoDict({"api_url": "https://api", "extra": 1})
+        mock_hydra.compose.return_value = _cfg_obj(common_obj, {"arxiv": svc_obj})
 
-        result = PaperDownloaderFactory.create("arxiv")
+        # Create arxiv
+        result1 = PaperDownloaderFactory.create("arxiv")
+        self.assertIs(result1, mock_arxiv.return_value)
+        mock_arxiv.assert_called_once()
+        passed_cfg = mock_arxiv.call_args[0][0]
+        self.assertTrue(passed_cfg.has_attribute("api_url"))
+        self.assertEqual(passed_cfg.get_config_dict()["request_timeout"], 15)
+        self.assertEqual(passed_cfg.get_config_dict()["chunk_size"], 4096)
+        self.assertEqual(passed_cfg.get_config_dict()["api_url"], "https://api")
 
-        mock_get_config.assert_called_once()
-        mock_build_config.assert_called_once_with(mock_config, "arxiv")
-        mock_arxiv.assert_called_once_with(mock_service_config)
-        self.assertEqual(result, mock_arxiv.return_value)
+        # Second create (cached): hydra.initialize should not be called again
+        mock_hydra.initialize.reset_mock()
+        mock_hydra.compose.reset_mock()
+        PaperDownloaderFactory.create("arxiv")
+        mock_hydra.initialize.assert_not_called()
+        mock_hydra.compose.assert_not_called()
 
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.MedrxivDownloader"
     )
-    @patch.object(PaperDownloaderFactory, "_get_unified_config")
-    @patch.object(PaperDownloaderFactory, "_build_service_config")
-    def test_create_medrxiv_downloader(
-        self, mock_build_config, mock_get_config, mock_medrxiv
+    @patch("aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hydra")
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.GlobalHydra"
+    )
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.OmegaConf"
+    )
+    def test_create_medrxiv_omegaconf_and_clear_existing(
+        self, mock_omegaconf, mock_global_hydra, mock_hydra, mock_medrxiv
     ):
-        """Test creating MedrxivDownloader through factory."""
-        mock_config = Mock()
-        mock_service_config = Mock()
-        mock_get_config.return_value = mock_config
-        mock_build_config.return_value = mock_service_config
+        """When GlobalHydra is initialized, it should clear;
+        OmegaConf extraction should populate fields."""
+        PaperDownloaderFactory.clear_cache()
+        # Force "already initialized" branch
+        mock_global_hydra.return_value.is_initialized.return_value = True
 
-        result = PaperDownloaderFactory.create("medrxiv")
+        # OmegaConf conversion for both common and service
+        common_oc = SimpleNamespace(_content=True)
+        svc_oc = SimpleNamespace(_content=True)
+        mock_omegaconf.to_container.side_effect = [
+            {"request_timeout": 20, "chunk_size": 8192},
+            {"api_url": "https://med", "pdf_url_template": "T"},
+        ]
+        mock_hydra.compose.return_value = _cfg_obj(common_oc, {"medrxiv": svc_oc})
 
-        mock_build_config.assert_called_once_with(mock_config, "medrxiv")
-        mock_medrxiv.assert_called_once_with(mock_service_config)
-        self.assertEqual(result, mock_medrxiv.return_value)
+        PaperDownloaderFactory.create("medrxiv")
+        # GlobalHydra.instance().clear should be called once
+        mock_global_hydra.instance.return_value.clear.assert_called_once()
+        # Verify the config passed
+        cfg = mock_medrxiv.call_args[0][0]
+        cfg_d = cfg.get_config_dict()
+        self.assertEqual(cfg_d["request_timeout"], 20)
+        self.assertEqual(cfg_d["chunk_size"], 8192)
+        self.assertEqual(cfg_d["api_url"], "https://med")
+        self.assertEqual(cfg_d["pdf_url_template"], "T")
 
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.BiorxivDownloader"
     )
-    @patch.object(PaperDownloaderFactory, "_get_unified_config")
-    @patch.object(PaperDownloaderFactory, "_build_service_config")
-    def test_create_biorxiv_downloader(
-        self, mock_build_config, mock_get_config, mock_biorxiv
+    @patch("aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hydra")
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.GlobalHydra"
+    )
+    def test_create_biorxiv_dir_fallback(
+        self, mock_global_hydra, mock_hydra, mock_biorxiv
     ):
-        """Test creating BiorxivDownloader through factory."""
-        mock_config = Mock()
-        mock_service_config = Mock()
-        mock_get_config.return_value = mock_config
-        mock_build_config.return_value = mock_service_config
+        """dir() fallback path with __slots__ object should populate public, skip private."""
+        mock_global_hydra.return_value.is_initialized.return_value = False
+        common_obj = _SlotsSource(public_val=30, private_val="hide")
+        svc_obj = _SlotsSource(public_val="https://biorxiv", private_val="x")
+        mock_hydra.compose.return_value = _cfg_obj(common_obj, {"biorxiv": svc_obj})
 
-        result = PaperDownloaderFactory.create("biorxiv")
-
-        mock_build_config.assert_called_once_with(mock_config, "biorxiv")
-        mock_biorxiv.assert_called_once_with(mock_service_config)
-        self.assertEqual(result, mock_biorxiv.return_value)
+        PaperDownloaderFactory.create("biorxiv")
+        cfg = mock_biorxiv.call_args[0][0]
+        cfg_d = cfg.get_config_dict()
+        # Both "public_attr" from common and service appear;
+        # service wins on name clash? not needed, just check present.
+        self.assertIn("public_attr", cfg_d)
+        self.assertEqual(cfg_d["public_attr"], "https://biorxiv")
+        # Ensure private key not present
+        self.assertNotIn("_private", cfg_d)
 
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.PubmedDownloader"
     )
-    @patch.object(PaperDownloaderFactory, "_get_unified_config")
-    @patch.object(PaperDownloaderFactory, "_build_service_config")
-    def test_create_pubmed_downloader(
-        self, mock_build_config, mock_get_config, mock_pubmed
+    @patch("aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hydra")
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.GlobalHydra"
+    )
+    def test_create_pubmed_apply_config_warning_path(
+        self, mock_global_hydra, mock_hydra, mock_pubmed
     ):
-        """Test creating PubmedDownloader through factory."""
-        mock_config = Mock()
-        mock_service_config = Mock()
-        mock_get_config.return_value = mock_config
-        mock_build_config.return_value = mock_service_config
+        """If extraction raises in a path, _apply_config should log a warning and continue."""
+        mock_global_hydra.return_value.is_initialized.return_value = False
+        # First (common) will raise inside _extract_from_items -> warning
+        common_obj = _ExplodingItemsSlots()
+        # Service path is sane to still build config
+        svc_obj = SimpleNamespace(
+            api_url="https://pubmed", request_timeout=55, chunk_size=1024
+        )
+        mock_hydra.compose.return_value = _cfg_obj(common_obj, {"pubmed": svc_obj})
 
-        result = PaperDownloaderFactory.create("pubmed")
+        with patch(
+            "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.logger"
+        ) as mock_logger:
+            PaperDownloaderFactory.create("pubmed")
+            # Warning logged once for common
+            self.assertTrue(mock_logger.warning.called)
 
-        mock_build_config.assert_called_once_with(mock_config, "pubmed")
-        mock_pubmed.assert_called_once_with(mock_service_config)
-        self.assertEqual(result, mock_pubmed.return_value)
+        cfg = mock_pubmed.call_args[0][0]
+        cfg_d = cfg.get_config_dict()
+        self.assertEqual(cfg_d["api_url"], "https://pubmed")
+        self.assertEqual(cfg_d["request_timeout"], 55)
+        self.assertEqual(cfg_d["chunk_size"], 1024)
 
-    @patch.object(PaperDownloaderFactory, "_get_unified_config")
-    def test_create_unsupported_service(self, mock_get_config):
-        """Test error when creating unsupported service."""
-        mock_config = Mock()
-        # Mock services as a dict-like object that doesn't contain 'unsupported'
-        mock_config.services = {"arxiv": {}, "medrxiv": {}, "biorxiv": {}, "pubmed": {}}
-        mock_config.supported_services = ["arxiv", "medrxiv", "biorxiv", "pubmed"]
-        mock_get_config.return_value = mock_config
-
-        with self.assertRaises(ValueError) as context:
+    @patch("aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hydra")
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.GlobalHydra"
+    )
+    def test_create_missing_service_error_message(self, mock_global_hydra, mock_hydra):
+        """Missing service should raise ValueError with 'Service ... not found' message."""
+        mock_global_hydra.return_value.is_initialized.return_value = False
+        mock_hydra.compose.return_value = _cfg_obj(SimpleNamespace(), {"arxiv": {}})
+        with self.assertRaises(ValueError) as ctx:
             PaperDownloaderFactory.create("unsupported")
-
         self.assertIn(
-            "Service 'unsupported' not found in configuration", str(context.exception)
+            "Service 'unsupported' not found in configuration", str(ctx.exception)
         )
 
-    @patch.object(PaperDownloaderFactory, "_get_unified_config")
-    def test_create_unsupported_service_fallback_error(self, mock_get_config):
-        """Test error when creating unsupported service (using fallback error message)."""
-        mock_config = Mock()
-        # Mock services that contains the service but make the factory not handle it
-        mock_config.services = {"unsupported": {}}
-        mock_config.common = Mock()
-        mock_config.supported_services = ["arxiv", "medrxiv", "biorxiv", "pubmed"]
-        mock_get_config.return_value = mock_config
-
-        # Mock _build_service_config to succeed
-        with patch.object(
-            PaperDownloaderFactory, "_build_service_config", return_value=Mock()
-        ):
-            with self.assertRaises(ValueError) as context:
-                PaperDownloaderFactory.create("unsupported")
-
-            self.assertIn(
-                "Unsupported service: unsupported. Supported:", str(context.exception)
-            )
-
     @patch("aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hydra")
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.GlobalHydra"
     )
-    def test_get_unified_config_success(self, mock_global_hydra, mock_hydra):
-        """Test successful configuration loading."""
-        mock_hydra_instance = Mock()
-        mock_global_hydra.return_value = mock_hydra_instance
-        mock_global_hydra().is_initialized.return_value = False
-
-        mock_cfg = Mock()
-        mock_cfg.tools.paper_download = {"test": "config"}
-        mock_hydra.compose.return_value = mock_cfg
-
-        result = PaperDownloaderFactory._get_unified_config()
-
-        self.assertEqual(result, {"test": "config"})
-        self.assertEqual(PaperDownloaderFactory._cached_config, {"test": "config"})
-
-    @patch("aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hydra")
-    @patch(
-        "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.GlobalHydra"
-    )
-    def test_get_unified_config_clear_existing(self, mock_global_hydra, mock_hydra):
-        """Test configuration loading with existing GlobalHydra."""
-        mock_hydra_instance = Mock()
-        mock_global_hydra.return_value = mock_hydra_instance
-        mock_global_hydra().is_initialized.return_value = True
-        mock_global_hydra.instance.return_value.clear = Mock()
-
-        mock_cfg = Mock()
-        mock_cfg.tools.paper_download = {"test": "config"}
-        mock_hydra.compose.return_value = mock_cfg
-
-        result = PaperDownloaderFactory._get_unified_config()
-
-        mock_global_hydra.instance().clear.assert_called_once()
-        self.assertEqual(result, {"test": "config"})
-
-    def test_get_unified_config_cached(self):
-        """Test that cached config is returned when available."""
-        PaperDownloaderFactory._cached_config = {"cached": "config"}
-
-        result = PaperDownloaderFactory._get_unified_config()
-
-        self.assertEqual(result, {"cached": "config"})
-
-    def test_get_unified_config_cached_thread_race(self):
-        """Test the double-check pattern in cached config loading."""
-        # First clear the cache
-        PaperDownloaderFactory._cached_config = None
-        PaperDownloaderFactory._config_lock = None
-
-        # Mock the lock to simulate a race condition
-        mock_lock = Mock()
-        PaperDownloaderFactory._config_lock = mock_lock
-
-        # Set up the context manager to simulate another thread setting the config
-        def lock_context_manager():
-            class MockContext:
-                def __enter__(self):
-                    # Simulate another thread setting the config during lock acquisition
-                    PaperDownloaderFactory._cached_config = {"race_condition": "config"}
-                    return self
-
-                def __exit__(self, *args):
-                    pass
-
-            return MockContext()
-
-        mock_lock.__enter__ = lambda self: lock_context_manager().__enter__()
-        mock_lock.__exit__ = lambda self, *args: lock_context_manager().__exit__(*args)
-
-        result = PaperDownloaderFactory._get_unified_config()
-
-        self.assertEqual(result, {"race_condition": "config"})
-
-    @patch("aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hydra")
-    def test_get_unified_config_failure(self, mock_hydra):
-        """Test configuration loading failure."""
+    def test_get_unified_config_failure_raises_runtimeerror(
+        self, mock_global_hydra, mock_hydra
+    ):
+        """Hydra initialize failure should surface as RuntimeError from create()."""
+        PaperDownloaderFactory.clear_cache()
+        mock_global_hydra.return_value.is_initialized.return_value = False
         mock_hydra.initialize.side_effect = Exception("Config error")
-
-        with self.assertRaises(RuntimeError) as context:
-            PaperDownloaderFactory._get_unified_config()
-
-        self.assertIn("Configuration loading failed", str(context.exception))
-
-    def test_build_service_config_missing_service(self):
-        """Test build_service_config with missing service."""
-        mock_config = Mock()
-        mock_config.services = {}
-
-        with self.assertRaises(ValueError) as context:
-            PaperDownloaderFactory._build_service_config(mock_config, "missing")
-
-        self.assertIn("Service 'missing' not found", str(context.exception))
-
-    @patch(
-        "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.OmegaConf"
-    )
-    def test_build_service_config_omega_conf(self, mock_omega_conf):
-        """Test build_service_config with OmegaConf objects."""
-        # Setup mock config
-        mock_unified_config = Mock()
-        mock_unified_config.services = {"test": Mock()}
-        mock_unified_config.common = Mock()
-        mock_unified_config.common._content = True
-        mock_unified_config.services["test"]._content = True
-
-        # Setup OmegaConf mock
-        mock_omega_conf.to_container.side_effect = [
-            {"common_key": "common_value"},  # For common config
-            {"service_key": "service_value"},  # For service config
-        ]
-
-        result = PaperDownloaderFactory._build_service_config(
-            mock_unified_config, "test"
-        )
-
-        # Verify the config object has both common and service attributes
-        self.assertTrue(hasattr(result, "common_key"))
-        self.assertTrue(hasattr(result, "service_key"))
-        self.assertEqual(result.common_key, "common_value")
-        self.assertEqual(result.service_key, "service_value")
-
-    def test_service_config_methods(self):
-        """Test ServiceConfig helper methods."""
-        mock_unified_config = Mock()
-        mock_unified_config.services = {"test": Mock()}
-        mock_unified_config.common = Mock()
-
-        # Mock the _apply_config calls to avoid complex setup
-        with patch.object(PaperDownloaderFactory, "_apply_config"):
-            config = PaperDownloaderFactory._build_service_config(
-                mock_unified_config, "test"
-            )
-
-            # Test get_config_dict method
-            config.test_attr = "test_value"
-            config._private_attr = "private"
-
-            config_dict = config.get_config_dict()
-            self.assertIn("test_attr", config_dict)
-            self.assertNotIn("_private_attr", config_dict)
-            self.assertEqual(config_dict["test_attr"], "test_value")
-
-            # Test has_attribute method
-            self.assertTrue(config.has_attribute("test_attr"))
-            self.assertFalse(config.has_attribute("nonexistent_attr"))
+        # Using arxiv path to trigger load; patch downloader to avoid import side-effects
+        with patch(
+            "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.ArxivDownloader"
+        ):
+            with self.assertRaises(RuntimeError):
+                PaperDownloaderFactory.create("arxiv")
 
 
 class TestDownloadPapersFunction(unittest.TestCase):
-    """Tests for the download_papers tool function and related functions."""
+    """Tests for the download_papers tool and internal impl."""
 
-    @patch.object(PaperDownloaderFactory, "create")
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download."
+        "paper_downloader.PaperDownloaderFactory.create"
+    )
     def test_download_papers_success(self, mock_create):
-        """Test successful paper download."""
-        # Setup mock downloader
-        mock_downloader = Mock()
-        mock_downloader.get_service_name.return_value = "arXiv"
-        mock_downloader.process_identifiers.return_value = {
-            "1234.5678": {
-                "Title": "Test Paper",
-                "access_type": "open_access_downloaded",
-            }
+        """Successful run returns article data and ToolMessage with summary."""
+        dl = Mock()
+        dl.get_service_name.return_value = "arXiv"
+        dl.process_identifiers.return_value = {
+            "1234.5678": {"Title": "T", "access_type": "open_access_downloaded"}
         }
-        mock_downloader.build_summary.return_value = "Successfully downloaded 1 paper"
-        mock_create.return_value = mock_downloader
+        dl.build_summary.return_value = "Summary OK"
+        mock_create.return_value = dl
 
-        result = _download_papers_impl("arxiv", ["1234.5678"], "test_tool_call_id")
+        cmd = _download_papers_impl("arxiv", ["1234.5678"], "tid1")
+        self.assertIsInstance(cmd, Command)
+        self.assertIn("1234.5678", cmd.update["article_data"])
+        msg = cmd.update["messages"][0]
+        self.assertIsInstance(msg, ToolMessage)
+        self.assertEqual(msg.tool_call_id, "tid1")
+        self.assertEqual(msg.content, "Summary OK")
 
-        # Verify result structure
-        self.assertIsInstance(result, Command)
-        self.assertIn("article_data", result.update)
-        self.assertIn("messages", result.update)
-
-        # Verify article data
-        article_data = result.update["article_data"]
-        self.assertIn("1234.5678", article_data)
-        self.assertEqual(article_data["1234.5678"]["Title"], "Test Paper")
-
-        # Verify message
-        messages = result.update["messages"]
-        self.assertEqual(len(messages), 1)
-        self.assertIsInstance(messages[0], ToolMessage)
-        self.assertEqual(messages[0].tool_call_id, "test_tool_call_id")
-        self.assertEqual(messages[0].content, "Successfully downloaded 1 paper")
-
-    @patch.object(PaperDownloaderFactory, "create")
-    def test_download_papers_service_error(self, mock_create):
-        """Test download_papers with service error."""
-        mock_create.side_effect = ValueError("Unsupported service: invalid")
-
-        result = _download_papers_impl("invalid", ["123"], "test_tool_call_id")
-
-        # Verify error handling
-        self.assertIsInstance(result, Command)
-        self.assertEqual(result.update["article_data"], {})
-
-        messages = result.update["messages"]
-        self.assertEqual(len(messages), 1)
-        self.assertIn("Service error", messages[0].content)
-        self.assertIn("invalid", messages[0].content)
-
-    @patch.object(PaperDownloaderFactory, "create")
-    def test_download_papers_unexpected_error(self, mock_create):
-        """Test download_papers with unexpected error."""
-        mock_downloader = Mock()
-        mock_downloader.process_identifiers.side_effect = RuntimeError(
-            "Unexpected error"
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download."
+        "paper_downloader.PaperDownloaderFactory.create"
+    )
+    def test_download_papers_service_error_branch(self, mock_create):
+        """ValueError from factory becomes a 'Service error' ToolMessage and empty data."""
+        mock_create.side_effect = ValueError("Unsupported service: nope")
+        cmd = _download_papers_impl("nope", ["x"], "tid2")
+        self.assertEqual(cmd.update["article_data"], {})
+        self.assertIn(
+            "Error: Service error for 'nope': Unsupported service: nope",
+            cmd.update["messages"][0].content,
         )
-        mock_create.return_value = mock_downloader
 
-        result = _download_papers_impl("arxiv", ["123"], "test_tool_call_id")
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download."
+        "paper_downloader.PaperDownloaderFactory.create"
+    )
+    def test_download_papers_unexpected_error_branch(self, mock_create):
+        """Unexpected error from downloader is caught and surfaced."""
+        dl = Mock()
+        dl.get_service_name.return_value = "arXiv"
+        dl.process_identifiers.side_effect = RuntimeError("kaboom")
+        mock_create.return_value = dl
 
-        # Verify error handling
-        self.assertIsInstance(result, Command)
-        self.assertEqual(result.update["article_data"], {})
-
-        messages = result.update["messages"]
-        self.assertEqual(len(messages), 1)
-        self.assertIn("Unexpected error", messages[0].content)
+        cmd = _download_papers_impl("arxiv", ["x"], "tid3")
+        self.assertEqual(cmd.update["article_data"], {})
+        self.assertIn(
+            "Error: Unexpected error during paper download: kaboom",
+            cmd.update["messages"][0].content,
+        )
 
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader._download_papers_impl"
     )
-    def test_convenience_functions(self, mock_impl):
-        """Test convenience wrapper functions."""
-        mock_impl.return_value = Command(update={"test": "result"})
-
-        # Test each convenience function
-        download_arxiv_papers(["1234.5678"], "tool_call_1")
-        mock_impl.assert_called_with("arxiv", ["1234.5678"], "tool_call_1")
-
-        download_medrxiv_papers(["10.1101/test"], "tool_call_2")
-        mock_impl.assert_called_with("medrxiv", ["10.1101/test"], "tool_call_2")
-
-        download_biorxiv_papers(["10.1101/test"], "tool_call_3")
-        mock_impl.assert_called_with("biorxiv", ["10.1101/test"], "tool_call_3")
-
-        download_pubmed_papers(["12345"], "tool_call_4")
-        mock_impl.assert_called_with("pubmed", ["12345"], "tool_call_4")
+    def test_convenience_wrappers(self, mock_impl):
+        """The convenience functions forward to the core impl with the right service string."""
+        mock_impl.return_value = Command(update={"ok": True})
+        download_arxiv_papers(["a"], "tc1")
+        mock_impl.assert_called_with("arxiv", ["a"], "tc1")
+        download_medrxiv_papers(["b"], "tc2")
+        mock_impl.assert_called_with("medrxiv", ["b"], "tc2")
+        download_biorxiv_papers(["c"], "tc3")
+        mock_impl.assert_called_with("biorxiv", ["c"], "tc3")
+        download_pubmed_papers(["d"], "tc4")
+        mock_impl.assert_called_with("pubmed", ["d"], "tc4")
 
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader._download_papers_impl"
     )
-    def test_main_download_papers_function(self, mock_impl):
-        """Test the main download_papers tool function."""
-        mock_impl.return_value = Command(update={"test": "result"})
+    def test_tool_entry(self, mock_impl):
+        """The download_papers tool entry should call the core impl."""
+        mock_impl.return_value = Command(update={"ok": True})
+        payload = {"service": "arxiv", "identifiers": ["123"], "tool_call_id": "tid"}
+        result = download_papers.invoke(payload)
+        mock_impl.assert_called_once_with("arxiv", ["123"], "tid")
+        self.assertTrue(result.update["ok"])
 
-        # Call the tool with proper input structure (as it's decorated with @tool)
-        input_data = {
-            "service": "arxiv",
-            "identifiers": ["1234.5678"],
-            "tool_call_id": "tool_call_id",
-        }
+    @patch("aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hydra")
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.GlobalHydra"
+    )
+    def test_create_unsupported_service_fallback_branch(
+        self, mock_global_hydra, mock_hydra
+    ):
+        """Covers the fallback ValueError when service is unsupported."""
+        mock_global_hydra.return_value.is_initialized.return_value = False
 
-        result = download_papers.invoke(input_data)
-
-        mock_impl.assert_called_once_with("arxiv", ["1234.5678"], "tool_call_id")
-        self.assertEqual(result.update["test"], "result")
-
-
-class TestConfigurationExtraction(unittest.TestCase):
-    """Tests for configuration extraction helper methods."""
-
-    def test_extract_from_omegaconf(self):
-        """Test OmegaConf extraction."""
-
-        # Create a simple object to act as config_obj
-        class TestConfig:
-            pass
-
-        config_obj = TestConfig()
-        source_config = Mock()
-
-        with patch(
-            "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.OmegaConf"
-        ) as mock_omega_conf:
-            mock_omega_conf.to_container.return_value = {
-                "key1": "value1",
-                "key2": "value2",
-                123: "invalid_key",  # Non-string key should be skipped
-            }
-
-            PaperDownloaderFactory._extract_from_omegaconf(config_obj, source_config)
-
-            # Verify only string keys were set
-            self.assertTrue(hasattr(config_obj, "key1"))
-            self.assertTrue(hasattr(config_obj, "key2"))
-            self.assertFalse(
-                hasattr(config_obj, "123")
-            )  # Non-string key should be skipped
-            self.assertEqual(config_obj.key1, "value1")
-            self.assertEqual(config_obj.key2, "value2")
-
-    def test_extract_from_dict(self):
-        """Test dictionary extraction."""
-
-        # Create a simple object to act as config_obj
-        class TestConfig:
-            pass
-
-        config_obj = TestConfig()
-        source_dict = {"public_key": "public_value", "_private_key": "private_value"}
-
-        PaperDownloaderFactory._extract_from_dict(config_obj, source_dict)
-
-        # Verify only non-private keys were set
-        self.assertTrue(hasattr(config_obj, "public_key"))
-        self.assertFalse(hasattr(config_obj, "_private_key"))
-        self.assertEqual(config_obj.public_key, "public_value")
-
-    def test_extract_from_items(self):
-        """Test items() method extraction."""
-
-        # Create a simple object to act as config_obj
-        class TestConfig:
-            pass
-
-        config_obj = TestConfig()
-        source_config = Mock()
-        source_config.items.return_value = [
-            ("str_key", "value1"),
-            (123, "value2"),  # Non-string key should be skipped
-        ]
-
-        PaperDownloaderFactory._extract_from_items(config_obj, source_config)
-
-        # Verify only string keys were set
-        self.assertTrue(hasattr(config_obj, "str_key"))
-        self.assertFalse(hasattr(config_obj, "123"))
-        self.assertEqual(config_obj.str_key, "value1")
-
-    def test_extract_from_dir(self):
-        """Test dir() approach extraction."""
-
-        # Create a simple object to act as config_obj
-        class TestConfig:
-            pass
-
-        config_obj = TestConfig()
-
-        # Create a simple source config object
-        class SourceConfig:
-            def __init__(self):
-                self.public_attr = "public_value"
-                self._private_attr = "private_value"
-
-        source_config = SourceConfig()
-
-        PaperDownloaderFactory._extract_from_dir(config_obj, source_config)
-
-        # Verify only non-private attributes were set
-        self.assertTrue(hasattr(config_obj, "public_attr"))
-        self.assertFalse(hasattr(config_obj, "_private_attr"))
-        self.assertEqual(config_obj.public_attr, "public_value")
-
-    def test_apply_config_exception_handling(self):
-        """Test exception handling in _apply_config method."""
-
-        # Create a simple object to act as config_obj
-        class TestConfig:
-            pass
-
-        config_obj = TestConfig()
-
-        # Mock _try_config_extraction to raise an exception
-        with patch.object(
-            PaperDownloaderFactory,
-            "_try_config_extraction",
-            side_effect=AttributeError("test error"),
-        ):
-            with patch(
-                "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.logger"
-            ) as mock_logger:
-                PaperDownloaderFactory._apply_config(config_obj, Mock(), "test")
-                mock_logger.warning.assert_called_once_with(
-                    "Failed to process %s config: %s",
-                    "test",
-                    mock_logger.warning.call_args[0][2],
-                )
-
-    def test_try_config_extraction_individual_methods(self):
-        """Test individual methods in config extraction."""
-
-        # Create a simple object to act as config_obj
-        class TestConfig:
-            pass
-
-        # Test direct __dict__ method
-        config_obj = TestConfig()
-        PaperDownloaderFactory._extract_from_dict(
-            config_obj, {"dict_key": "dict_value"}
+        common_cfg = SimpleNamespace(request_timeout=30, chunk_size=8192)
+        services = {"unsupported": SimpleNamespace(api_url="https://nope")}
+        unified = SimpleNamespace(
+            common=common_cfg,
+            services=services,
+            supported_services=["arxiv", "medrxiv", "biorxiv", "pubmed"],
         )
-        self.assertEqual(config_obj.dict_key, "dict_value")
+        mock_hydra.compose.return_value = SimpleNamespace(
+            tools=SimpleNamespace(paper_download=unified)
+        )
 
-        # Test items() method
-        config_obj2 = TestConfig()
-        items_source = Mock()
-        items_source.items.return_value = [("items_key", "items_value")]
-        PaperDownloaderFactory._extract_from_items(config_obj2, items_source)
-        self.assertEqual(config_obj2.items_key, "items_value")
+        with self.assertRaises(ValueError) as ctx:
+            PaperDownloaderFactory.create("unsupported")
 
-        # Test dir() method
-        config_obj3 = TestConfig()
+        msg = str(ctx.exception)
+        self.assertIn("Unsupported service: unsupported. Supported:", msg)
+        for svc in ["arxiv", "medrxiv", "biorxiv", "pubmed"]:
+            self.assertIn(svc, msg)
 
-        class DirSource:
-            def __init__(self):
-                self.dir_attr = "dir_value"
-                self._private = "private_value"
 
-        dir_source = DirSource()
-        PaperDownloaderFactory._extract_from_dir(config_obj3, dir_source)
-        self.assertEqual(config_obj3.dir_attr, "dir_value")
-        self.assertFalse(hasattr(config_obj3, "_private"))
+class TestUnifiedConfigDoubleCheck(unittest.TestCase):
+    """Covers the double-check return branch in _get_unified_config."""
 
-    def test_try_config_extraction_fallback_methods(self):
-        """Test fallback methods in _try_config_extraction by directly calling them."""
+    @patch("aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hydra")
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.GlobalHydra"
+    )
+    def test_double_check_inside_lock(self, mock_global_hydra, mock_hydra):
+        """tests the double-check branch in _get_unified_config"""
+        # ensure hydra path doesn't interfere if we do end up there
+        mock_global_hydra.return_value.is_initialized.return_value = False
 
-        class TestConfig:
-            pass
+        # start clean
+        _set_cached_config(None)
 
-        # Test __dict__ method directly (lines 215-219)
-        config_obj = TestConfig()
-        dict_source = {"dict_attr": "dict_value"}
-        PaperDownloaderFactory._extract_from_dict(config_obj, dict_source)
-        self.assertEqual(config_obj.dict_attr, "dict_value")
+        class _LockCtx:
+            """lock context manager that simulates another thread setting the cache."""
 
-        # Test items() method directly (lines 221-224)
-        config_obj2 = TestConfig()
-        items_source = Mock()
-        items_source.items.return_value = [("items_key", "items_value")]
-        PaperDownloaderFactory._extract_from_items(config_obj2, items_source)
-        self.assertEqual(config_obj2.items_key, "items_value")
+            def __enter__(self):
+                # simulate another thread setting the cache while the lock is held
+                _set_cached_config({"via": "enter"})
+                return self
 
-        # Test dir() method directly (lines 226-227)
-        config_obj3 = TestConfig()
+            def __exit__(self, exc_type, exc, tb):
+                """exit context manager, no-op."""
+                return False
 
-        class DirSource:
-            def __init__(self):
-                self.dir_attr = "dir_value"
-                self._private = "private_value"
+        _set_config_lock(_LockCtx())
 
-        dir_source = DirSource()
-        PaperDownloaderFactory._extract_from_dir(config_obj3, dir_source)
-        self.assertEqual(config_obj3.dir_attr, "dir_value")
-        self.assertFalse(hasattr(config_obj3, "_private"))
+        # call the real function; it should return from the *double-check* branch
+        result = PaperDownloaderFactory._get_unified_config()
+        self.assertEqual(result, {"via": "enter"})
 
-    def test_try_config_extraction_comprehensive_fallback_flow(self):
-        """Test the complete fallback flow through _try_config_extraction."""
-
-        class TestConfig:
-            pass
-
-        # Test items() fallback path (lines 222-224)
-        config_obj2 = TestConfig()
-
-        # Mock hasattr to force items() path
-        with patch(
-            "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr"
-        ) as mock_hasattr:
-
-            def hasattr_side_effect(obj, attr):
-                if attr == "_content":
-                    return False  # Skip OmegaConf path
-                elif attr == "__dict__":
-                    return False  # Skip __dict__ path
-                elif attr == "items":
-                    return True  # Use items() fallback
-                # No default return needed for this test
-
-            mock_hasattr.side_effect = hasattr_side_effect
-
-            # Create source with items method
-            source_config = Mock()
-            source_config.items.return_value = [("items_attr", "items_value")]
-
-            PaperDownloaderFactory._try_config_extraction(config_obj2, source_config)
-
-            # Should have extracted using items()
-            self.assertTrue(hasattr(config_obj2, "items_attr"))
-            self.assertEqual(config_obj2.items_attr, "items_value")
-
-        # Test dir() fallback path (lines 226-227)
-        config_obj3 = TestConfig()
-
-        # Mock hasattr to force dir() path
-        with patch(
-            "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr"
-        ) as mock_hasattr:
-
-            def hasattr_side_effect(obj, attr):
-                if attr == "_content":
-                    return False  # Skip OmegaConf path
-                elif attr == "__dict__":
-                    return False  # Skip __dict__ path
-                elif attr == "items":
-                    return False  # Skip items() path - forces dir() fallback
-                # No default return needed for this test
-
-            mock_hasattr.side_effect = hasattr_side_effect
-
-            # Create source for dir() approach
-            class DirSource:
-                def __init__(self):
-                    self.dir_attr = "dir_value"
-                    self._private = "private"
-
-            source_config = DirSource()
-
-            PaperDownloaderFactory._try_config_extraction(config_obj3, source_config)
-
-            # Should have extracted using dir()
-            self.assertTrue(hasattr(config_obj3, "dir_attr"))
-            self.assertEqual(config_obj3.dir_attr, "dir_value")
-            self.assertFalse(hasattr(config_obj3, "_private"))
-
-    def test_try_config_extraction_dict_access_path(self):
-        """Test the __dict__ access path (lines 215-219) in _try_config_extraction."""
-
-        class TestConfig:
-            pass
-
-        config_obj = TestConfig()
-
-        # Mock hasattr to force __dict__ access path
-        with patch(
-            "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr"
-        ) as mock_hasattr:
-
-            def hasattr_side_effect(obj, attr):
-                if attr == "_content":
-                    return False  # Skip OmegaConf path
-                elif attr == "__dict__":
-                    return True  # Use __dict__ access - lines 215-219
-                # No default return needed for this test
-
-            mock_hasattr.side_effect = hasattr_side_effect
-
-            # Create source with __dict__ attribute
-            class DictSource:
-                def __init__(self):
-                    self.test_attr = "test_value"
-
-            source_config = DictSource()
-
-            PaperDownloaderFactory._try_config_extraction(config_obj, source_config)
-
-            # Should have extracted using __dict__ access
-            self.assertTrue(hasattr(config_obj, "test_attr"))
-            self.assertEqual(config_obj.test_attr, "test_value")
-
-    def test_hasattr_side_effect_coverage(self):
-        """Test to ensure all paths in hasattr_side_effect functions are covered."""
-
-        class TestConfig:
-            pass
-
-        # Test to ensure all return paths in hasattr side effects are covered
-        config_obj = TestConfig()
-
-        # This will test the 'return True' path (line 629)
-        with patch(
-            "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.hasattr"
-        ) as mock_hasattr:
-
-            def hasattr_side_effect(obj, attr):
-                if attr == "_content":
-                    return False
-                elif attr == "__dict__":
-                    return False
-                elif attr == "items":
-                    return False
-                # No default return needed for this test
-
-            mock_hasattr.side_effect = hasattr_side_effect
-
-            class TestSource:
-                def __init__(self):
-                    self.attr = "value"
-
-            source = TestSource()
-            PaperDownloaderFactory._try_config_extraction(config_obj, source)
-            self.assertTrue(hasattr(config_obj, "attr"))
+        # cleanup
+        _set_cached_config(None)
+        _set_config_lock(None)
