@@ -152,48 +152,28 @@ class TestBiorxivDownloader(unittest.TestCase):
 
         self.assertIn("No collection data found", str(context.exception))
 
-    def test_construct_pdf_url_success(self):
-        """Test successful PDF URL construction."""
-        metadata = self.sample_json_response
-
-        result = self.downloader.construct_pdf_url(
-            metadata, "10.1101/2023.01.01.123456"
+    def test_construct_pdf_url_variants(self):
+        """PDF URL construction: normal, missing collection, default version."""
+        # Success
+        self.assertEqual(
+            self.downloader.construct_pdf_url(
+                self.sample_json_response, "10.1101/2023.01.01.123456"
+            ),
+            "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v2.full.pdf",
         )
-
-        expected_url = (
-            "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v2.full.pdf"
+        # No collection
+        self.assertEqual(
+            self.downloader.construct_pdf_url({}, "10.1101/2023.01.01.123456"),
+            "",
         )
-        self.assertEqual(result, expected_url)
-
-    def test_construct_pdf_url_no_collection(self):
-        """Test PDF URL construction with missing collection."""
-        metadata = {}
-
-        result = self.downloader.construct_pdf_url(
-            metadata, "10.1101/2023.01.01.123456"
+        # Default version
+        meta_default = {"collection": [{"title": "Test Paper"}]}
+        self.assertEqual(
+            self.downloader.construct_pdf_url(
+                meta_default, "10.1101/2023.01.01.123456"
+            ),
+            "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1.full.pdf",
         )
-
-        self.assertEqual(result, "")
-
-    def test_construct_pdf_url_default_version(self):
-        """Test PDF URL construction with default version."""
-        metadata = {
-            "collection": [
-                {
-                    "title": "Test Paper"
-                    # No version field
-                }
-            ]
-        }
-
-        result = self.downloader.construct_pdf_url(
-            metadata, "10.1101/2023.01.01.123456"
-        )
-
-        expected_url = (
-            "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1.full.pdf"
-        )
-        self.assertEqual(result, expected_url)
 
     @patch("tempfile.NamedTemporaryFile")
     def test_download_pdf_to_temp_success(self, mock_tempfile):
@@ -245,80 +225,57 @@ class TestBiorxivDownloader(unittest.TestCase):
         mock_temp_file.write.assert_any_call(b"PDF content chunk 1")
         mock_temp_file.write.assert_any_call(b"PDF content chunk 2")
 
-    def test_download_pdf_to_temp_no_url(self):
-        """Test PDF download with empty URL."""
-        result = self.downloader.download_pdf_to_temp("", "10.1101/2023.01.01.123456")
+    def test_download_pdf_to_temp_error_variants(self):
+        """Download errors: empty URL and network failure."""
+        # Empty URL
+        self.assertIsNone(self.downloader.download_pdf_to_temp("", "10.1101/x"))
 
-        self.assertIsNone(result)
-
-    def test_download_pdf_to_temp_network_error(self):
-        """Test PDF download with network error."""
+        # Network error
         mock_scraper = Mock()
         mock_scraper.get.side_effect = requests.RequestException("Network error")
         self.downloader.set_scraper(mock_scraper)
+        url = "https://www.biorxiv.org/content/10.1101/xv1.full.pdf"
+        self.assertIsNone(self.downloader.download_pdf_to_temp(url, "10.1101/x"))
 
-        pdf_url = "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1.full.pdf"
-        result = self.downloader.download_pdf_to_temp(
-            pdf_url, "10.1101/2023.01.01.123456"
-        )
-
-        self.assertIsNone(result)
-
-    def test_get_scraper_new(self):
-        """Test getting new scraper when none exists."""
-        # Set scraper to None to test creating new one
+    @patch("cloudscraper.create_scraper")
+    def test_get_scraper_new_and_existing(self, mock_create):
+        """_get_scraper creates when missing and reuses when present."""
+        # New scraper
         self.downloader.set_scraper(None)
+        new_scraper = Mock()
+        mock_create.return_value = new_scraper
+        got = self.downloader.get_scraper_public()
+        self.assertIs(got, new_scraper)
+        mock_create.assert_called_once_with(browser={"custom": "test-agent"}, delay=10)
 
-        with patch("cloudscraper.create_scraper") as mock_create:
-            mock_scraper = Mock()
-            mock_create.return_value = mock_scraper
+        # Existing scraper
+        self.downloader.set_scraper(new_scraper)
+        got2 = self.downloader.get_scraper_public()
+        self.assertIs(got2, new_scraper)
 
-            result = self.downloader.get_scraper_public()
-
-            self.assertEqual(result, mock_scraper)
-            mock_create.assert_called_once_with(
-                browser={"custom": "test-agent"}, delay=10
-            )
-
-    def test_get_scraper_existing(self):
-        """Test getting existing scraper."""
-        existing_scraper = Mock()
-        self.downloader.set_scraper(existing_scraper)
-
-        result = self.downloader.get_scraper_public()
-
-        self.assertEqual(result, existing_scraper)
-
-    def test_visit_landing_page_with_pdf_url(self):
-        """Test visiting landing page with full PDF URL."""
+    def test_visit_landing_page_variants(self):
+        """Landing page visit happens only for .full.pdf URLs."""
         mock_scraper = Mock()
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_scraper.get.return_value = mock_response
+        ok = Mock()
+        ok.raise_for_status = Mock()
+        mock_scraper.get.return_value = ok
 
-        pdf_url = "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1.full.pdf"
-
+        # Case 1: with .full.pdf -> should visit landing
+        pdf_url_full = (
+            "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1.full.pdf"
+        )
         self.downloader.visit_landing_page_public(
-            mock_scraper, pdf_url, "10.1101/2023.01.01.123456"
+            mock_scraper, pdf_url_full, "10.1101/2023.01.01.123456"
         )
+        expected = "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1"
+        mock_scraper.get.assert_called_with(expected, timeout=30)
 
-        expected_landing_url = (
-            "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1"
-        )
-        mock_scraper.get.assert_called_once_with(expected_landing_url, timeout=30)
-        mock_response.raise_for_status.assert_called_once()
-
-    def test_visit_landing_page_without_pdf_suffix(self):
-        """Test visiting landing page with URL that doesn't have .full.pdf suffix."""
-        mock_scraper = Mock()
-
-        pdf_url = "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1"
-
+        # Case 2: no .full.pdf -> no call
+        mock_scraper.get.reset_mock()
+        pdf_url_plain = "https://www.biorxiv.org/content/10.1101/2023.01.01.123456v1"
         self.downloader.visit_landing_page_public(
-            mock_scraper, pdf_url, "10.1101/2023.01.01.123456"
+            mock_scraper, pdf_url_plain, "10.1101/2023.01.01.123456"
         )
-
-        # Should not make any calls since no .full.pdf in URL
         mock_scraper.get.assert_not_called()
 
     @patch("tempfile.NamedTemporaryFile")
@@ -348,67 +305,51 @@ class TestBiorxivDownloader(unittest.TestCase):
         mock_temp_file.write.assert_any_call(b"chunk3")
         self.assertEqual(mock_temp_file.write.call_count, 3)
 
-    def test_extract_filename_from_header(self):
-        """Test filename extraction from Content-Disposition header."""
-        mock_response = Mock()
-        mock_response.headers = {
-            "Content-Disposition": 'attachment; filename="test-paper.pdf"'
-        }
-
-        with patch.object(
-            self.downloader, "get_default_filename", return_value="default.pdf"
-        ):
-            result = self.downloader.extract_filename_public(
-                mock_response, "10.1101/test"
-            )
-
-        self.assertEqual(result, "test-paper.pdf")
-
-    def test_extract_filename_no_header(self):
-        """Test filename extraction when no Content-Disposition header."""
-        mock_response = Mock()
-        mock_response.headers = {}
-
-        with patch.object(
-            self.downloader, "get_default_filename", return_value="default.pdf"
-        ):
-            result = self.downloader.extract_filename_public(
-                mock_response, "10.1101/test"
-            )
-
-        self.assertEqual(result, "default.pdf")
-
-    def test_extract_filename_invalid_header(self):
-        """Test filename extraction with malformed header."""
-        mock_response = Mock()
-        mock_response.headers = {"Content-Disposition": "invalid header format"}
-
-        with patch.object(
-            self.downloader, "get_default_filename", return_value="default.pdf"
-        ):
-            result = self.downloader.extract_filename_public(
-                mock_response, "10.1101/test"
-            )
-
-        self.assertEqual(result, "default.pdf")
-
-    def test_extract_filename_regex_exception(self):
-        """Test filename extraction with regex causing exception."""
-        mock_response = Mock()
-        mock_response.headers = {
-            "Content-Disposition": 'attachment; filename="test.pdf"'
-        }
-
-        # Mock re.search to raise a RequestException (to trigger the exception handler)
-        with patch("re.search", side_effect=requests.RequestException("Regex error")):
-            with patch.object(
-                self.downloader, "get_default_filename", return_value="default.pdf"
+    def test_extract_filename_variants(self):
+        """Filename extraction across header variants and regex-exception path."""
+        cases = [
+            (
+                {"Content-Disposition": 'attachment; filename="test-paper.pdf"'},
+                "test-paper.pdf",
+                False,
+            ),
+            ({}, "default.pdf", False),
+            ({"Content-Disposition": "invalid header format"}, "default.pdf", False),
+            (
+                {"Content-Disposition": 'attachment; filename="test.pdf"'},
+                "default.pdf",
+                True,
+            ),  # trigger exception path
+        ]
+        for headers, expected, raise_regex in cases:
+            with self.subTest(
+                headers=headers, expected=expected, raise_regex=raise_regex
             ):
-                result = self.downloader.extract_filename_public(
-                    mock_response, "10.1101/test"
-                )
-
-        self.assertEqual(result, "default.pdf")
+                resp = Mock()
+                resp.headers = headers
+                if raise_regex:
+                    with patch(
+                        "re.search",
+                        side_effect=requests.RequestException("Regex error"),
+                    ):
+                        with patch.object(
+                            self.downloader,
+                            "get_default_filename",
+                            return_value="default.pdf",
+                        ):
+                            got = self.downloader.extract_filename_public(
+                                resp, "10.1101/test"
+                            )
+                else:
+                    with patch.object(
+                        self.downloader,
+                        "get_default_filename",
+                        return_value="default.pdf",
+                    ):
+                        got = self.downloader.extract_filename_public(
+                            resp, "10.1101/test"
+                        )
+                self.assertEqual(got, expected)
 
     def test_extract_paper_metadata_success(self):
         """Test successful paper metadata extraction."""
@@ -490,35 +431,22 @@ class TestBiorxivDownloader(unittest.TestCase):
 
         self.assertEqual(result, expected)
 
-    def test_extract_authors_semicolon_separated(self):
-        """Test author extraction from semicolon-separated string."""
-        authors_str = "John Doe; Jane Smith; Bob Johnson"
+    def test_extract_authors_variants(self):
+        """Author parsing for semicolon list and empty string."""
+        self.assertEqual(
+            self.downloader.extract_authors_public("John Doe; Jane Smith; Bob Johnson"),
+            ["John Doe", "Jane Smith", "Bob Johnson"],
+        )
+        self.assertEqual(self.downloader.extract_authors_public(""), [])
 
-        result = self.downloader.extract_authors_public(authors_str)
-
-        expected = ["John Doe", "Jane Smith", "Bob Johnson"]
-        self.assertEqual(result, expected)
-
-    def test_extract_authors_empty_string(self):
-        """Test author extraction from empty string."""
-        result = self.downloader.extract_authors_public("")
-
-        self.assertEqual(result, [])
-
-    def test_get_service_name(self):
-        """Test get_service_name method."""
-        result = self.downloader.get_service_name()
-        self.assertEqual(result, "bioRxiv")
-
-    def test_get_identifier_name(self):
-        """Test get_identifier_name method."""
-        result = self.downloader.get_identifier_name()
-        self.assertEqual(result, "DOI")
-
-    def test_get_default_filename(self):
-        """Test get_default_filename method."""
-        result = self.downloader.get_default_filename("10.1101/2023.01.01.123456")
-        self.assertEqual(result, "10_1101_2023_01_01_123456.pdf")
+    def test_service_and_identifier_helpers(self):
+        """Service name, identifier name, and default filename."""
+        self.assertEqual(self.downloader.get_service_name(), "bioRxiv")
+        self.assertEqual(self.downloader.get_identifier_name(), "DOI")
+        self.assertEqual(
+            self.downloader.get_default_filename("10.1101/2023.01.01.123456"),
+            "10_1101_2023_01_01_123456.pdf",
+        )
 
     def test_get_paper_identifier_info(self):
         """Test _get_paper_identifier_info method."""
