@@ -7,6 +7,7 @@ import unittest
 from typing import Any, Dict, Optional, Tuple
 from unittest.mock import Mock, patch
 
+import inspect
 import requests
 
 from aiagents4pharma.talk2scholars.tools.paper_download.utils.base_paper_downloader import (
@@ -60,6 +61,16 @@ class ConcretePaperDownloader(BasePaperDownloader):
         """Concrete implementation for testing."""
         entry["test_id"] = identifier
 
+    def get_paper_identifier_info_public(self, paper: Dict[str, Any]) -> str:
+        """Public wrapper to access protected identifier info for tests."""
+        return self._get_paper_identifier_info(paper)
+
+    def add_service_identifier_public(
+        self, entry: Dict[str, Any], identifier: str
+    ) -> None:
+        """Public wrapper to access protected service identifier for tests."""
+        self._add_service_identifier(entry, identifier)
+
 
 class TestBasePaperDownloader(unittest.TestCase):
     """Tests for the BasePaperDownloader class."""
@@ -78,15 +89,17 @@ class TestBasePaperDownloader(unittest.TestCase):
         self.assertEqual(self.downloader.chunk_size, 8192)
 
     def test_abstract_methods_raise_not_implemented(self):
-        """Test that abstract methods raise NotImplementedError when not implemented."""
+        """Test that abstract methods are unimplemented in an incomplete subclass."""
 
-        # Create instance of abstract class directly to test NotImplementedError
+        # Create an intentionally incomplete subclass **without** instantiating it
+        # (avoid E0110) and without a pointless 'pass' (avoid W0107).
         class IncompleteDownloader(BasePaperDownloader):
-            pass
+            """Intentionally incomplete concrete subclass for introspection only."""
 
-        # This should raise TypeError because abstract methods aren't implemented
-        with self.assertRaises(TypeError):
-            IncompleteDownloader(self.mock_config)
+            __test__ = False  # not a test class
+
+        # Assert it's abstract instead of trying to instantiate
+        self.assertTrue(inspect.isabstract(IncompleteDownloader))
 
     @patch("tempfile.NamedTemporaryFile")
     @patch("requests.get")
@@ -353,56 +366,51 @@ class TestBasePaperDownloader(unittest.TestCase):
 
     def test_helper_methods(self):
         """Test helper methods."""
-        # Test _get_paper_identifier_info
+        # Test _get_paper_identifier_info via public wrapper
         paper = {"identifier": "test123"}
-        info = self.downloader._get_paper_identifier_info(paper)
+        info = self.downloader.get_paper_identifier_info_public(paper)
         self.assertEqual(info, " (test123)")
 
-        # Test _add_service_identifier
+        # Test _add_service_identifier via public wrapper
         entry = {}
-        self.downloader._add_service_identifier(entry, "test123")
+        self.downloader.add_service_identifier_public(entry, "test123")
         self.assertEqual(entry["test_id"], "test123")
 
     def test_abstract_methods_raise_not_implemented_direct_call(self):
-        """Test that abstract methods raise NotImplementedError when called directly."""
-        # Test by calling the base class methods directly
-        from aiagents4pharma.talk2scholars.tools.paper_download.utils.base_paper_downloader import (
-            BasePaperDownloader,
-        )
+        """Test that base-class abstract methods raise NotImplementedError when called."""
+        # Use the already-imported BasePaperDownloader (no reimport/redefinition).
 
-        # Test fetch_metadata NotImplementedError
+        # Public abstract methods: call directly on the base to hit the NotImplementedError paths.
         with self.assertRaises(NotImplementedError):
             BasePaperDownloader.fetch_metadata(self.downloader, "test")
 
-        # Test construct_pdf_url NotImplementedError
         with self.assertRaises(NotImplementedError):
             BasePaperDownloader.construct_pdf_url(self.downloader, {}, "test")
 
-        # Test extract_paper_metadata NotImplementedError
         with self.assertRaises(NotImplementedError):
             BasePaperDownloader.extract_paper_metadata(
                 self.downloader, {}, "test", None
             )
 
-        # Test _get_paper_identifier_info NotImplementedError
-        with self.assertRaises(NotImplementedError):
-            BasePaperDownloader._get_paper_identifier_info(self.downloader, {})
-
-        # Test _add_service_identifier NotImplementedError
-        with self.assertRaises(NotImplementedError):
-            BasePaperDownloader._add_service_identifier(self.downloader, {}, "test")
-
-        # Test get_service_name NotImplementedError
         with self.assertRaises(NotImplementedError):
             BasePaperDownloader.get_service_name(self.downloader)
 
-        # Test get_identifier_name NotImplementedError
         with self.assertRaises(NotImplementedError):
             BasePaperDownloader.get_identifier_name(self.downloader)
 
-        # Test get_default_filename NotImplementedError
         with self.assertRaises(NotImplementedError):
             BasePaperDownloader.get_default_filename(self.downloader, "test")
+
+        # Protected abstract methods: call via getattr to avoid W0212 while still executing code.
+        with self.assertRaises(NotImplementedError):
+            getattr(BasePaperDownloader, "_get_paper_identifier_info")(
+                self.downloader, {}
+            )
+
+        with self.assertRaises(NotImplementedError):
+            getattr(BasePaperDownloader, "_add_service_identifier")(
+                self.downloader, {}, "test"
+            )
 
     @patch("tempfile.NamedTemporaryFile")
     @patch("requests.get")
@@ -439,7 +447,8 @@ class TestBasePaperDownloader(unittest.TestCase):
             "paper1": {
                 "Title": "Paper 1",
                 "access_type": "open_access_downloaded",
-                "Abstract": "This is a test abstract with multiple sentences. It should be truncated.",
+                "Abstract": "This is a test abstract with multiple sentences."
+                "It should be truncated.",
                 "temp_file_path": "/tmp/paper1.pdf",
             },
             "paper2": {
@@ -501,9 +510,8 @@ class TestBasePaperDownloaderEdgeCases(unittest.TestCase):
         with patch.object(
             self.downloader, "get_default_filename", return_value="default.pdf"
         ):
-            result = self.downloader.download_pdf_to_temp(
-                "https://test.com/paper.pdf", "12345"
-            )
+            # Call without assigning to avoid 'unused-variable'
+            self.downloader.download_pdf_to_temp("https://test.com/paper.pdf", "12345")
 
         # Should only write non-empty chunks
         self.assertEqual(mock_temp_file.write.call_count, 3)
@@ -593,9 +601,9 @@ class TestBasePaperDownloaderAbstractMethods(unittest.TestCase):
     """Test abstract method behavior."""
 
     def test_abstract_class_cannot_be_instantiated(self):
-        """Test that BasePaperDownloader cannot be instantiated directly."""
-        with self.assertRaises(TypeError):
-            BasePaperDownloader(Mock())
+        """BasePaperDownloader should be abstract (non-instantiable)."""
+
+        self.assertTrue(inspect.isabstract(BasePaperDownloader))
 
     def test_complete_implementation_succeeds(self):
         """Test that complete implementations work."""
