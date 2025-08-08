@@ -14,6 +14,42 @@ from aiagents4pharma.talk2scholars.tools.paper_download.utils.arxiv_downloader i
 )
 
 
+class ArxivDownloaderTestShim(ArxivDownloader):
+    """Public wrappers to exercise protected helpers without W0212."""
+
+    def extract_basic_metadata_public(self, entry, ns):
+        """extract_basic_metadata_public"""
+        return self._extract_basic_metadata(entry, ns)
+
+    def extract_title_public(self, entry, ns):
+        """extract_title_public"""
+        return self._extract_title(entry, ns)
+
+    def extract_authors_public(self, entry, ns):
+        """extract_authors_public"""
+        return self._extract_authors(entry, ns)
+
+    def extract_abstract_public(self, entry, ns):
+        """extract_authors_public"""
+        return self._extract_abstract(entry, ns)
+
+    def extract_publication_date_public(self, entry, ns):
+        """extract_publication_date_public"""
+        return self._extract_publication_date(entry, ns)
+
+    def extract_pdf_metadata_public(self, pdf_result, identifier):
+        """extract_pdf_metadata_public"""
+        return self._extract_pdf_metadata(pdf_result, identifier)
+
+    def get_paper_identifier_info_public(self, paper):
+        """get_paper_identifier_info_public"""
+        return self._get_paper_identifier_info(paper)
+
+    def add_service_identifier_public(self, entry, identifier):
+        """add_service_identifier_public"""
+        self._add_service_identifier(entry, identifier)
+
+
 class TestArxivDownloader(unittest.TestCase):
     """Tests for the ArxivDownloader class."""
 
@@ -25,7 +61,8 @@ class TestArxivDownloader(unittest.TestCase):
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
 
-        self.downloader = ArxivDownloader(self.mock_config)
+        # Use the testable subclass to avoid W0212 while still covering helpers
+        self.downloader = ArxivDownloaderTestShim(self.mock_config)
 
         # Sample arXiv XML response
         self.sample_xml = """<?xml version="1.0" encoding="UTF-8"?>
@@ -65,7 +102,10 @@ class TestArxivDownloader(unittest.TestCase):
         result = self.downloader.fetch_metadata("1234.5678")
 
         # Verify API call - it uses query string format, not params
-        expected_url = "http://export.arxiv.org/api/query?search_query=id:1234.5678&start=0&max_results=1"
+        expected_url = (
+            "http://export.arxiv.org/api/query?search_query="
+            "id:1234.5678&start=0&max_results=1"
+        )
         mock_get.assert_called_once_with(expected_url, timeout=30)
         mock_response.raise_for_status.assert_called_once()
 
@@ -217,7 +257,7 @@ class TestArxivDownloader(unittest.TestCase):
         ns = {"atom": "http://www.w3.org/2005/Atom"}
         entry = metadata.find("atom:entry", ns)
 
-        result = self.downloader._extract_basic_metadata(entry, ns)
+        result = self.downloader.extract_basic_metadata_public(entry, ns)
 
         expected = {
             "Title": "Test Paper Title",
@@ -225,48 +265,43 @@ class TestArxivDownloader(unittest.TestCase):
             "Abstract": "This is a test abstract for the paper.",
             "Publication Date": "2023-01-01T12:00:00Z",
         }
-
         self.assertEqual(result, expected)
 
-    def test_extract_title(self):
-        """Test title extraction."""
-        metadata = ET.fromstring(self.sample_xml)
+    def test_extract_title_variants(self):
+        """Title extraction for present and missing cases."""
         ns = {"atom": "http://www.w3.org/2005/Atom"}
-        entry = metadata.find("atom:entry", ns)
 
-        result = self.downloader._extract_title(entry, ns)
+        # Case 1: Title present
+        metadata1 = ET.fromstring(self.sample_xml)
+        entry1 = metadata1.find("atom:entry", ns)
+        self.assertEqual(
+            self.downloader.extract_title_public(entry1, ns), "Test Paper Title"
+        )
 
-        self.assertEqual(result, "Test Paper Title")
-
-    def test_extract_title_missing(self):
-        """Test title extraction when title is missing."""
+        # Case 2: Title missing
         xml_no_title = """<?xml version="1.0" encoding="UTF-8"?>
         <feed xmlns="http://www.w3.org/2005/Atom">
             <entry>
                 <id>http://arxiv.org/abs/1234.5678v1</id>
             </entry>
         </feed>"""
+        metadata2 = ET.fromstring(xml_no_title)
+        entry2 = metadata2.find("atom:entry", ns)
+        self.assertEqual(self.downloader.extract_title_public(entry2, ns), "N/A")
 
-        metadata = ET.fromstring(xml_no_title)
+    def test_extract_authors_variants(self):
+        """Authors extraction for present and empty cases."""
         ns = {"atom": "http://www.w3.org/2005/Atom"}
-        entry = metadata.find("atom:entry", ns)
 
-        result = self.downloader._extract_title(entry, ns)
+        # Case 1: Authors present
+        metadata1 = ET.fromstring(self.sample_xml)
+        entry1 = metadata1.find("atom:entry", ns)
+        self.assertEqual(
+            self.downloader.extract_authors_public(entry1, ns),
+            ["John Doe", "Jane Smith"],
+        )
 
-        self.assertEqual(result, "N/A")
-
-    def test_extract_authors(self):
-        """Test authors extraction."""
-        metadata = ET.fromstring(self.sample_xml)
-        ns = {"atom": "http://www.w3.org/2005/Atom"}
-        entry = metadata.find("atom:entry", ns)
-
-        result = self.downloader._extract_authors(entry, ns)
-
-        self.assertEqual(result, ["John Doe", "Jane Smith"])
-
-    def test_extract_authors_empty(self):
-        """Test authors extraction when no authors present."""
+        # Case 2: Authors missing
         xml_no_authors = """<?xml version="1.0" encoding="UTF-8"?>
         <feed xmlns="http://www.w3.org/2005/Atom">
             <entry>
@@ -274,88 +309,70 @@ class TestArxivDownloader(unittest.TestCase):
                 <title>Test Paper Title</title>
             </entry>
         </feed>"""
+        metadata2 = ET.fromstring(xml_no_authors)
+        entry2 = metadata2.find("atom:entry", ns)
+        self.assertEqual(self.downloader.extract_authors_public(entry2, ns), [])
 
-        metadata = ET.fromstring(xml_no_authors)
-        ns = {"atom": "http://www.w3.org/2005/Atom"}
-        entry = metadata.find("atom:entry", ns)
-
-        result = self.downloader._extract_authors(entry, ns)
-
-        self.assertEqual(result, [])
-
-    def test_extract_abstract(self):
-        """Test abstract extraction."""
+    def test_extract_abstract_and_publication_date(self):
+        """Abstract and publication date extraction."""
         metadata = ET.fromstring(self.sample_xml)
         ns = {"atom": "http://www.w3.org/2005/Atom"}
         entry = metadata.find("atom:entry", ns)
 
-        result = self.downloader._extract_abstract(entry, ns)
+        self.assertEqual(
+            self.downloader.extract_abstract_public(entry, ns),
+            "This is a test abstract for the paper.",
+        )
+        self.assertEqual(
+            self.downloader.extract_publication_date_public(entry, ns),
+            "2023-01-01T12:00:00Z",
+        )
 
-        self.assertEqual(result, "This is a test abstract for the paper.")
-
-    def test_extract_publication_date(self):
-        """Test publication date extraction."""
-        metadata = ET.fromstring(self.sample_xml)
-        ns = {"atom": "http://www.w3.org/2005/Atom"}
-        entry = metadata.find("atom:entry", ns)
-
-        result = self.downloader._extract_publication_date(entry, ns)
-
-        self.assertEqual(result, "2023-01-01T12:00:00Z")
-
-    def test_extract_pdf_metadata_with_result(self):
-        """Test PDF metadata extraction with download result."""
+    def test_extract_pdf_metadata_variants(self):
+        """PDF metadata extraction with and without a download result."""
+        # With result
         pdf_result = ("/tmp/test.pdf", "paper.pdf")
-
-        result = self.downloader._extract_pdf_metadata(pdf_result, "1234.5678")
-
-        expected = {
+        expected_with = {
             "URL": "/tmp/test.pdf",
             "pdf_url": "/tmp/test.pdf",
             "filename": "paper.pdf",
             "access_type": "open_access_downloaded",
             "temp_file_path": "/tmp/test.pdf",
         }
+        self.assertEqual(
+            self.downloader.extract_pdf_metadata_public(pdf_result, "1234.5678"),
+            expected_with,
+        )
 
-        self.assertEqual(result, expected)
-
-    def test_extract_pdf_metadata_without_result(self):
-        """Test PDF metadata extraction without download result."""
+        # Without result
         with patch.object(
             self.downloader, "get_default_filename", return_value="default.pdf"
         ):
-            result = self.downloader._extract_pdf_metadata(None, "1234.5678")
+            expected_without = {
+                "URL": "",
+                "pdf_url": "",
+                "filename": "default.pdf",
+                "access_type": "download_failed",
+                "temp_file_path": "",
+            }
+            self.assertEqual(
+                self.downloader.extract_pdf_metadata_public(None, "1234.5678"),
+                expected_without,
+            )
 
-        expected = {
-            "URL": "",
-            "pdf_url": "",
-            "filename": "default.pdf",
-            "access_type": "download_failed",
-            "temp_file_path": "",
-        }
-
-        self.assertEqual(result, expected)
-
-    def test_get_service_name(self):
-        """Test get_service_name method."""
-        result = self.downloader.get_service_name()
-        self.assertEqual(result, "arXiv")
-
-    def test_get_identifier_name(self):
-        """Test get_identifier_name method."""
-        result = self.downloader.get_identifier_name()
-        self.assertEqual(result, "arXiv ID")
-
-    def test_get_default_filename(self):
-        """Test get_default_filename method."""
-        result = self.downloader.get_default_filename("1234.5678")
-        self.assertEqual(result, "1234.5678.pdf")
+    def test_service_and_identifier_helpers(self):
+        """Service name, identifier name, and default filename helpers."""
+        self.assertEqual(self.downloader.get_service_name(), "arXiv")
+        self.assertEqual(self.downloader.get_identifier_name(), "arXiv ID")
+        self.assertEqual(
+            self.downloader.get_default_filename("1234.5678"), "1234.5678.pdf"
+        )
 
     def test_get_paper_identifier_info(self):
         """Test _get_paper_identifier_info method."""
         paper = {"arxiv_id": "1234.5678", "Publication Date": "2023-01-01T12:00:00Z"}
 
-        result = self.downloader._get_paper_identifier_info(paper)
+        result = self.downloader.get_paper_identifier_info_public(paper)
 
         self.assertIn("1234.5678", result)
         self.assertIn("2023-01-01", result)
@@ -364,7 +381,7 @@ class TestArxivDownloader(unittest.TestCase):
         """Test _add_service_identifier method."""
         entry = {}
 
-        self.downloader._add_service_identifier(entry, "1234.5678")
+        self.downloader.add_service_identifier_public(entry, "1234.5678")
 
         self.assertEqual(entry["arxiv_id"], "1234.5678")
 
@@ -380,7 +397,7 @@ class TestArxivDownloaderIntegration(unittest.TestCase):
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
 
-        self.downloader = ArxivDownloader(self.mock_config)
+        self.downloader = ArxivDownloaderTestShim(self.mock_config)
 
         self.sample_xml = """<?xml version="1.0" encoding="UTF-8"?>
         <feed xmlns="http://www.w3.org/2005/Atom">
@@ -397,7 +414,8 @@ class TestArxivDownloaderIntegration(unittest.TestCase):
         </feed>"""
 
     @patch(
-        "aiagents4pharma.talk2scholars.tools.paper_download.utils.arxiv_downloader.ArxivDownloader.download_pdf_to_temp"
+        "aiagents4pharma.talk2scholars.tools.paper_download.utils."
+        "arxiv_downloader.ArxivDownloader.download_pdf_to_temp"
     )
     @patch("requests.get")
     def test_full_paper_processing_workflow(self, mock_get, mock_download):
