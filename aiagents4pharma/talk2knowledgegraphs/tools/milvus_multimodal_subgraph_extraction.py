@@ -389,7 +389,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
             graph_nodes = graph_nodes.merge(color_df, on="node_id", how="left")
         else:
             graph_nodes["color"] = 'black'
-        graph_nodes['color'].fillna('black', inplace=True)
+        graph_nodes['color'] = graph_nodes['color'].fillna('black')
 
         # Edges
         coll_name = f"{cfg_db.milvus_db.database_name}_edges"
