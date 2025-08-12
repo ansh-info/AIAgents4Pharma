@@ -5,20 +5,129 @@ Exctraction of multimodal subgraph using Prize-Collecting Steiner Tree (PCST) al
 from typing import Tuple, NamedTuple
 import logging
 import pickle
+import platform
+import subprocess
+import sys
 import pandas as pd
 import pcst_fast
 from pymilvus import Collection
-try:
-    import cupy as py
-    import cudf
-    df = cudf
-except ImportError:
-    import numpy as py
-    df = pd
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class SystemDetector:
+    """Detect system capabilities and choose appropriate libraries."""
+
+    def __init__(self):
+        self.os_type = platform.system().lower()  # 'windows', 'linux', 'darwin'
+        self.architecture = platform.machine().lower()  # 'x86_64', 'arm64', etc.
+        self.has_nvidia_gpu = self._detect_nvidia_gpu()
+        self.use_gpu = (
+            self.has_nvidia_gpu and self.os_type != "darwin"
+        )  # No CUDA on macOS
+
+        logger.info("System Detection Results:")
+        logger.info("  OS: %s", self.os_type)
+        logger.info("  Architecture: %s", self.architecture)
+        logger.info("  NVIDIA GPU detected: %s", self.has_nvidia_gpu)
+        logger.info("  Will use GPU acceleration: %s", self.use_gpu)
+
+    def _detect_nvidia_gpu(self) -> bool:
+        """Detect if NVIDIA GPU is available."""
+        try:
+            # Try nvidia-smi command
+            result = subprocess.run(
+                ["nvidia-smi"], capture_output=True, text=True, timeout=10
+            )
+            return result.returncode == 0
+        except (
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+            subprocess.SubprocessError,
+        ):
+            return False
+
+
+class DynamicLibraryLoader:
+    """Dynamically load libraries based on system capabilities."""
+    
+    def __init__(self, detector: SystemDetector):
+        self.detector = detector
+        self.use_gpu = detector.use_gpu
+        
+        # Import libraries based on system capabilities
+        self._import_libraries()
+        
+        # Dynamic settings based on hardware
+        self.normalize_vectors = self.use_gpu  # Only normalize for GPU
+        self.metric_type = "IP" if self.use_gpu else "COSINE"
+        
+        logger.info("Library Configuration:")
+        logger.info("  Using GPU acceleration: %s", self.use_gpu)
+        logger.info("  Vector normalization: %s", self.normalize_vectors)
+        logger.info("  Metric type: %s", self.metric_type)
+
+    def _import_libraries(self):
+        """Dynamically import libraries based on system capabilities."""
+        # Always import base libraries
+        import numpy as np
+        import pandas as pd
+        
+        self.pd = pd
+        self.np = np
+        
+        # Conditionally import GPU libraries
+        if self.detector.use_gpu:
+            try:
+                import cudf
+                import cupy as cp
+                
+                self.cudf = cudf
+                self.cp = cp
+                self.py = cp  # Use cupy for array operations
+                self.df = cudf  # Use cudf for dataframes
+                logger.info("Successfully imported GPU libraries (cudf, cupy)")
+            except ImportError as e:
+                logger.error("cudf or cupy not found. Falling back to CPU mode.")
+                logger.error("Import error: %s", str(e))
+                self.detector.use_gpu = False
+                self.use_gpu = False
+                self._setup_cpu_mode()
+        else:
+            self._setup_cpu_mode()
+    
+    def _setup_cpu_mode(self):
+        """Setup CPU mode with numpy and pandas."""
+        self.py = self.np  # Use numpy for array operations
+        self.df = self.pd  # Use pandas for dataframes
+        self.normalize_vectors = False
+        self.metric_type = "COSINE"
+        logger.info("Using CPU mode with numpy and pandas")
+
+    def normalize_matrix(self, matrix, axis: int = 1):
+        """Normalize matrix using appropriate library."""
+        if not self.normalize_vectors:
+            return matrix
+
+        if self.use_gpu:
+            # Use cupy for GPU
+            matrix_cp = self.cp.asarray(matrix).astype(self.cp.float32)
+            norms = self.cp.linalg.norm(matrix_cp, axis=axis, keepdims=True)
+            return matrix_cp / norms
+        else:
+            # CPU mode doesn't normalize for COSINE similarity
+            return matrix
+
+    def to_list(self, data):
+        """Convert data to list format."""
+        if hasattr(data, "tolist"):
+            return data.tolist()
+        elif hasattr(data, "to_arrow"):
+            return data.to_arrow().to_pylist()
+        else:
+            return list(data)
 
 class MultimodalPCSTPruning(NamedTuple):
     """
@@ -37,6 +146,9 @@ class MultimodalPCSTPruning(NamedTuple):
         num_clusters: The number of clusters.
         pruning: The pruning strategy to use.
         verbosity_level: The verbosity level.
+        use_description: Whether to use description embeddings.
+        metric_type: The similarity metric type (dynamic based on hardware).
+        loader: The dynamic library loader instance.
     """
     topk: int = 3
     topk_e: int = 3
@@ -47,7 +159,8 @@ class MultimodalPCSTPruning(NamedTuple):
     pruning: str = "gw"
     verbosity_level: int = 0
     use_description: bool = False
-    metric_type: str = "IP"  # Inner Product
+    metric_type: str = None  # Will be set dynamically
+    loader: DynamicLibraryLoader = None
 
     def prepare_collections(self, cfg: dict, modality: str) -> dict:
         """
@@ -85,7 +198,7 @@ class MultimodalPCSTPruning(NamedTuple):
                              query_emb: list,
                              colls: dict) -> dict:
         """
-        Compute the node prizes based on the cosine similarity between the query and nodes.
+        Compute the node prizes based on the similarity between the query and nodes.
 
         Args:
             query_emb: The query embedding. This can be an embedding of
@@ -95,17 +208,20 @@ class MultimodalPCSTPruning(NamedTuple):
         Returns:
             The prizes of the nodes.
         """
-        # Intialize several variables
+        # Initialize several variables
         topk = min(self.topk, colls["nodes"].num_entities)
-        n_prizes = py.zeros(colls["nodes"].num_entities, dtype=py.float32)
+        n_prizes = self.loader.py.zeros(colls["nodes"].num_entities, dtype=self.loader.py.float32)
 
-        # Calculate cosine similarity for text features and update the score
+        # Get the actual metric type to use
+        actual_metric_type = self.metric_type or self.loader.metric_type
+
+        # Calculate similarity for text features and update the score
         if self.use_description:
             # Search the collection with the text embedding
             res = colls["nodes"].search(
                 data=[query_emb],
                 anns_field="desc_emb",
-                param={"metric_type": self.metric_type},
+                param={"metric_type": actual_metric_type},
                 limit=topk,
                 output_fields=["node_id"])
         else:
@@ -113,48 +229,49 @@ class MultimodalPCSTPruning(NamedTuple):
             res = colls["nodes_type"].search(
                 data=[query_emb],
                 anns_field="feat_emb",
-                param={"metric_type": self.metric_type},
+                param={"metric_type": actual_metric_type},
                 limit=topk,
                 output_fields=["node_id"])
 
         # Update the prizes based on the search results
-        n_prizes[[r.id for r in res[0]]] = py.arange(topk, 0, -1).astype(py.float32)
+        n_prizes[[r.id for r in res[0]]] = self.loader.py.arange(topk, 0, -1).astype(self.loader.py.float32)
 
         return n_prizes
 
     def _compute_edge_prizes(self,
                              text_emb: list,
-                             colls: dict) -> py.ndarray:
+                             colls: dict):
         """
-        Compute the node prizes based on the cosine similarity between the query and nodes.
+        Compute the edge prizes based on the similarity between the query and edges.
 
         Args:
             text_emb: The textual description embedding.
             colls: The collections of nodes, node-type specific nodes, and edges in Milvus.
 
         Returns:
-            The prizes of the nodes.
+            The prizes of the edges.
         """
-        # Intialize several variables
+        # Initialize several variables
         topk_e = min(self.topk_e, colls["edges"].num_entities)
-        e_prizes = py.zeros(colls["edges"].num_entities, dtype=py.float32)
+        e_prizes = self.loader.py.zeros(colls["edges"].num_entities, dtype=self.loader.py.float32)
+
+        # Get the actual metric type to use
+        actual_metric_type = self.metric_type or self.loader.metric_type
 
         # Search the collection with the query embedding
         res = colls["edges"].search(
             data=[text_emb],
             anns_field="feat_emb",
-            param={"metric_type": self.metric_type},
+            param={"metric_type": actual_metric_type},
             limit=topk_e, # Only retrieve the top-k edges
-            # limit=colls["edges"].num_entities,
             output_fields=["head_id", "tail_id"])
 
         # Update the prizes based on the search results
         e_prizes[[r.id for r in res[0]]] = [r.score for r in res[0]]
 
         # Further process the edge_prizes
-        unique_prizes, inverse_indices = py.unique(e_prizes, return_inverse=True)
-        topk_e_values = unique_prizes[py.argsort(-unique_prizes)[:topk_e]]
-        # e_prizes[e_prizes < topk_e_values[-1]] = 0.0
+        unique_prizes, inverse_indices = self.loader.py.unique(e_prizes, return_inverse=True)
+        topk_e_values = unique_prizes[self.loader.py.argsort(-unique_prizes)[:topk_e]]
         last_topk_e_value = topk_e
         for k in range(topk_e):
             indices = inverse_indices == (unique_prizes == topk_e_values[k]).nonzero()[0]
@@ -194,9 +311,9 @@ class MultimodalPCSTPruning(NamedTuple):
         return {"nodes": n_prizes, "edges": e_prizes}
 
     def compute_subgraph_costs(self,
-                               edge_index: py.ndarray,
+                               edge_index,
                                num_nodes: int,
-                               prizes: dict) -> Tuple[py.ndarray, py.ndarray, py.ndarray]:
+                               prizes: dict):
         """
         Compute the costs in constructing the subgraph proposed by G-Retriever paper.
 
@@ -218,7 +335,7 @@ class MultimodalPCSTPruning(NamedTuple):
         # Update edge cost threshold
         updated_cost_e = min(
             self.cost_e,
-            py.max(prizes["edges"]).item() * (1 - self.c_const / 2),
+            self.loader.py.max(prizes["edges"]).item() * (1 - self.c_const / 2),
         )
 
         # Masks for real and virtual edges
@@ -228,19 +345,19 @@ class MultimodalPCSTPruning(NamedTuple):
 
         # Real edge indices
         logger.log(logging.INFO, "Computing real edges")
-        real_["indices"] = py.nonzero(real_["mask"])[0]
+        real_["indices"] = self.loader.py.nonzero(real_["mask"])[0]
         real_["src"] = edge_index[0][real_["indices"]]
         real_["dst"] = edge_index[1][real_["indices"]]
-        real_["edges"] = py.stack([real_["src"], real_["dst"]], axis=1)
+        real_["edges"] = self.loader.py.stack([real_["src"], real_["dst"]], axis=1)
         real_["costs"] = updated_cost_e - prizes["edges"][real_["indices"]]
 
         # Edge index mapping: local real edge idx -> original global index
         logger.log(logging.INFO, "Creating mapping for real edges")
-        mapping_edges = dict(zip(range(len(real_["indices"])), real_["indices"].tolist()))
+        mapping_edges = dict(zip(range(len(real_["indices"])), self.loader.to_list(real_["indices"])))
 
         # Virtual edge handling
         logger.log(logging.INFO, "Computing virtual edges")
-        virt_["indices"] = py.nonzero(virt_["mask"])[0]
+        virt_["indices"] = self.loader.py.nonzero(virt_["mask"])[0]
         virt_["src"] = edge_index[0][virt_["indices"]]
         virt_["dst"] = edge_index[1][virt_["indices"]]
         virt_["prizes"] = prizes["edges"][virt_["indices"]] - updated_cost_e
@@ -248,28 +365,28 @@ class MultimodalPCSTPruning(NamedTuple):
         # Generate virtual node IDs
         logger.log(logging.INFO, "Generating virtual node IDs")
         virt_["num"] = virt_["indices"].shape[0]
-        virt_["node_ids"] = py.arange(num_nodes, num_nodes + virt_["num"])
+        virt_["node_ids"] = self.loader.py.arange(num_nodes, num_nodes + virt_["num"])
 
         # Virtual edges: (src → virtual), (virtual → dst)
         logger.log(logging.INFO, "Creating virtual edges")
-        virt_["edges_1"] = py.stack([virt_["src"], virt_["node_ids"]], axis=1)
-        virt_["edges_2"] = py.stack([virt_["node_ids"], virt_["dst"]], axis=1)
-        virt_["edges"] = py.concatenate([virt_["edges_1"],
-                                         virt_["edges_2"]], axis=0)
-        virt_["costs"] = py.zeros((virt_["edges"].shape[0],), dtype=real_["costs"].dtype)
+        virt_["edges_1"] = self.loader.py.stack([virt_["src"], virt_["node_ids"]], axis=1)
+        virt_["edges_2"] = self.loader.py.stack([virt_["node_ids"], virt_["dst"]], axis=1)
+        virt_["edges"] = self.loader.py.concatenate([virt_["edges_1"],
+                                                     virt_["edges_2"]], axis=0)
+        virt_["costs"] = self.loader.py.zeros((virt_["edges"].shape[0],), dtype=real_["costs"].dtype)
 
         # Combine real and virtual edges/costs
         logger.log(logging.INFO, "Combining real and virtual edges/costs")
-        all_edges = py.concatenate([real_["edges"], virt_["edges"]], axis=0)
-        all_costs = py.concatenate([real_["costs"], virt_["costs"]], axis=0)
+        all_edges = self.loader.py.concatenate([real_["edges"], virt_["edges"]], axis=0)
+        all_costs = self.loader.py.concatenate([real_["costs"], virt_["costs"]], axis=0)
 
         # Final prizes
         logger.log(logging.INFO, "Getting final prizes")
-        final_prizes = py.concatenate([prizes["nodes"], virt_["prizes"]], axis=0)
+        final_prizes = self.loader.py.concatenate([prizes["nodes"], virt_["prizes"]], axis=0)
 
         # Mapping virtual node ID -> edge index in original graph
         logger.log(logging.INFO, "Creating mapping for virtual nodes")
-        mapping_nodes = dict(zip(virt_["node_ids"].tolist(), virt_["indices"].tolist()))
+        mapping_nodes = dict(zip(self.loader.to_list(virt_["node_ids"]), self.loader.to_list(virt_["indices"])))
 
         # Build return values
         logger.log(logging.INFO, "Building return values")
@@ -286,7 +403,7 @@ class MultimodalPCSTPruning(NamedTuple):
 
     def get_subgraph_nodes_edges(self,
                                  num_nodes: int,
-                                 vertices: py.ndarray,
+                                 vertices,
                                  edges_dict: dict,
                                  mapping: dict) -> dict:
         """
@@ -305,20 +422,17 @@ class MultimodalPCSTPruning(NamedTuple):
         # Get edges information
         edges = edges_dict["edges"]
         num_prior_edges = edges_dict["num_prior_edges"]
-        # Get edges information
-        edges = edges_dict["edges"]
-        num_prior_edges = edges_dict["num_prior_edges"]
+        
         # Retrieve the selected nodes and edges based on the given vertices and edges
         subgraph_nodes = vertices[vertices < num_nodes]
         subgraph_edges = [mapping["edges"][e.item()] for e in edges if e < num_prior_edges]
         virtual_vertices = vertices[vertices >= num_nodes]
         if len(virtual_vertices) > 0:
-            virtual_vertices = vertices[vertices >= num_nodes]
             virtual_edges = [mapping["nodes"][i.item()] for i in virtual_vertices]
-            subgraph_edges = py.array(subgraph_edges + virtual_edges)
+            subgraph_edges = self.loader.py.array(subgraph_edges + virtual_edges)
         edge_index = edges_dict["edge_index"][:, subgraph_edges]
-        subgraph_nodes = py.unique(
-            py.concatenate(
+        subgraph_nodes = self.loader.py.unique(
+            self.loader.py.concatenate(
                 [subgraph_nodes, edge_index[0], edge_index[1]]
             )
         )
@@ -352,7 +466,7 @@ class MultimodalPCSTPruning(NamedTuple):
         logger.log(logging.INFO, "Loading cache edge index")
         with open(cfg.milvus_db.cache_edge_index_path, "rb") as f:
             edge_index = pickle.load(f)
-            edge_index = py.array(edge_index)
+            edge_index = self.loader.py.array(edge_index)
 
         # Assert the topk and topk_e values for subgraph retrieval
         assert self.topk > 0, "topk must be greater than or equal to 0"
@@ -383,8 +497,8 @@ class MultimodalPCSTPruning(NamedTuple):
         logger.log(logging.INFO, "Getting subgraph nodes and edges")
         subgraph = self.get_subgraph_nodes_edges(
             colls["nodes"].num_entities,
-            py.asarray(result_vertices),
-            {"edges": py.asarray(result_edges),
+            self.loader.py.asarray(result_vertices),
+            {"edges": self.loader.py.asarray(result_edges),
              "num_prior_edges": edges_dict["num_prior_edges"],
              "edge_index": edge_index},
             mapping)
