@@ -11,7 +11,8 @@ over the DataFrame.
 
 Capabilities
 - Filter, sort, and aggregate rows using metadata columns (e.g., Title, Authors, Venue, Year).
-- Extract paper identifiers from a designated column (default: 'paper_ids'), optionally for a single row.
+- Extract paper identifiers from a designated column (default: 'paper_ids'),
+  optionally for a single row.
 - Return the DataFrame agent’s textual result as a ToolMessage.
 
 Requirements
