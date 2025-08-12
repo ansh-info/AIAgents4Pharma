@@ -53,7 +53,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
     name: str = "subgraph_extraction"
     description: str = "A tool for subgraph extraction based on user's prompt."
     args_schema: Type[BaseModel] = MultimodalSubgraphExtractionInput
-    
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Initialize hardware detection and dynamic library loading
@@ -224,6 +224,9 @@ class MultimodalSubgraphExtractionTool(BaseTool):
             # Prepare the PCSTPruning object and extract the subgraph
             # Parameters were set in the configuration file obtained from Hydra
             # start = datetime.datetime.now()
+            # Get dynamic metric type (overrides any config setting)
+            dynamic_metric_type = self.loader.metric_type if hasattr(cfg, 'vector_processing') and getattr(cfg.vector_processing, 'dynamic_metrics', True) else getattr(cfg, 'search_metric_type', self.loader.metric_type)
+            
             subgraph = MultimodalPCSTPruning(
                 topk=state["topk_nodes"],
                 topk_e=state["topk_edges"],
@@ -234,7 +237,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
                 pruning=cfg.pruning,
                 verbosity_level=cfg.verbosity_level,
                 use_description=q[1]['use_description'],
-                metric_type=self.loader.metric_type,  # Use dynamic metric type
+                metric_type=dynamic_metric_type,  # Use dynamic or config metric type
                 loader=self.loader  # Pass the loader instance
             ).extract_subgraph(q[1]['desc_emb'],
                                q[1]['feat_emb'],

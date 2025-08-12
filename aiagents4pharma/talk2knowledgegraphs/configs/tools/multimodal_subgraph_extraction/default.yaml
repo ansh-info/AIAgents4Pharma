@@ -3,6 +3,8 @@ ollama_embeddings:
   - "nomic-embed-text"
 temperature: 0.1
 streaming: False
+
+# PCST Algorithm Parameters
 topk: 15
 topk_e: 15
 cost_e: 0.5
@@ -11,7 +13,50 @@ root: -1
 num_clusters: 1
 pruning: "gw"
 verbosity_level: 0
-search_metric_type: "IP"  # Inner Product
+
+# Dynamic Hardware-Aware Configuration (NEW)
+# Note: search_metric_type is now automatically set by DynamicLibraryLoader
+# GPU Mode: Uses "IP" with normalized vectors
+# CPU Mode: Uses "COSINE" with raw vectors
+
+# GPU Detection and Performance Settings
+gpu_detection:
+  # Timeout for GPU detection command (seconds)  
+  detection_timeout: 10
+  
+  # Log GPU detection results
+  log_detection: true
+  
+  # Force CPU mode even if GPU is detected (for testing)
+  # Uncomment the line below to force CPU mode:
+  # force_cpu_mode: true
+
+# Hardware-Specific Vector Processing
+vector_processing:
+  # Enable dynamic metric type selection based on hardware
+  dynamic_metrics: true
+  
+  # Enable GPU vector normalization when using GPU with COSINE preference
+  gpu_normalize_vectors: true
+  
+  # Log vector processing configuration
+  log_vector_config: true
+
+# Milvus Database Configuration (NEW - was missing!)
+milvus_db:
+  # Database connection settings
+  host: ${oc.env:MILVUS_HOST,localhost}
+  port: ${oc.env:MILVUS_PORT,19530}
+  
+  # Database and collection names
+  database_name: ${oc.env:T2KG_MILVUS_DB_NAME,talk2knowledgegraphs}
+  
+  # Cache settings for edge index
+  cache_edge_index_path: ${oc.env:T2KG_CACHE_PATH,./cache/edge_index.pkl}
+  
+  # Collection loading settings
+  validate_collection_loading: true
+  consistency_level: "Strong"
 node_id_column: "node_id"
 node_attr_column: "node_attr"
 edge_src_column: "edge_src"
