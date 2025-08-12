@@ -31,6 +31,10 @@ services:
     # PDF Download
     pdf_base_url: "https://arxiv.org/pdf"
 
+    # XML namespace configuration
+    xml_namespace:
+      atom: "http://www.w3.org/2005/Atom"
+
     # Service-specific settings (inherit common settings)
     service_name: "arXiv"
     identifier_type: "arXiv ID"
@@ -40,8 +44,12 @@ services:
     # Primary API
     api_url: "https://api.medrxiv.org/details"
 
-    # PDF Download (Note: Not used directly, PDF URLs are constructed from DOI + version)
+    # PDF Download configuration
     pdf_base_url: "https://www.medrxiv.org/content/10.1101/"
+    pdf_url_template: "https://www.medrxiv.org/content/{identifier}v{version}.full.pdf"
+
+    # Default values
+    default_version: "1"
 
     # Service-specific settings
     service_name: "medRxiv"
@@ -52,16 +60,19 @@ services:
     # Primary API
     api_url: "https://api.biorxiv.org/details"
 
-    # PDF Download (Note: Not used directly, PDF URLs are constructed from DOI + version)
+    # PDF Download configuration
     pdf_base_url: "https://www.biorxiv.org/content/10.1101/"
-
-    # Templates for landing page & PDF URL
     landing_url_template: "https://www.biorxiv.org/content/{doi}v{version}"
     pdf_url_template: "https://www.biorxiv.org/content/{doi}v{version}.full.pdf"
+
+    # Default values
+    default_version: "1"
 
     # Cloudflare-bypass settings
     cf_clearance_timeout: 30
     session_reuse: true
+    browser_config:
+      type: "custom" # Used for cloudscraper browser configuration
 
     # Service-specific settings
     service_name: "bioRxiv"
@@ -82,18 +93,30 @@ services:
     ftp_base_url: "ftp://ftp.ncbi.nlm.nih.gov"
     https_base_url: "https://ftp.ncbi.nlm.nih.gov"
 
+    # API configuration
+    id_converter_format: "json"
+
+    # Page scraping configuration
+    pdf_meta_name: "citation_pdf_url"
+
+    # Error handling
+    default_error_code: "unknown"
+
     # PubMed-specific settings
     service_name: "PubMed"
     identifier_type: "PMID"
     supports_batch: true
     log_response_preview_chars: 500 # chars to log from API responses
 
+# Global configuration for all services
+supported_services: ["arxiv", "medrxiv", "biorxiv", "pubmed"]
+
 # Tool configuration
 tool:
   name: "download_papers"
   description: "Universal paper download tool supporting arXiv, medRxiv, bioRxiv, and PubMed"
   supported_services: ["arxiv", "medrxiv", "biorxiv", "pubmed"]
-  default_service: "arxiv"
+  default_service: "pubmed"
 
   # Output configuration
   max_summary_papers: 3

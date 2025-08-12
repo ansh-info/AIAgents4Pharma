@@ -22,6 +22,10 @@ class ArxivDownloader(BasePaperDownloader):
         super().__init__(config)
         self.api_url = config.api_url
         self.pdf_base_url = config.pdf_base_url
+        # XML namespace configuration
+        self.xml_namespaces = getattr(
+            config, "xml_namespace", {"atom": "http://www.w3.org/2005/Atom"}
+        )
 
     def fetch_metadata(self, identifier: str) -> ET.Element:
         """
@@ -44,7 +48,7 @@ class ArxivDownloader(BasePaperDownloader):
         response.raise_for_status()
 
         root = ET.fromstring(response.text)
-        entry = root.find("atom:entry", {"atom": "http://www.w3.org/2005/Atom"})
+        entry = root.find("atom:entry", self.xml_namespaces)
 
         if entry is None:
             raise RuntimeError("No entry found in arXiv API response")
@@ -62,8 +66,7 @@ class ArxivDownloader(BasePaperDownloader):
         Returns:
             PDF URL string
         """
-        ns = {"atom": "http://www.w3.org/2005/Atom"}
-        entry = metadata.find("atom:entry", ns)
+        entry = metadata.find("atom:entry", self.xml_namespaces)
 
         if entry is None:
             return ""
@@ -72,7 +75,7 @@ class ArxivDownloader(BasePaperDownloader):
         pdf_url = next(
             (
                 link.attrib.get("href")
-                for link in entry.findall("atom:link", ns)
+                for link in entry.findall("atom:link", self.xml_namespaces)
                 if link.attrib.get("title") == "pdf"
             ),
             None,
@@ -102,14 +105,13 @@ class ArxivDownloader(BasePaperDownloader):
         Returns:
             Standardized paper metadata dictionary
         """
-        ns = {"atom": "http://www.w3.org/2005/Atom"}
-        entry = metadata.find("atom:entry", ns)
+        entry = metadata.find("atom:entry", self.xml_namespaces)
 
         if entry is None:
             raise RuntimeError("No entry found in metadata")
 
         # Extract basic metadata
-        basic_metadata = self._extract_basic_metadata(entry, ns)
+        basic_metadata = self._extract_basic_metadata(entry, self.xml_namespaces)
 
         # Handle PDF download results
         pdf_metadata = self._extract_pdf_metadata(pdf_result, identifier)

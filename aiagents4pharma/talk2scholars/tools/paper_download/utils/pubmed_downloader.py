@@ -32,6 +32,10 @@ class PubmedDownloader(BasePaperDownloader):
         # URL conversion for NCBI FTP links
         self.ftp_base_url = config.ftp_base_url
         self.https_base_url = config.https_base_url
+        # Configuration values
+        self.id_converter_format = getattr(config, "id_converter_format", "json")
+        self.pdf_meta_name = getattr(config, "pdf_meta_name", "citation_pdf_url")
+        self.default_error_code = getattr(config, "default_error_code", "unknown")
 
     def fetch_metadata(self, identifier: str) -> Dict[str, Any]:
         """
@@ -47,7 +51,7 @@ class PubmedDownloader(BasePaperDownloader):
             requests.RequestException: If API call fails
             RuntimeError: If no records found in response
         """
-        query_url = f"{self.id_converter_url}?ids={identifier}&format=json"
+        query_url = f"{self.id_converter_url}?ids={identifier}&format={self.id_converter_format}"
         logger.info(
             "Fetching metadata from ID converter for PMID %s: %s", identifier, query_url
         )
@@ -139,7 +143,7 @@ class PubmedDownloader(BasePaperDownloader):
             # Check for error first
             error_elem = root.find(".//error")
             if error_elem is not None:
-                error_code = error_elem.get("code", "unknown")
+                error_code = error_elem.get("code", self.default_error_code)
                 error_text = error_elem.text or "unknown error"
                 logger.info(
                     "OA API error for PMCID %s: %s - %s", pmcid, error_code, error_text
@@ -197,15 +201,18 @@ class PubmedDownloader(BasePaperDownloader):
 
             soup = BeautifulSoup(response.content, "html.parser")
 
-            # Look for citation_pdf_url meta tag
-            pdf_meta = soup.find("meta", attrs={"name": "citation_pdf_url"})
+            # Look for PDF meta tag
+            pdf_meta = soup.find("meta", attrs={"name": self.pdf_meta_name})
             if pdf_meta is not None:
                 # Cast to Tag to help type checker understand this is a BeautifulSoup Tag object
                 meta_tag = cast(Tag, pdf_meta)
                 content = meta_tag.get("content")
                 if content:
                     logger.info(
-                        "Found citation_pdf_url meta tag for %s: %s", pmcid, content
+                        "Found %s meta tag for %s: %s",
+                        self.pdf_meta_name,
+                        pmcid,
+                        content,
                     )
                     return str(content)
 

@@ -20,8 +20,12 @@ class MedrxivDownloader(BasePaperDownloader):
         """Initialize MedRxiv downloader with configuration."""
         super().__init__(config)
         self.api_url = config.api_url
-        # Note: pdf_base_url from config is not directly used since we construct
-        # URLs from DOI + version
+        self.pdf_url_template = getattr(
+            config,
+            "pdf_url_template",
+            "https://www.medrxiv.org/content/{identifier}v{version}.full.pdf",
+        )
+        self.default_version = getattr(config, "default_version", "1")
 
     def fetch_metadata(self, identifier: str) -> Dict[str, Any]:
         """
@@ -65,11 +69,10 @@ class MedrxivDownloader(BasePaperDownloader):
             return ""
 
         paper = metadata["collection"][0]  # Get first (and should be only) paper
-        version = paper.get("version", "1")  # Default to version 1
+        version = paper.get("version", self.default_version)
 
-        # Construct medRxiv PDF URL
-        # Format: https://www.medrxiv.org/content/{DOI}v{version}.full.pdf
-        pdf_url = f"https://www.medrxiv.org/content/{identifier}v{version}.full.pdf"
+        # Construct medRxiv PDF URL using template
+        pdf_url = self.pdf_url_template.format(identifier=identifier, version=version)
         logger.info("Constructed PDF URL for DOI %s: %s", identifier, pdf_url)
 
         return pdf_url

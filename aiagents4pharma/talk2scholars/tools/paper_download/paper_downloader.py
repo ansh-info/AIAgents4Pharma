@@ -6,7 +6,7 @@ Supports downloading papers from arXiv, medRxiv, bioRxiv, and PubMed through a s
 
 import logging
 import threading
-from typing import Annotated, Any, List, Literal
+from typing import Annotated, Any, List, Literal, Optional
 
 import hydra
 from hydra.core.global_hydra import GlobalHydra
@@ -30,8 +30,12 @@ logger = logging.getLogger(__name__)
 class UnifiedPaperDownloadInput(BaseModel):
     """Input schema for the unified paper download tool."""
 
-    service: Literal["arxiv", "medrxiv", "biorxiv", "pubmed"] = Field(
-        description="Paper service to download from: 'arxiv', 'medrxiv', 'biorxiv', or 'pubmed'"
+    service: Optional[Literal["arxiv", "medrxiv", "biorxiv", "pubmed"]] = Field(
+        default=None,
+        description=(
+            "Paper service to download from: 'arxiv', 'medrxiv', 'biorxiv', or 'pubmed'. "
+            "If not specified, uses the configured default service."
+        ),
     )
     identifiers: List[str] = Field(
         description=(
@@ -58,7 +62,34 @@ class PaperDownloaderFactory:
         cls._cached_config = None
 
     @staticmethod
-    def create(service: str) -> BasePaperDownloader:
+    def get_default_service() -> Literal["arxiv", "medrxiv", "biorxiv", "pubmed"]:
+        """
+        Get the default service from configuration.
+
+        Returns:
+            Default service name from config, fallback to 'pubmed'
+        """
+        config = PaperDownloaderFactory._get_unified_config()
+        default_service = getattr(config.tool, "default_service", "pubmed")
+        # Ensure the default service is valid and return with proper type
+        if default_service == "arxiv":
+            return "arxiv"
+        if default_service == "medrxiv":
+            return "medrxiv"
+        if default_service == "biorxiv":
+            return "biorxiv"
+        if default_service == "pubmed":
+            return "pubmed"
+        logger.warning(
+            "Invalid default service '%s' in config, falling back to 'pubmed'",
+            default_service,
+        )
+        return "pubmed"
+
+    @staticmethod
+    def create(
+        service: Literal["arxiv", "medrxiv", "biorxiv", "pubmed"],
+    ) -> BasePaperDownloader:
         """
         Create appropriate downloader instance for the specified service.
 
@@ -80,13 +111,8 @@ class PaperDownloaderFactory:
             return MedrxivDownloader(service_config)
         if service == "biorxiv":
             return BiorxivDownloader(service_config)
-        if service == "pubmed":
-            return PubmedDownloader(service_config)
-
-        supported = getattr(
-            config, "supported_services", ["arxiv", "medrxiv", "biorxiv", "pubmed"]
-        )
-        raise ValueError(f"Unsupported service: {service}. Supported: {supported}")
+        # service == "pubmed"
+        return PubmedDownloader(service_config)
 
     @staticmethod
     def _get_unified_config() -> Any:
@@ -264,7 +290,7 @@ class PaperDownloaderFactory:
     parse_docstring=True,
 )
 def download_papers(
-    service: Literal["arxiv", "medrxiv", "biorxiv", "pubmed"],
+    service: Optional[Literal["arxiv", "medrxiv", "biorxiv", "pubmed"]],
     identifiers: List[str],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command[Any]:
@@ -276,7 +302,7 @@ def download_papers(
     using the temp_file_path in the returned metadata.
 
     Args:
-        service: Paper service to download from
+        service: Paper service to download from (optional, uses configured default if not specified)
             - 'arxiv': For arXiv preprints (requires arXiv IDs)
             - 'medrxiv': For medRxiv preprints (requires DOIs)
             - 'biorxiv': For bioRxiv preprints (requires DOIs)
@@ -298,41 +324,45 @@ def download_papers(
 
         # Download from PubMed
         download_papers("pubmed", ["12345678", "87654321"])
+
+        # Use default service (configured in default.yaml)
+        download_papers(None, ["12345678", "87654321"])
     """
     return _download_papers_impl(service, identifiers, tool_call_id)
 
 
 # Convenience functions for backward compatibility (optional)
+# These functions explicitly specify the service, bypassing the default service config
 def download_arxiv_papers(
     arxiv_ids: List[str], tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command[Any]:
-    """Convenience function for downloading arXiv papers."""
+    """Convenience function for downloading arXiv papers (explicitly uses arXiv service)."""
     return _download_papers_impl("arxiv", arxiv_ids, tool_call_id)
 
 
 def download_medrxiv_papers(
     dois: List[str], tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command[Any]:
-    """Convenience function for downloading medRxiv papers."""
+    """Convenience function for downloading medRxiv papers (explicitly uses medRxiv service)."""
     return _download_papers_impl("medrxiv", dois, tool_call_id)
 
 
 def download_biorxiv_papers(
     dois: List[str], tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command[Any]:
-    """Convenience function for downloading bioRxiv papers."""
+    """Convenience function for downloading bioRxiv papers (explicitly uses bioRxiv service)."""
     return _download_papers_impl("biorxiv", dois, tool_call_id)
 
 
 def download_pubmed_papers(
     pmids: List[str], tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command[Any]:
-    """Convenience function for downloading PubMed papers."""
+    """Convenience function for downloading PubMed papers (explicitly uses PubMed service)."""
     return _download_papers_impl("pubmed", pmids, tool_call_id)
 
 
 def _download_papers_impl(
-    service: Literal["arxiv", "medrxiv", "biorxiv", "pubmed"],
+    service: Optional[Literal["arxiv", "medrxiv", "biorxiv", "pubmed"]],
     identifiers: List[str],
     tool_call_id: str,
 ) -> Command[Any]:
@@ -340,6 +370,10 @@ def _download_papers_impl(
     Internal implementation function that contains the actual download logic.
     This is called by both the decorated tool and the convenience functions.
     """
+    # Resolve default service if not specified
+    if service is None:
+        service = PaperDownloaderFactory.get_default_service()
+        logger.info("No service specified, using configured default: %s", service)
     logger.info(
         "Starting unified paper download for service '%s' with %d identifiers: %s",
         service,

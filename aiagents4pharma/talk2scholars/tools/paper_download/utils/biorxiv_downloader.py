@@ -37,15 +37,22 @@ class BiorxivDownloader(BasePaperDownloader):
             "https://www.biorxiv.org/content/{doi}v{version}.full.pdf",
         )
 
+        # Default values
+        self.default_version = getattr(config, "default_version", "1")
+
         # CloudScraper specific settings
         self.cf_clearance_timeout = getattr(config, "cf_clearance_timeout", 30)
         self.session_reuse = getattr(config, "session_reuse", True)
+        self.browser_config_type = getattr(config, "browser_config", {}).get(
+            "type", "custom"
+        )
 
         # Initialize shared CloudScraper session if enabled
         self._scraper = None
         if self.session_reuse:
             self._scraper = cloudscraper.create_scraper(
-                browser={"custom": self.user_agent}, delay=self.cf_clearance_timeout
+                browser={self.browser_config_type: self.user_agent},
+                delay=self.cf_clearance_timeout,
             )
 
     def fetch_metadata(self, identifier: str) -> Dict[str, Any]:
@@ -67,7 +74,8 @@ class BiorxivDownloader(BasePaperDownloader):
 
         # Use CloudScraper for metadata as well, in case API is behind CF protection
         scraper = self._scraper or cloudscraper.create_scraper(
-            browser={"custom": self.user_agent}, delay=self.cf_clearance_timeout
+            browser={self.browser_config_type: self.user_agent},
+            delay=self.cf_clearance_timeout,
         )
 
         response = scraper.get(query_url, timeout=self.request_timeout)
@@ -95,7 +103,7 @@ class BiorxivDownloader(BasePaperDownloader):
             return ""
 
         paper = metadata["collection"][0]  # Get first (and should be only) paper
-        version = paper.get("version", "1")  # Default to version 1
+        version = paper.get("version", self.default_version)
 
         # Construct bioRxiv PDF URL using template
         pdf_url = self.pdf_url_template.format(doi=identifier, version=version)
@@ -144,7 +152,8 @@ class BiorxivDownloader(BasePaperDownloader):
     def _get_scraper(self):
         """Get or create CloudScraper instance."""
         return self._scraper or cloudscraper.create_scraper(
-            browser={"custom": self.user_agent}, delay=self.cf_clearance_timeout
+            browser={self.browser_config_type: self.user_agent},
+            delay=self.cf_clearance_timeout,
         )
 
     def _visit_landing_page(self, scraper, pdf_url: str, identifier: str) -> None:
