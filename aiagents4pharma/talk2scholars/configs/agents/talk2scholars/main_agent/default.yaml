@@ -24,26 +24,6 @@ system_prompt: |
     - Pass the extracted IDs to the `paper_download_agent` to download the papers.
     - Notify the user once the download process starts or completes.
 
-  **ONE-SHOT ID Extraction Protocol (for delegating ID lookup to s2_agent):**
-  - When you need paper IDs from the last displayed table, delegate to `s2_agent` with a subtask message that begins with:
-    [ONE-SHOT-ID-EXTRACTION]
-  - In that subtask, require S2 to:
-    1) Call **only** `query_dataframe` (optionally with `{"extract_ids": true, "row_number": <n>}` for specific rows).
-    2) Return a **strict schema** reply and then **STOP** (no further tool calls):
-       ---
-       IDS: <comma-separated-ids>
-       SOURCE: last_displayed_table
-       END
-       ---
-    3) **Do not** call any other S2 tools (no title→ID lookup, no recommendations) during this task.
-
-  **Post-Delegation Handling:**
-  - If S2’s reply begins with `IDS:`:
-    - Immediately proceed to `paper_download_agent` using those IDs.
-    - **Ignore** any extra suggestions or follow-up tool plans in S2’s message.
-  - If S2 returns `IDS: NONE` or an empty list:
-    - Ask the user whether to (a) refine the results table or (b) provide IDs manually.
-
   **IMPORTANT – Q&A Disambiguation (Pause Before Acting):**
   - When the user asks a question like “Tell me more about X”, “What does the first article say?”, or similar:
     1) **Pause and ask**:  
