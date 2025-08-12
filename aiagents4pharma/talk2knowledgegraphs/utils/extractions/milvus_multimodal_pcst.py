@@ -2,15 +2,25 @@
 Exctraction of multimodal subgraph using Prize-Collecting Steiner Tree (PCST) algorithm.
 """
 
-from typing import Tuple, NamedTuple
 import logging
 import pickle
 import platform
 import subprocess
-import sys
+from typing import NamedTuple
+
+import numpy as np
 import pandas as pd
 import pcst_fast
 from pymilvus import Collection
+
+try:
+    import cudf
+    import cupy as cp
+    CUDF_AVAILABLE = True
+except ImportError:
+    CUDF_AVAILABLE = False
+    cudf = None
+    cp = None
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +49,7 @@ class SystemDetector:
         try:
             # Try nvidia-smi command
             result = subprocess.run(
-                ["nvidia-smi"], capture_output=True, text=True, timeout=10
+                ["nvidia-smi"], capture_output=True, text=True, timeout=10, check=False
             )
             return result.returncode == 0
         except (
@@ -49,6 +59,19 @@ class SystemDetector:
         ):
             return False
 
+    def get_system_info(self) -> dict:
+        """Get comprehensive system information."""
+        return {
+            "os_type": self.os_type,
+            "architecture": self.architecture,
+            "has_nvidia_gpu": self.has_nvidia_gpu,
+            "use_gpu": self.use_gpu,
+        }
+
+    def is_gpu_compatible(self) -> bool:
+        """Check if the system is compatible with GPU acceleration."""
+        return self.has_nvidia_gpu and self.os_type != "darwin"
+
 
 class DynamicLibraryLoader:
     """Dynamically load libraries based on system capabilities."""
@@ -56,6 +79,14 @@ class DynamicLibraryLoader:
     def __init__(self, detector: SystemDetector):
         self.detector = detector
         self.use_gpu = detector.use_gpu
+
+        # Initialize attributes that will be set later
+        self.py = None
+        self.df = None
+        self.pd = None
+        self.np = None
+        self.cudf = None
+        self.cp = None
 
         # Import libraries based on system capabilities
         self._import_libraries()
@@ -71,27 +102,20 @@ class DynamicLibraryLoader:
 
     def _import_libraries(self):
         """Dynamically import libraries based on system capabilities."""
-        # Always import base libraries
-        import numpy as np
-        import pandas as pd
-
+        # Set base libraries
         self.pd = pd
         self.np = np
 
         # Conditionally import GPU libraries
         if self.detector.use_gpu:
-            try:
-                import cudf
-                import cupy as cp
-
+            if CUDF_AVAILABLE:
                 self.cudf = cudf
                 self.cp = cp
                 self.py = cp  # Use cupy for array operations
                 self.df = cudf  # Use cudf for dataframes
                 logger.info("Successfully imported GPU libraries (cudf, cupy)")
-            except ImportError as e:
+            else:
                 logger.error("cudf or cupy not found. Falling back to CPU mode.")
-                logger.error("Import error: %s", str(e))
                 self.detector.use_gpu = False
                 self.use_gpu = False
                 self._setup_cpu_mode()
@@ -116,18 +140,16 @@ class DynamicLibraryLoader:
             matrix_cp = self.cp.asarray(matrix).astype(self.cp.float32)
             norms = self.cp.linalg.norm(matrix_cp, axis=axis, keepdims=True)
             return matrix_cp / norms
-        else:
-            # CPU mode doesn't normalize for COSINE similarity
-            return matrix
+        # CPU mode doesn't normalize for COSINE similarity
+        return matrix
 
     def to_list(self, data):
         """Convert data to list format."""
         if hasattr(data, "tolist"):
             return data.tolist()
-        elif hasattr(data, "to_arrow"):
+        if hasattr(data, "to_arrow"):
             return data.to_arrow().to_pylist()
-        else:
-            return list(data)
+        return list(data)
 
 
 class MultimodalPCSTPruning(NamedTuple):
