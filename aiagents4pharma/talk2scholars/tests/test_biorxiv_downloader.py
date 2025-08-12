@@ -71,6 +71,8 @@ class TestBiorxivDownloader(unittest.TestCase):
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
         self.mock_config.session_reuse = True
+        self.mock_config.default_version = "1"
+        self.mock_config.browser_config = {"type": "custom"}
 
         # Mock the scraper creation during initialization
         mock_scraper = Mock()
@@ -490,6 +492,8 @@ class TestBiorxivDownloaderIntegration(unittest.TestCase):
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
         self.mock_config.session_reuse = True
+        self.mock_config.default_version = "1"
+        self.mock_config.browser_config = {"type": "custom"}
 
         # Mock the scraper creation during initialization
         mock_scraper = Mock()
@@ -626,6 +630,8 @@ class TestBiorxivCloudFlareHandling(unittest.TestCase):
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
         self.mock_config.session_reuse = True
+        self.mock_config.default_version = "1"
+        self.mock_config.browser_config = {"type": "custom"}
 
         # Mock the scraper creation during initialization
         mock_scraper = Mock()

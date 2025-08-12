@@ -50,6 +50,10 @@ class TestMedrxivDownloader(unittest.TestCase):
         self.mock_config.api_url = "https://api.medrxiv.org/details"
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
+        self.mock_config.pdf_url_template = (
+            "https://www.medrxiv.org/content/{identifier}v{version}.full.pdf"
+        )
+        self.mock_config.default_version = "1"
 
         self.downloader = MedrxivDownloaderTestShim(self.mock_config)
 
@@ -314,6 +318,10 @@ class TestMedrxivDownloaderIntegration(unittest.TestCase):
         self.mock_config.api_url = "https://api.medrxiv.org/details"
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
+        self.mock_config.pdf_url_template = (
+            "https://www.medrxiv.org/content/{identifier}v{version}.full.pdf"
+        )
+        self.mock_config.default_version = "1"
 
         self.downloader = MedrxivDownloaderTestShim(self.mock_config)
 
@@ -473,6 +481,10 @@ class TestMedrxivSpecialCases(unittest.TestCase):
         self.mock_config.api_url = "https://api.medrxiv.org/details"
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
+        self.mock_config.pdf_url_template = (
+            "https://www.medrxiv.org/content/{identifier}v{version}.full.pdf"
+        )
+        self.mock_config.default_version = "1"
 
         self.downloader = MedrxivDownloaderTestShim(self.mock_config)
 

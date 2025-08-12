@@ -60,6 +60,7 @@ class TestArxivDownloader(unittest.TestCase):
         self.mock_config.pdf_base_url = "https://arxiv.org/pdf"
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
+        self.mock_config.xml_namespace = {"atom": "http://www.w3.org/2005/Atom"}
 
         # Use the testable subclass to avoid W0212 while still covering helpers
         self.downloader = ArxivDownloaderTestShim(self.mock_config)
@@ -396,6 +397,7 @@ class TestArxivDownloaderIntegration(unittest.TestCase):
         self.mock_config.pdf_base_url = "https://arxiv.org/pdf"
         self.mock_config.request_timeout = 30
         self.mock_config.chunk_size = 8192
+        self.mock_config.xml_namespace = {"atom": "http://www.w3.org/2005/Atom"}
 
         self.downloader = ArxivDownloaderTestShim(self.mock_config)
 

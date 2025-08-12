@@ -314,6 +314,35 @@ class TestDownloadPapersFunction(unittest.TestCase):
 
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download."
+        "paper_downloader.PaperDownloaderFactory.get_default_service"
+    )
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download."
+        "paper_downloader.PaperDownloaderFactory.create"
+    )
+    def test_download_papers_none_service_uses_default(self, mock_create, mock_get_default):
+        """When service=None, should use get_default_service() result."""
+        mock_get_default.return_value = "pubmed"
+        dl = Mock()
+        dl.get_service_name.return_value = "PubMed"
+        dl.process_identifiers.return_value = {
+            "12345": {"Title": "Test", "access_type": "abstract_only"}
+        }
+        dl.build_summary.return_value = "PubMed Summary"
+        mock_create.return_value = dl
+
+        cmd = _download_papers_impl(None, ["12345"], "tid1")
+
+        # Verify default service was requested
+        mock_get_default.assert_called_once()
+        # Verify create was called with the default service
+        mock_create.assert_called_once_with("pubmed")
+
+        self.assertIsInstance(cmd, Command)
+        self.assertIn("12345", cmd.update["article_data"])
+
+    @patch(
+        "aiagents4pharma.talk2scholars.tools.paper_download."
         "paper_downloader.PaperDownloaderFactory.create"
     )
     def test_download_papers_service_error_branch(self, mock_create):
@@ -374,30 +403,66 @@ class TestDownloadPapersFunction(unittest.TestCase):
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader.GlobalHydra"
     )
-    def test_create_unsupported_service_fallback_branch(
-        self, mock_global_hydra, mock_hydra
-    ):
-        """Covers the fallback ValueError when service is unsupported."""
+    def test_get_default_service_functionality(self, mock_global_hydra, mock_hydra):
+        """Test get_default_service method with various configurations."""
         mock_global_hydra.return_value.is_initialized.return_value = False
 
+        # Test default service from config
         common_cfg = SimpleNamespace(request_timeout=30, chunk_size=8192)
-        services = {"unsupported": SimpleNamespace(api_url="https://nope")}
-        unified = SimpleNamespace(
-            common=common_cfg,
-            services=services,
-            supported_services=["arxiv", "medrxiv", "biorxiv", "pubmed"],
-        )
+        services = {
+            "arxiv": SimpleNamespace(api_url="https://arxiv.org"),
+            "pubmed": SimpleNamespace(id_converter_url="https://pmc.ncbi.nlm.nih.gov")
+        }
+        tool_cfg = SimpleNamespace(default_service="arxiv")
         mock_hydra.compose.return_value = SimpleNamespace(
-            tools=SimpleNamespace(paper_download=unified)
+            tools=SimpleNamespace(
+                paper_download=SimpleNamespace(
+                    tool=tool_cfg, common=common_cfg, services=services
+                )
+            )
         )
 
-        with self.assertRaises(ValueError) as ctx:
-            PaperDownloaderFactory.create("unsupported")
+        # Clear cache to ensure fresh config load
+        PaperDownloaderFactory.clear_cache()
+        result = PaperDownloaderFactory.get_default_service()
+        self.assertEqual(result, "arxiv")
 
-        msg = str(ctx.exception)
-        self.assertIn("Unsupported service: unsupported. Supported:", msg)
-        for svc in ["arxiv", "medrxiv", "biorxiv", "pubmed"]:
-            self.assertIn(svc, msg)
+        # Test invalid default service fallback
+        tool_cfg.default_service = "invalid_service"
+        PaperDownloaderFactory.clear_cache()
+        result = PaperDownloaderFactory.get_default_service()
+        self.assertEqual(result, "pubmed")  # Should fallback to pubmed
+
+        # Test missing default service (fallback to pubmed)
+        mock_hydra.compose.return_value = SimpleNamespace(
+            tools=SimpleNamespace(
+                paper_download=SimpleNamespace(
+                    tool=SimpleNamespace(), common=common_cfg, services=services
+                )
+            )
+        )
+        PaperDownloaderFactory.clear_cache()
+        result = PaperDownloaderFactory.get_default_service()
+        self.assertEqual(result, "pubmed")
+
+        # Test medrxiv default service
+        tool_cfg.default_service = "medrxiv"
+        mock_hydra.compose.return_value = SimpleNamespace(
+            tools=SimpleNamespace(
+                paper_download=SimpleNamespace(
+                    tool=tool_cfg, common=common_cfg, services=services
+                )
+            )
+        )
+        PaperDownloaderFactory.clear_cache()
+        result = PaperDownloaderFactory.get_default_service()
+        self.assertEqual(result, "medrxiv")
+
+        # Test biorxiv default service
+        tool_cfg.default_service = "biorxiv"
+        PaperDownloaderFactory.clear_cache()
+        result = PaperDownloaderFactory.get_default_service()
+        self.assertEqual(result, "biorxiv")
 
 
 class TestUnifiedConfigDoubleCheck(unittest.TestCase):
