@@ -160,13 +160,18 @@ uv run coverage xml
 **Component-Specific Coverage:**
 ```bash
 # Coverage for specific component (standard configuration)
+# Note: Use quotes on macOS/zsh shell, GitHub Actions CI doesn't require them
 uv run coverage run --include="aiagents4pharma/talk2scholars/*" -m pytest --cache-clear aiagents4pharma/talk2scholars/tests/ && uv run coverage report
 
-# Run coverage on each subfolder individually
+# Run coverage on each subfolder individually (local development - use quotes for macOS/zsh)
 uv run coverage run --include="aiagents4pharma/talk2scholars/*" -m pytest --cache-clear aiagents4pharma/talk2scholars/tests/ && uv run coverage report
 uv run coverage run --include="aiagents4pharma/talk2biomodels/*" -m pytest --cache-clear aiagents4pharma/talk2biomodels/tests/ && uv run coverage report
 uv run coverage run --include="aiagents4pharma/talk2knowledgegraphs/*" -m pytest --cache-clear aiagents4pharma/talk2knowledgegraphs/tests/ && uv run coverage report
 uv run coverage run --include="aiagents4pharma/talk2aiagents4pharma/*" -m pytest --cache-clear aiagents4pharma/talk2aiagents4pharma/tests/ && uv run coverage report
+uv run coverage run --include="aiagents4pharma/talk2cells/*" -m pytest --cache-clear aiagents4pharma/talk2cells/tests/ && uv run coverage report
+
+# Alternative format for CI environments (without quotes)
+# uv run coverage run --include=aiagents4pharma/talk2scholars/* -m pytest --cache-clear aiagents4pharma/talk2scholars/tests/
 
 # Coverage with source specification (all components)
 uv run coverage run --source=aiagents4pharma -m pytest
