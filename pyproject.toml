@@ -59,7 +59,7 @@ dependencies = [
   "pygeneconverter==0.3",
   "pylint==3.3.1",
   "pymilvus==2.5.11",
-  "pypdf==5.2.0",
+  "pypdf==6.0.0",
   "PyPDF2==3.0.1",
   "pytest==8.3.3",
   "pytest-asyncio==0.25.2",
@@ -99,7 +99,6 @@ source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "_version.py"
-
 
 
 [tool.hatch.build.targets.wheel]
@@ -143,18 +142,18 @@ line-length = 100
 
 [tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "UP", # pyupgrade
+  "E",  # pycodestyle errors
+  "W",  # pycodestyle warnings
+  "F",  # pyflakes
+  "I",  # isort
+  "B",  # flake8-bugbear
+  "C4", # flake8-comprehensions
+  "UP", # pyupgrade
 ]
 ignore = [
-    "E501",  # line too long, handled by black
-    "B008",  # do not perform function calls in argument defaults
-    "C901",  # too complex
+  "E501", # line too long, handled by black
+  "B008", # do not perform function calls in argument defaults
+  "C901", # too complex
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -176,15 +175,25 @@ warn_unreachable = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-module = [
-    "setuptools.*",
-    "pkg_resources.*",
-]
+module = ["setuptools.*", "pkg_resources.*"]
 ignore_missing_imports = true
 
 [tool.bandit]
 exclude_dirs = ["tests", "test_*"]
-skips = ["B101", "B601", "B404", "B607", "B602", "B403", "B301", "B615", "B614", "B603"]
+skips = [
+  "B101",
+  "B601",
+  "B404",
+  "B607",
+  "B602",
+  "B403",
+  "B301",
+  "B615",
+  "B614",
+  "B603",
+  "B405",
+  "B314",
+]
 
 [tool.bandit.assert_used]
 skips = ["*_test.py", "*/test_*.py"]
@@ -196,25 +205,20 @@ organization = "virtualpatientengine"
 
 [tool.coverage.run]
 source = ["aiagents4pharma"]
-omit = [
-    "*/tests/*",
-    "*/test_*",
-    "docs/*",
-    "app/*",
-]
+omit = ["*/tests/*", "*/test_*", "docs/*", "app/*"]
 
 [tool.coverage.report]
 exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if 0:",
-    "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
+  "pragma: no cover",
+  "def __repr__",
+  "if self.debug:",
+  "if settings.DEBUG",
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "if 0:",
+  "if __name__ == .__main__.:",
+  "class .*\\bProtocol\\):",
+  "@(abc\\.)?abstractmethod",
 ]
 
 [tool.coverage.xml]

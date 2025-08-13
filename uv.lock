@@ -162,7 +162,7 @@ requires-dist = [
     { name = "pygeneconverter", specifier = "==0.3" },
     { name = "pylint", specifier = "==3.3.1" },
     { name = "pymilvus", specifier = "==2.5.11" },
-    { name = "pypdf", specifier = "==5.2.0" },
+    { name = "pypdf", specifier = "==6.0.0" },
     { name = "pypdf2", specifier = "==3.0.1" },
     { name = "pytest", specifier = "==8.3.3" },
     { name = "pytest-asyncio", specifier = "==0.25.2" },
@@ -3966,11 +3966,11 @@ wheels = [
 
 [[package]]
 name = "pypdf"
-version = "5.2.0"
+version = "6.0.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/49/8b/14ab0db77d1287922e1d3e69cf3dbeee718133e109913b92c6cffe7b1f2e/pypdf-5.2.0.tar.gz", hash = "sha256:7c38e68420f038f2c4998fd9d6717b6db4f6cef1642e9cf384d519c9cf094663", size = 5020162, upload-time = "2025-01-26T11:48:42.606Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/20/ac/a300a03c3b34967c050677ccb16e7a4b65607ee5df9d51e8b6d713de4098/pypdf-6.0.0.tar.gz", hash = "sha256:282a99d2cc94a84a3a3159f0d9358c0af53f85b4d28d76ea38b96e9e5ac2a08d", size = 5033827, upload-time = "2025-08-11T14:22:02.352Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3e/6e/9aa158121eb5a6af5537af0bde9e38092a97c40a5a0ecaec7cc9688b2c2e/pypdf-5.2.0-py3-none-any.whl", hash = "sha256:d107962ec45e65e3bd10c1d9242bdbbedaa38193c9e3a6617bd6d996e5747b19", size = 298686, upload-time = "2025-01-26T11:48:40.113Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/83/2cacc506eb322bb31b747bc06ccb82cc9aa03e19ee9c1245e538e49d52be/pypdf-6.0.0-py3-none-any.whl", hash = "sha256:56ea60100ce9f11fc3eec4f359da15e9aec3821b036c1f06d2b660d35683abb8", size = 310465, upload-time = "2025-08-11T14:22:00.481Z" },
 ]
 
 [[package]]
