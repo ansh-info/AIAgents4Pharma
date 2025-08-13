@@ -1,11 +1,14 @@
-# Modernized release workflow with uv and git tag versioning
+# Modernized release workflow with semantic-release auto-tagging
 name: RELEASE
 
 on:
   push:
-    tags:
-      - 'v*'  # Trigger on version tags like v1.0.0
-  workflow_dispatch:  # Allow manual triggering
+    branches: [main]
+    paths:
+      - "aiagents4pharma/**"
+      - "pyproject.toml"
+      - "uv.lock"
+  workflow_dispatch:
 
 jobs:
   release:
@@ -27,6 +30,15 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
+      - name: Set up Node.js for semantic-release
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install semantic-release
+        run: npm ci
+
       - name: Install dependencies
         run: uv sync --frozen --extra dev
 
@@ -35,10 +47,14 @@ jobs:
           uv run ruff check aiagents4pharma/
           uv run bandit -c pyproject.toml -r aiagents4pharma/
 
-      - name: Get release version from tag
+      - name: Run semantic-release (creates tag automatically)
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get release version from latest tag
         run: |
-          # Extract version from git tag
-          RELEASE_VERSION=${GITHUB_REF#refs/tags/}
+          RELEASE_VERSION=$(git describe --tags --abbrev=0)
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
           echo "Release version: $RELEASE_VERSION"
 
