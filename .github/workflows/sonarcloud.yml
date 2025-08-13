@@ -20,7 +20,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+          fetch-depth: 0 # Shallow clones should be disabled for better analysis
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -30,6 +30,22 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --frozen --extra dev
+
+      - name: Setup Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          export PATH="/usr/local/bin:$PATH"
+          echo "/usr/local/bin" >> $GITHUB_PATH
+          ollama serve &
+          sleep 10
+
+      - name: Pull Ollama models
+        run: |
+          ollama pull llama3.2:1b
+          ollama pull nomic-embed-text
+
+      - name: Verify Ollama setup
+        run: ollama list
 
       - name: Run tests with coverage
         run: |
@@ -44,8 +60,8 @@ jobs:
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}     # Generate a token on Sonarcloud.io
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} # Generate a token on Sonarcloud.io
 
       - name: Upload analysis artifacts
         if: always()
