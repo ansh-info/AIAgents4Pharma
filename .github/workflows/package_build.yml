@@ -88,6 +88,8 @@ jobs:
 
       - name: Test wheel installation
         run: |
+          uv venv
+          source .venv/bin/activate
           uv pip install dist/*.whl
           uv run python -c "import aiagents4pharma; print('Package import successful')"
 
