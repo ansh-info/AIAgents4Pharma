@@ -79,6 +79,7 @@ dependencies = [
   "transformers>=4.54.0",
   "umap-learn==0.5.7",
   "xlsxwriter>=3.0.0,!=3.2.3",
+  "python-magic>=0.4.27",
 ]
 dynamic = ["version"]
 
