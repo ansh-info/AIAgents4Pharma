@@ -3,14 +3,6 @@ site_name: AIAgents4Pharma
 nav:
   - Home: index.md
 
-  # Developer Documentation Section
-  - Developer Documentation:
-      - Setup Guide: developer/README.md
-      - Testing & Linting: developer/TESTING_LINTING.md
-      - GitHub Workflows: developer/WORKFLOWS.md
-      - Streamlit Security: developer/STREAMLIT_SECURITY.md
-      - SonarCloud Setup: developer/SONARCLOUD_SETUP.md
-
   - Talk2AIAgents4Pharma:
       - Introduction: talk2aiagents4pharma/intro.md
       - Agents:
@@ -177,8 +169,13 @@ nav:
             - Answer Formatter: talk2scholars/utils/answer_formatter.md
             - Tool Helper: talk2scholars/utils/tool_helper.md
 
-  # Operations & Project Management
+  # Developer Documentation Section
   - Documentation:
+      - Setup Guide: developer/README.md
+      - Testing & Linting: developer/TESTING_LINTING.md
+      - GitHub Workflows: developer/WORKFLOWS.md
+      - Streamlit Security: developer/STREAMLIT_SECURITY.md
+      - SonarCloud Setup: developer/SONARCLOUD_SETUP.md
       - Ops:
           - Introduction: ops/Documentation_intro.md
           - CodeOps: ops/CodeOps.md
