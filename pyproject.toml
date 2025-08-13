@@ -97,6 +97,8 @@ dev = [
 path = "release_version.txt"
 pattern = "(?P<version>.*)"
 
+
+
 [tool.hatch.build.targets.wheel]
 packages = ["aiagents4pharma"]
 
@@ -115,7 +117,7 @@ filterwarnings = ["ignore::DeprecationWarning"]
 extension-pkg-allow-list = ["pcst_fast"]
 
 [tool.black]
-line-length = 88
+line-length = 100
 target-version = ["py312"]
 include = '\.pyi?$'
 extend-exclude = '''
@@ -134,7 +136,7 @@ extend-exclude = '''
 
 [tool.ruff]
 target-version = "py312"
-line-length = 88
+line-length = 100
 
 [tool.ruff.lint]
 select = [
