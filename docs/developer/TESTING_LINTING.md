@@ -159,10 +159,16 @@ uv run coverage xml
 
 **Component-Specific Coverage:**
 ```bash
-# Coverage for specific component
-uv run coverage run --include=aiagents4pharma/talk2scholars/* -m pytest aiagents4pharma/talk2scholars/tests/
+# Coverage for specific component (standard configuration)
+uv run coverage run --include="aiagents4pharma/talk2scholars/*" -m pytest --cache-clear aiagents4pharma/talk2scholars/tests/ && uv run coverage report
 
-# Coverage with source specification
+# Run coverage on each subfolder individually
+uv run coverage run --include="aiagents4pharma/talk2scholars/*" -m pytest --cache-clear aiagents4pharma/talk2scholars/tests/ && uv run coverage report
+uv run coverage run --include="aiagents4pharma/talk2biomodels/*" -m pytest --cache-clear aiagents4pharma/talk2biomodels/tests/ && uv run coverage report
+uv run coverage run --include="aiagents4pharma/talk2knowledgegraphs/*" -m pytest --cache-clear aiagents4pharma/talk2knowledgegraphs/tests/ && uv run coverage report
+uv run coverage run --include="aiagents4pharma/talk2aiagents4pharma/*" -m pytest --cache-clear aiagents4pharma/talk2aiagents4pharma/tests/ && uv run coverage report
+
+# Coverage with source specification (all components)
 uv run coverage run --source=aiagents4pharma -m pytest
 
 # Show missing lines
@@ -275,8 +281,14 @@ uv run pylint aiagents4pharma/
 # Run on specific component
 uv run pylint aiagents4pharma/talk2scholars/
 
-# Disable specific warnings
+# Disable specific warnings (standard configuration)
 uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/
+
+# Run on each subfolder individually
+uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2scholars/
+uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2biomodels/
+uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2knowledgegraphs/
+uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2cells/
 
 # Generate JSON report
 uv run pylint aiagents4pharma/ --output-format=json --reports=no > pylint-report.json
