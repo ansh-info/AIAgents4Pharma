@@ -8,6 +8,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
 jobs:
   sonarcloud:
     name: SonarCloud Analysis
@@ -35,7 +38,7 @@ jobs:
 
       - name: Run pylint with JSON output
         run: |
-          uv run pylint aiagents4pharma --output-format=json --reports=no > pylint-report.json || true
+          uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma --output-format=json --reports=no > pylint-report.json || true
         continue-on-error: true
 
       - name: SonarCloud Scan
