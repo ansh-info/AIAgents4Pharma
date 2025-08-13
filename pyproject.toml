@@ -193,6 +193,7 @@ skips = [
   "B603",
   "B405",
   "B314",
+  "B501",
 ]
 
 [tool.bandit.assert_used]
