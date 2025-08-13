@@ -24,11 +24,8 @@ class DummyLLM(BaseChatModel):
     model_name: str = Field(...)
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
-        """Generate a response given messages."""
-        # Extract content from first message (LangChain guarantees message format)
+        """generate a dummy response based on the input messages."""
         DummyLLM.called_prompt = messages[0].content
-
-        # Return proper ChatResult object
         message = AIMessage(content="dummy output")
         generation = ChatGeneration(message=message)
         return ChatResult(generations=[generation])
@@ -37,6 +34,11 @@ class DummyLLM(BaseChatModel):
     def _llm_type(self):
         """Return the type of the language model."""
         return "dummy"
+
+    # NEW: public shim to avoid protected access in tests
+    def public_llm_type(self) -> str:
+        """public method to access the LLM type."""
+        return self._llm_type
 
 
 # --- Dummy Workflow and Sub-agent Functions ---
@@ -203,9 +205,11 @@ def test_dummy_llm_generate():
 def test_dummy_llm_llm_type():
     """Test the dummy LLM's type identification."""
     dummy = DummyLLM(model_name="test-model")
-    # Test the _llm_type property using getattr to avoid protected access warning (covers line 32)
-    llm_type = dummy._llm_type
+
+    # Use public shim instead of protected attribute access
+    llm_type = dummy.public_llm_type()
     assert llm_type == "dummy"
+
     # Also test the public string representation
     assert "DummyLLM" in str(dummy.__class__.__name__)
 

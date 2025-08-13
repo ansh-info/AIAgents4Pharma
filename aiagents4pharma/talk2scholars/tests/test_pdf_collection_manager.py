@@ -39,17 +39,20 @@ def index_params():
 
 
 def set_collection_cache(key, value):
-    """Set a mocked collection into the cache."""
-    # Use setattr to avoid protected access warnings
-    collection_manager._collection_cache = {key: value}
+    """Set a mocked collection into the cache without replacing the whole attribute."""
+    cache = getattr(collection_manager, "_collection_cache", None)
+    if cache is None:
+        cache = {}
+        # Still need to attach it once if it doesn't exist
+        object.__setattr__(collection_manager, "_collection_cache", cache)
+    cache[key] = value
 
 
 def clear_collection_cache(key):
     """Remove a mocked collection from the cache."""
-    # Use getattr/setattr to avoid protected access warnings
-    cache = getattr(collection_manager, "_collection_cache", {})
-    cache.pop(key, None)
-    collection_manager._collection_cache = cache
+    cache = getattr(collection_manager, "_collection_cache", None)
+    if cache is not None:
+        cache.pop(key, None)
 
 
 # -- Tests --
@@ -148,3 +151,23 @@ def test_ensure_collection_exception(mock_utility, mock_collection_cls, request)
 
     with pytest.raises(RuntimeError, match="milvus failure"):
         collection_manager.ensure_collection_exists("fail_collection", config, index, has_gpu=False)
+
+
+def test_set_collection_cache_initializes_when_missing(monkeypatch):
+    """Ensure set_collection_cache initializes the cache when attribute is absent."""
+    # Remove the attribute if present (avoids W0212 and stays lint-clean)
+    monkeypatch.delattr(collection_manager, "_collection_cache", raising=False)
+
+    key = "init_case"
+    val = MagicMock()
+
+    # This should go through the None-branch and attach the cache via object.__setattr__
+    set_collection_cache(key, val)
+
+    # Verify cache got created and populated
+    cache = getattr(collection_manager, "_collection_cache", None)
+    assert isinstance(cache, dict)
+    assert cache.get(key) is val
+
+    # Cleanup
+    clear_collection_cache(key)

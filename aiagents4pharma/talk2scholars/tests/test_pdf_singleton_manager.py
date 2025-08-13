@@ -1,4 +1,6 @@
-"""Tests for singleton_manager: manages vector store connections and event loops."""
+"""
+Tests for singleton_manager: manages vector store connections and event loops.
+"""
 
 from unittest.mock import MagicMock, patch
 
@@ -21,19 +23,20 @@ def test_singleton_instance_identity():
 
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.detect_nvidia_gpu")
-def test_detect_gpu_once(mock_detect):
+def test_detect_gpu_once(mock_detect, monkeypatch):
     """Ensure GPU detection is cached."""
     mock_detect.return_value = True
     singleton = VectorstoreSingleton()
-    # Reset GPU detection using setattr to avoid protected access warning
-    singleton.__class__._gpu_detected = None
+
+    # Reset GPU detection cache safely
+    monkeypatch.setattr(VectorstoreSingleton, "_gpu_detected", None, raising=False)
 
     result = singleton.detect_gpu_once()
     assert result is True
 
+    # Second call should use cached value; detect_nvidia_gpu called only once
     result2 = singleton.detect_gpu_once()
     assert result2 is True
-
     mock_detect.assert_called_once()
 
 
@@ -63,21 +66,20 @@ def test_get_connection_creates_connection(_, mock_db, mock_conns):
 
 
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.Milvus")
-def test_get_vector_store_creates_if_missing(mock_milvus):
+def test_get_vector_store_creates_if_missing(mock_milvus, monkeypatch):
     """get_vector_store should create a new vector store if missing."""
     singleton = VectorstoreSingleton()
-    # Clear caches using setattr to avoid protected access warning
-    singleton.__class__._vector_stores = {}
-    singleton.__class__._event_loops = {}
+
+    # Clear caches safely
+    monkeypatch.setattr(VectorstoreSingleton, "_vector_stores", {}, raising=False)
+    monkeypatch.setattr(VectorstoreSingleton, "_event_loops", {}, raising=False)
 
     mock_embed = MagicMock()
     connection_args = {"host": "localhost", "port": 19530}
 
     vs = singleton.get_vector_store("collection1", mock_embed, connection_args)
 
-    # Verify vector store was created by checking the call
     assert vs is not None
-    mock_milvus.assert_called_once()
     mock_milvus.assert_called_once()
 
 
@@ -118,11 +120,12 @@ def test_get_vectorstore_force_new(mock_vectorstore_cls):
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.connections.connect")
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.connections.has_connection")
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.db")
-def test_get_connection_milvus_error(_, mock_has_connection, mock_connect):
+def test_get_connection_milvus_error(_, mock_has_connection, mock_connect, monkeypatch):
     """get_connection should raise MilvusException on connection failure."""
     manager = VectorstoreSingleton()
-    # Clear connections using setattr to avoid protected access warning
-    manager.__class__._connections = {}
+
+    # Reset connections cache safely
+    monkeypatch.setattr(VectorstoreSingleton, "_connections", {}, raising=False)
 
     mock_has_connection.return_value = False
     mock_connect.side_effect = MilvusException("Connection failed")
@@ -131,11 +134,12 @@ def test_get_connection_milvus_error(_, mock_has_connection, mock_connect):
         manager.get_connection("localhost", 19530, "test_db")
 
 
-def test_get_event_loop_creates_new_loop_on_closed():
+def test_get_event_loop_creates_new_loop_on_closed(monkeypatch):
     """Ensure get_event_loop creates a new loop if current one is closed."""
     manager = VectorstoreSingleton()
-    # Clear event loops using setattr to avoid protected access warning
-    manager.__class__._event_loops = {}
+
+    # Clear event loops safely
+    monkeypatch.setattr(VectorstoreSingleton, "_event_loops", {}, raising=False)
 
     mock_loop = MagicMock()
     mock_loop.is_closed.return_value = True
