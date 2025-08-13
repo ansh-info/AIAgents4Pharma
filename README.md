@@ -164,6 +164,15 @@ Check out the tutorials on each agent for detailed instructions.
 We welcome your support to make **AIAgents4Pharma** even better.
 All types of contributions are appreciated — whether you're fixing bugs, adding features, improving documentation, or helping with testing, every contribution is valuable.
 
+#### Development Setup
+
+For contributors and developers, we have comprehensive documentation:
+
+- **[Developer Setup Guide](docs/developer/README.md)** - Complete setup instructions with UV, security implementation, and tooling
+- **[Testing & Linting Guide](docs/developer/TESTING_LINTING.md)** - How to run tests, coverage, and code quality checks
+- **[GitHub Workflows](docs/developer/WORKFLOWS.md)** - Understanding our CI/CD pipeline
+- **[Streamlit Security](docs/developer/STREAMLIT_SECURITY.md)** - File upload security implementation
+
 #### How to contribute
 
 1. Star this repository to show your support.
@@ -174,19 +183,29 @@ All types of contributions are appreciated — whether you're fixing bugs, addin
 git checkout -b feat/your-feature-name
 ```
 
-4. Make your changes and commit them:
+4. Set up your development environment:
+
+```sh
+uv sync  # Install dependencies
+uv run pre-commit install  # Set up code quality hooks
+```
+
+5. Make your changes and run quality checks:
+
+```sh
+uv run pytest  # Run tests
+uv run ruff check --fix .  # Lint and fix code
+uv run pre-commit run --all-files  # Run all checks
+```
+
+6. Commit and push your changes:
 
 ```sh
 git commit -m "feat: add a brief description of your change"
-```
-
-5. Push your branch:
-
-```sh
 git push origin feat/your-feature-name
 ```
 
-6. Open a Pull Request.
+7. Open a Pull Request.
 
 #### Areas where you can help
 
@@ -200,7 +219,7 @@ git push origin feat/your-feature-name
 - **Talk2KnowledgeGraphs**: [@awmulyadi](https://github.com/awmulyadi)
 - **Talk2Scholars**: [@ansh-info](https://github.com/ansh-info), [@gurdeep330](https://github.com/gurdeep330)
 
-Please refer to our [CONTRIBUTING.md](CONTRIBUTING.md) for more detailed contribution guidelines.
+Please refer to our [CONTRIBUTING.md](CONTRIBUTING.md) and [developer documentation](docs/developer/) for detailed contribution guidelines and setup instructions.
 
 ## Feedback
 
