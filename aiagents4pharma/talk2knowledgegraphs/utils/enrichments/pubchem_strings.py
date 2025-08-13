@@ -38,17 +38,13 @@ class EnrichmentWithPubChem(Enrichments):
 
         # Load Hydra configuration to get the base URL for PubChem
         with hydra.initialize(version_base=None, config_path="../../configs"):
-            cfg = hydra.compose(
-                config_name="config", overrides=["utils/pubchem_utils=default"]
-            )
+            cfg = hydra.compose(config_name="config", overrides=["utils/pubchem_utils=default"])
             cfg = cfg.utils.pubchem_utils
         # Iterate over each PubChem ID in the input list
         pubchem_cids = texts
         for pubchem_cid in pubchem_cids:
             # Prepare the URL
-            pubchem_url = (
-                f"{cfg.pubchem_cid2smiles_url}/{pubchem_cid}/property/smiles/JSON"
-            )
+            pubchem_url = f"{cfg.pubchem_cid2smiles_url}/{pubchem_cid}/property/smiles/JSON"
             # Get the data
             response = requests.get(pubchem_url, timeout=60)
             data = response.json()

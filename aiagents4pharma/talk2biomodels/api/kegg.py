@@ -48,9 +48,7 @@ def fetch_kegg_names(ids: list[str], batch_size: int = 10) -> dict[str, str]:
             if not entry.strip():
                 continue
             lines = entry.strip().split("\n")
-            entry_line = next(
-                (line for line in lines if line.startswith("ENTRY")), None
-            )
+            entry_line = next((line for line in lines if line.startswith("ENTRY")), None)
             name_line = next((line for line in lines if line.startswith("NAME")), None)
 
             # if not entry_line and not name_line:

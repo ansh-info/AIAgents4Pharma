@@ -158,9 +158,7 @@ def dummy_requests_get_exception(url, params, timeout):
 @pytest.fixture(autouse=True)
 def patch_hydra(monkeypatch):
     """Patch Hydra's initialize and compose functions with dummy implementations."""
-    monkeypatch.setattr(
-        hydra, "initialize", lambda version_base, config_path: DummyHydraContext()
-    )
+    monkeypatch.setattr(hydra, "initialize", lambda version_base, config_path: DummyHydraContext())
     # Patch hydra.compose to return our dummy config.
     monkeypatch.setattr(hydra, "compose", lambda config_name, overrides: dummy_config)
 

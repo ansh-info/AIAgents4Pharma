@@ -30,16 +30,10 @@ class RequestedModelInfo:
     """
 
     species: bool = Field(description="Get species from the model.", default=False)
-    parameters: bool = Field(
-        description="Get parameters from the model.", default=False
-    )
-    compartments: bool = Field(
-        description="Get compartments from the model.", default=False
-    )
+    parameters: bool = Field(description="Get parameters from the model.", default=False)
+    compartments: bool = Field(description="Get compartments from the model.", default=False)
     units: bool = Field(description="Get units from the model.", default=False)
-    description: bool = Field(
-        description="Get description from the model.", default=False
-    )
+    description: bool = Field(description="Get description from the model.", default=False)
     name: bool = Field(description="Get name from the model.", default=False)
 
 
@@ -48,9 +42,7 @@ class GetModelInfoInput(BaseModel):
     Input schema for the GetModelInfo tool.
     """
 
-    requested_model_info: RequestedModelInfo = Field(
-        description="requested model information"
-    )
+    requested_model_info: RequestedModelInfo = Field(description="requested model information")
     sys_bio_model: ModelData = Field(description="model data")
     tool_call_id: Annotated[str, InjectedToolCallId]
     state: Annotated[dict, InjectedState]
@@ -95,9 +87,7 @@ class GetModelInfoTool(BaseTool):
             requested_model_info,
         )
         # print (state, 'state')
-        sbml_file_path = (
-            state["sbml_file_path"][-1] if len(state["sbml_file_path"]) > 0 else None
-        )
+        sbml_file_path = state["sbml_file_path"][-1] if len(state["sbml_file_path"]) > 0 else None
         model_obj = load_biomodel(sys_bio_model, sbml_file_path=sbml_file_path)
         dic_results = {}
         # Extract species from the model
@@ -122,9 +112,7 @@ class GetModelInfoTool(BaseTool):
 
         # Extract parameters from the model
         if requested_model_info.parameters:
-            df_parameters = basico.model_info.get_parameters(
-                model=model_obj.copasi_model
-            )
+            df_parameters = basico.model_info.get_parameters(model=model_obj.copasi_model)
             if df_parameters is None:
                 raise ValueError("Unable to extract parameters from the model.")
             # Convert index into a column
@@ -133,15 +121,11 @@ class GetModelInfoTool(BaseTool):
                 ["name", "type", "unit", "initial_value", "display_name"]
             ]
             # Convert this into a dictionary
-            dic_results["Parameters"] = dic_results["Parameters"].to_dict(
-                orient="records"
-            )
+            dic_results["Parameters"] = dic_results["Parameters"].to_dict(orient="records")
 
         # Extract compartments from the model
         if requested_model_info.compartments:
-            df_compartments = basico.model_info.get_compartments(
-                model=model_obj.copasi_model
-            )
+            df_compartments = basico.model_info.get_compartments(model=model_obj.copasi_model)
             dic_results["Compartments"] = df_compartments.index.tolist()
             dic_results["Compartments"] = ",".join(dic_results["Compartments"])
 
@@ -155,9 +139,7 @@ class GetModelInfoTool(BaseTool):
 
         # Extract time unit from the model
         if requested_model_info.units:
-            dic_results["Units"] = basico.model_info.get_model_units(
-                model=model_obj.copasi_model
-            )
+            dic_results["Units"] = basico.model_info.get_model_units(model=model_obj.copasi_model)
 
         # Prepare the dictionary of updated state for the model
         dic_updated_state_for_model = {}
@@ -172,8 +154,6 @@ class GetModelInfoTool(BaseTool):
             update=dic_updated_state_for_model
             | {
                 # update the message history
-                "messages": [
-                    ToolMessage(content=dic_results, tool_call_id=tool_call_id)
-                ],
+                "messages": [ToolMessage(content=dic_results, tool_call_id=tool_call_id)],
             }
         )

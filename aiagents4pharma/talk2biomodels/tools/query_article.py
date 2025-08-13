@@ -46,9 +46,7 @@ class QueryArticle(BaseTool):
             query (str): The search query.
         """
         logger.log(logging.INFO, "loading the article from %s", state["pdf_file_name"])
-        logger.log(
-            logging.INFO, "searching the article with the question: %s", question
-        )
+        logger.log(logging.INFO, "searching the article with the question: %s", question)
         # Load the article
         loader = PyPDFLoader(state["pdf_file_name"])
         # Load the pages of the article

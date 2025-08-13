@@ -33,9 +33,7 @@ def test_query_article_with_an_article():
         config,
         {
             "pdf_file_name": "aiagents4pharma/talk2biomodels/tests/article_on_model_537.pdf",
-            "text_embedding_model": NVIDIAEmbeddings(
-                model="nvidia/llama-3.2-nv-embedqa-1b-v2"
-            ),
+            "text_embedding_model": NVIDIAEmbeddings(model="nvidia/llama-3.2-nv-embedqa-1b-v2"),
         },
     )
     prompt = "What is the title of the article?"
@@ -71,11 +69,7 @@ def test_query_article_without_an_article():
     # Update state by providing the text embedding model
     app.update_state(
         config,
-        {
-            "text_embedding_model": NVIDIAEmbeddings(
-                model="nvidia/llama-3.2-nv-embedqa-1b-v2"
-            )
-        },
+        {"text_embedding_model": NVIDIAEmbeddings(model="nvidia/llama-3.2-nv-embedqa-1b-v2")},
     )
     # Test the tool query_article
     app.invoke({"messages": [HumanMessage(content=prompt)]}, config=config)

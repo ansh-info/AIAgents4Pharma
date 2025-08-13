@@ -33,28 +33,16 @@ def get_app(uniq_id, llm_model: BaseChatModel):
                 model_kwargs={"parallel_tool_calls": False},
             )
     # Load hydra configuration
-    logger.log(
-        logging.INFO, "Launching AIAgents4Pharma_Agent with thread_id %s", uniq_id
-    )
+    logger.log(logging.INFO, "Launching AIAgents4Pharma_Agent with thread_id %s", uniq_id)
     with hydra.initialize(version_base=None, config_path="../configs"):
-        cfg = hydra.compose(
-            config_name="config", overrides=["agents/main_agent=default"]
-        )
+        cfg = hydra.compose(config_name="config", overrides=["agents/main_agent=default"])
         cfg = cfg.agents.main_agent
     logger.log(logging.INFO, "System_prompt of T2AA4P: %s", cfg.system_prompt)
-    with hydra.initialize(
-        version_base=None, config_path="../../talk2biomodels/configs"
-    ):
-        cfg_t2b = hydra.compose(
-            config_name="config", overrides=["agents/t2b_agent=default"]
-        )
+    with hydra.initialize(version_base=None, config_path="../../talk2biomodels/configs"):
+        cfg_t2b = hydra.compose(config_name="config", overrides=["agents/t2b_agent=default"])
         cfg_t2b = cfg_t2b.agents.t2b_agent
-    with hydra.initialize(
-        version_base=None, config_path="../../talk2knowledgegraphs/configs"
-    ):
-        cfg_t2kg = hydra.compose(
-            config_name="config", overrides=["agents/t2kg_agent=default"]
-        )
+    with hydra.initialize(version_base=None, config_path="../../talk2knowledgegraphs/configs"):
+        cfg_t2kg = hydra.compose(config_name="config", overrides=["agents/t2kg_agent=default"])
         cfg_t2kg = cfg_t2kg.agents.t2kg_agent
     system_prompt = cfg.system_prompt
     system_prompt += "\n\nHere is the system prompt of T2B agent\n"

@@ -45,14 +45,10 @@ class SubgraphExtractionInput(BaseModel):
         arg_data: Argument for analytical process over graph data.
     """
 
-    tool_call_id: Annotated[str, InjectedToolCallId] = Field(
-        description="Tool call ID."
-    )
+    tool_call_id: Annotated[str, InjectedToolCallId] = Field(description="Tool call ID.")
     state: Annotated[dict, InjectedState] = Field(description="Injected state.")
     prompt: str = Field(description="Prompt to interact with the backend.")
-    arg_data: ArgumentData = Field(
-        description="Experiment over graph data.", default=None
-    )
+    arg_data: ArgumentData = Field(description="Experiment over graph data.", default=None)
 
 
 class SubgraphExtractionTool(BaseTool):
@@ -100,9 +96,7 @@ class SubgraphExtractionTool(BaseTool):
                     ]
                 )
 
-                qa_chain = create_stuff_documents_chain(
-                    state["llm_model"], prompt_template
-                )
+                qa_chain = create_stuff_documents_chain(state["llm_model"], prompt_template)
                 rag_chain = create_retrieval_chain(
                     InMemoryVectorStore.from_documents(
                         documents=splits, embedding=state["embedding_model"]
@@ -121,9 +115,7 @@ class SubgraphExtractionTool(BaseTool):
 
         # Prepare the prompt
         if len(all_genes) > 0:
-            prompt = " ".join(
-                [prompt, cfg.prompt_endotype_addition, ", ".join(all_genes)]
-            )
+            prompt = " ".join([prompt, cfg.prompt_endotype_addition, ", ".join(all_genes)])
 
         return prompt
 
@@ -154,14 +146,8 @@ class SubgraphExtractionTool(BaseTool):
             # Edge features
             edge_index=torch.LongTensor(
                 [
-                    [
-                        mapping[i]
-                        for i in pyg_graph.edge_index[:, subgraph["edges"]][0].tolist()
-                    ],
-                    [
-                        mapping[i]
-                        for i in pyg_graph.edge_index[:, subgraph["edges"]][1].tolist()
-                    ],
+                    [mapping[i] for i in pyg_graph.edge_index[:, subgraph["edges"]][0].tolist()],
+                    [mapping[i] for i in pyg_graph.edge_index[:, subgraph["edges"]][1].tolist()],
                 ]
             ),
             edge_attr=pyg_graph.edge_attr[subgraph["edges"]],
@@ -231,9 +217,7 @@ class SubgraphExtractionTool(BaseTool):
 
         # Retrieve source graph from the state
         initial_graph = {}
-        initial_graph["source"] = state["dic_source_graph"][
-            -1
-        ]  # The last source graph as of now
+        initial_graph["source"] = state["dic_source_graph"][-1]  # The last source graph as of now
         # logger.log(logging.INFO, "Source graph: %s", source_graph)
 
         # Load the knowledge graph

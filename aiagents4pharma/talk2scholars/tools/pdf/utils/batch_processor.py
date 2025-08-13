@@ -43,9 +43,7 @@ def add_papers_batch(
         logger.info("No papers to add")
         return
 
-    to_process = [
-        (pid, url, md) for pid, url, md in papers_to_add if pid not in loaded_papers
-    ]
+    to_process = [(pid, url, md) for pid, url, md in papers_to_add if pid not in loaded_papers]
     if not to_process:
         logger.info("Skipping %d already-loaded papers", len(papers_to_add))
         logger.info("All %d papers are already loaded", len(papers_to_add))

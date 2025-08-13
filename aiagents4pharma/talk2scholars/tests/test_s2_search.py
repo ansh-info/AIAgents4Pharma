@@ -149,9 +149,7 @@ def dummy_requests_get_exception(url, params, timeout):
 def patch_hydra(monkeypatch):
     """hydra patch to mock initialize and compose functions."""
     # Patch hydra.initialize to return our dummy context manager.
-    monkeypatch.setattr(
-        hydra, "initialize", lambda version_base, config_path: DummyHydraContext()
-    )
+    monkeypatch.setattr(hydra, "initialize", lambda version_base, config_path: DummyHydraContext())
     # Patch hydra.compose to return our dummy config.
     monkeypatch.setattr(hydra, "compose", lambda config_name, overrides: dummy_config)
 

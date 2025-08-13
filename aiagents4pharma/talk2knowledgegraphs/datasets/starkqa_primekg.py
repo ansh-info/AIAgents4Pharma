@@ -64,9 +64,7 @@ class StarkQAPrimeKG(Dataset):
         # Otherwise, load the data from the local directory
         local_file = os.path.join(self.local_dir, "qa/prime/stark_qa/stark_qa.csv")
         if os.path.exists(local_file):
-            print(
-                f"{local_file} already exists. Loading the data from the local directory."
-            )
+            print(f"{local_file} already exists. Loading the data from the local directory.")
         else:
             print(f"Downloading files from {self.hf_repo_id}")
 
@@ -103,9 +101,7 @@ class StarkQAPrimeKG(Dataset):
         qa_indices = sorted(starkqa["id"].tolist())
         starkqa_split_idx = {}
         for split in ["train", "val", "test", "test-0.1"]:
-            indices_file = os.path.join(
-                self.local_dir, "qa/prime/split", f"{split}.index"
-            )
+            indices_file = os.path.join(self.local_dir, "qa/prime/split", f"{split}.index")
             with open(indices_file, encoding="utf-8") as f:
                 indices = f.read().strip().split("\n")
             query_ids = [int(idx) for idx in indices]
@@ -114,9 +110,7 @@ class StarkQAPrimeKG(Dataset):
             )
 
         # Load the node info of PrimeKG preprocessed for StarkQA
-        with open(
-            os.path.join(self.local_dir, "skb/prime/processed/node_info.pkl"), "rb"
-        ) as f:
+        with open(os.path.join(self.local_dir, "skb/prime/processed/node_info.pkl"), "rb") as f:
             starkqa_node_info = pickle.load(f)
 
         return starkqa, starkqa_split_idx, starkqa_node_info
@@ -132,12 +126,8 @@ class StarkQAPrimeKG(Dataset):
         # Load the provided embeddings of query and nodes
         # Note that they utilized 'text-embedding-ada-002' for embeddings
         emb_model = "text-embedding-ada-002"
-        query_emb_url = (
-            "https://drive.google.com/uc?id=1MshwJttPZsHEM2cKA5T13SIrsLeBEdyU"
-        )
-        node_emb_url = (
-            "https://drive.google.com/uc?id=16EJvCMbgkVrQ0BuIBvLBp-BYPaye-Edy"
-        )
+        query_emb_url = "https://drive.google.com/uc?id=1MshwJttPZsHEM2cKA5T13SIrsLeBEdyU"
+        node_emb_url = "https://drive.google.com/uc?id=16EJvCMbgkVrQ0BuIBvLBp-BYPaye-Edy"
 
         # Prepare respective directories to store the embeddings
         emb_dir = os.path.join(self.local_dir, emb_model)
@@ -168,9 +158,7 @@ class StarkQAPrimeKG(Dataset):
         dictionary of split indices, and node information.
         """
         print("Loading StarkQAPrimeKG dataset...")
-        self.starkqa, self.starkqa_split_idx, self.starkqa_node_info = (
-            self._load_stark_repo()
-        )
+        self.starkqa, self.starkqa_split_idx, self.starkqa_node_info = self._load_stark_repo()
 
         print("Loading StarkQAPrimeKG embeddings...")
         self.query_emb_dict, self.node_emb_dict = self._load_stark_embeddings()

@@ -49,9 +49,9 @@ def df_pandas_to_kg(
 
     # Assert that the nodes in the index of the df_nodes_attrs
     # are present in the source and target columns of the df
-    assert set(df_nodes_attrs.index).issubset(
-        set(df[node_source]).union(set(df[node_target]))
-    ), "Nodes in index of df_nodes not found in df_edges"
+    assert set(df_nodes_attrs.index).issubset(set(df[node_source]).union(set(df[node_target]))), (
+        "Nodes in index of df_nodes not found in df_edges"
+    )
 
     # Create a knowledge graph from the dataframes
     # Add edges and nodes to the knowledge graph

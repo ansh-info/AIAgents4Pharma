@@ -85,9 +85,7 @@ def zotero_review(
             raise ValueError("LLM model is not available in the state.")
         structured_llm = llm_model.with_structured_output(ZoteroReviewDecision)
         # Convert the raw human response to a message for structured parsing
-        decision_response = structured_llm.invoke(
-            [HumanMessage(content=str(human_review))]
-        )
+        decision_response = structured_llm.invoke([HumanMessage(content=str(human_review))])
 
         # Process the structured response
         if decision_response.decision == "approve":
@@ -107,9 +105,7 @@ def zotero_review(
                 }
             )
         if decision_response.decision == "custom" and decision_response.custom_path:
-            logger.info(
-                "User approved with custom path: %s", decision_response.custom_path
-            )
+            logger.info("User approved with custom path: %s", decision_response.custom_path)
             return Command(
                 update={
                     "messages": [

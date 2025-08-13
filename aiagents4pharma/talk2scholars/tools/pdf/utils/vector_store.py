@@ -96,12 +96,8 @@ class Vectorstore:
 
         # Initialize Milvus connection parameters with environment variable fallback
         self.connection_args = {
-            "host": (
-                config.milvus.host if config else os.getenv("MILVUS_HOST", "127.0.0.1")
-            ),
-            "port": (
-                config.milvus.port if config else int(os.getenv("MILVUS_PORT", "19530"))
-            ),
+            "host": (config.milvus.host if config else os.getenv("MILVUS_HOST", "127.0.0.1")),
+            "port": (config.milvus.port if config else int(os.getenv("MILVUS_PORT", "19530"))),
         }
         # Log the connection parameters being used
         logger.info(
@@ -109,9 +105,7 @@ class Vectorstore:
             self.connection_args["host"],
             self.connection_args["port"],
         )
-        self.collection_name = (
-            config.milvus.collection_name if config else "pdf_rag_documents"
-        )
+        self.collection_name = config.milvus.collection_name if config else "pdf_rag_documents"
         self.db_name = config.milvus.db_name if config else "pdf_rag_db"
 
         # Get singleton instance
@@ -182,9 +176,7 @@ class Vectorstore:
             langchain_collection = getattr(self.vector_store, "collection", None)
 
         if langchain_collection is None:
-            logger.warning(
-                "No LangChain collection found, proceeding with empty loaded_papers"
-            )
+            logger.warning("No LangChain collection found, proceeding with empty loaded_papers")
             return
 
         # Force flush and check entity count
@@ -232,22 +224,16 @@ class Vectorstore:
                 if isinstance(value, str):
                     conditions.append(f'{key} == "{value}"')
                 elif isinstance(value, list):
-                    vals = ", ".join(
-                        f'"{v}"' if isinstance(v, str) else str(v) for v in value
-                    )
+                    vals = ", ".join(f'"{v}"' if isinstance(v, str) else str(v) for v in value)
                     conditions.append(f"{key} in [{vals}]")
                 else:
                     conditions.append(f"{key} == {value}")
             expr = " and ".join(conditions)
 
         # Delegate to the wrapped store
-        return self.vector_store.similarity_search(
-            query=query, k=k, expr=expr, **kwargs
-        )
+        return self.vector_store.similarity_search(query=query, k=k, expr=expr, **kwargs)
 
-    def max_marginal_relevance_search(
-        self, query: str, **kwargs: Any
-    ) -> list[Document]:
+    def max_marginal_relevance_search(self, query: str, **kwargs: Any) -> list[Document]:
         """
         Perform MMR search on the vector store.
         Query embedding will be automatically normalized if using GPU with COSINE.
@@ -272,9 +258,7 @@ class Vectorstore:
                 if isinstance(value, str):
                     conditions.append(f'{key} == "{value}"')
                 elif isinstance(value, list):
-                    vals = ", ".join(
-                        f'"{v}"' if isinstance(v, str) else str(v) for v in value
-                    )
+                    vals = ", ".join(f'"{v}"' if isinstance(v, str) else str(v) for v in value)
                     conditions.append(f"{key} in [{vals}]")
                 else:
                     conditions.append(f"{key} == {value}")

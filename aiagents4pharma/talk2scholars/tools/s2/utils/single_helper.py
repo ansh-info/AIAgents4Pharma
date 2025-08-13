@@ -87,9 +87,7 @@ class SinglePaperRecData:
                     ) from e
 
         if self.response is None:
-            raise RuntimeError(
-                "Failed to obtain a response from the Semantic Scholar API."
-            )
+            raise RuntimeError("Failed to obtain a response from the Semantic Scholar API.")
 
         logger.info(
             "API Response Status for recommendations of paper %s: %s",
@@ -111,9 +109,7 @@ class SinglePaperRecData:
 
         self.recommendations = self.data.get("recommendedPapers", [])
         if not self.recommendations:
-            logger.error(
-                "No recommendations returned from API for paper: %s", self.paper_id
-            )
+            logger.error("No recommendations returned from API for paper: %s", self.paper_id)
             raise RuntimeError(
                 "No recommendations were found for your query. Consider refining your search "
                 "by using more specific keywords or different terms."
@@ -196,9 +192,7 @@ class SinglePaperRecData:
             "Papers are attached as an artifact. "
             "Here is a summary of the recommendations:\n"
         )
-        self.content += (
-            f"Number of recommended papers found: {self.get_paper_count()}\n"
-        )
+        self.content += f"Number of recommended papers found: {self.get_paper_count()}\n"
         self.content += f"Query Paper ID: {self.paper_id}\n"
         self.content += "Here are a few of these papers:\n" + top_papers_info
 

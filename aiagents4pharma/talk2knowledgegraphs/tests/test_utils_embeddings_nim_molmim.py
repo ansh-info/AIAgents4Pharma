@@ -20,9 +20,7 @@ class TestEmbeddingWithMOLMIM(unittest.TestCase):
         self.embeddings_model = EmbeddingWithMOLMIM(self.base_url)
         self.test_texts = ["CCO", "CCC", "C=O"]
         self.test_query = "CCO"
-        self.mock_response = {
-            "embeddings": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]]
-        }
+        self.mock_response = {"embeddings": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]]}
 
     @patch("requests.post")
     def test_embed_documents(self, mock_post):

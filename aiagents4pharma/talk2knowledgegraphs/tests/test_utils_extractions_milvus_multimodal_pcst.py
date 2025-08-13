@@ -20,9 +20,7 @@ class TestMultimodalPCSTPruning(unittest.TestCase):
 
     def setUp(self):
         # Patch cupy and cudf to simulate GPU environment
-        patcher_cupy = patch.dict(
-            "sys.modules", {"cupy": MagicMock(), "cudf": MagicMock()}
-        )
+        patcher_cupy = patch.dict("sys.modules", {"cupy": MagicMock(), "cudf": MagicMock()})
         patcher_cupy.start()
         self.addCleanup(patcher_cupy.stop)
 
@@ -50,8 +48,7 @@ class TestMultimodalPCSTPruning(unittest.TestCase):
 
         # Patch pickle.load to return a numpy array for edge_index
         self.pickle_patcher = patch(
-            "aiagents4pharma.talk2knowledgegraphs.utils."
-            "extractions.milvus_multimodal_pcst.pickle"
+            "aiagents4pharma.talk2knowledgegraphs.utils.extractions.milvus_multimodal_pcst.pickle"
         )
         self.mock_pickle = self.pickle_patcher.start()
         self.addCleanup(self.pickle_patcher.stop)
@@ -68,9 +65,7 @@ class TestMultimodalPCSTPruning(unittest.TestCase):
         node_coll.search.return_value = [[MagicMock(id=0), MagicMock(id=1)]]
         edge_coll = MagicMock()
         edge_coll.num_entities = 2
-        edge_coll.search.return_value = [
-            [MagicMock(id=0, score=1.0), MagicMock(id=1, score=0.5)]
-        ]
+        edge_coll.search.return_value = [[MagicMock(id=0, score=1.0), MagicMock(id=1, score=0.5)]]
         self.mock_collection.side_effect = lambda name: (
             node_coll if "nodes" in name else edge_coll
         )
@@ -183,8 +178,7 @@ class TestMultimodalPCSTPruning(unittest.TestCase):
         cudf as numpy and pandas.
         """
         module_name = (
-            "aiagents4pharma.talk2knowledgegraphs.utils"
-            + ".extractions.milvus_multimodal_pcst"
+            "aiagents4pharma.talk2knowledgegraphs.utils" + ".extractions.milvus_multimodal_pcst"
         )
         with patch.dict("sys.modules", {"cupy": np, "cudf": pd}):
             # Reload the module to trigger the GPU branch

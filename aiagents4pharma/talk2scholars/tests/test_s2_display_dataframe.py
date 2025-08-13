@@ -54,9 +54,7 @@ class TestS2Tools:
             raised_error,
             match="No papers found. A search/rec needs to be performed first.",
         ):
-            display_dataframe.invoke(
-                {"state": initial_state, "tool_call_id": "test123"}
-            )
+            display_dataframe.invoke({"state": initial_state, "tool_call_id": "test123"})
 
     def test_display_dataframe_shows_papers(self, initial_state):
         """Verifies display_dataframe tool correctly returns papers from state"""
@@ -64,9 +62,7 @@ class TestS2Tools:
         state["last_displayed_papers"] = "papers"
         state["papers"] = MOCK_STATE_PAPER
 
-        result = display_dataframe.invoke(
-            input={"state": state, "tool_call_id": "test123"}
-        )
+        result = display_dataframe.invoke(input={"state": state, "tool_call_id": "test123"})
 
         assert isinstance(result, Command)  # Expect a Command object
         assert isinstance(result.update, dict)  # Ensure update is a dictionary

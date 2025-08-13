@@ -9,9 +9,7 @@ class TestEnrichments(Enrichments):
     """Test implementation of the Enrichments interface for testing purposes."""
 
     def enrich_documents(self, texts: list[str]) -> list[list[float]]:
-        return [
-            f"Additional text description of {text} as the input." for text in texts
-        ]
+        return [f"Additional text description of {text} as the input." for text in texts]
 
     def enrich_documents_with_rag(self, texts, docs):
         # Currently we don't have a RAG model to test this method.

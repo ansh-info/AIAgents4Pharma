@@ -54,9 +54,7 @@ def get_app(uniq_id, llm_model: BaseChatModel):
         cfg = cfg.agents.talk2scholars.paper_download_agent
 
     # Define tools properly
-    tools = ToolNode(
-        [download_arxiv_paper, download_medrxiv_paper, download_biorxiv_paper]
-    )
+    tools = ToolNode([download_arxiv_paper, download_medrxiv_paper, download_biorxiv_paper])
 
     # Define the model
     logger.info("Using OpenAI model %s", llm_model)

@@ -46,14 +46,10 @@ class MultimodalSubgraphExtractionInput(BaseModel):
         arg_data: Argument for analytical process over graph data.
     """
 
-    tool_call_id: Annotated[str, InjectedToolCallId] = Field(
-        description="Tool call ID."
-    )
+    tool_call_id: Annotated[str, InjectedToolCallId] = Field(description="Tool call ID.")
     state: Annotated[dict, InjectedState] = Field(description="Injected state.")
     prompt: str = Field(description="Prompt to interact with the backend.")
-    arg_data: ArgumentData = Field(
-        description="Experiment over graph data.", default=None
-    )
+    arg_data: ArgumentData = Field(description="Experiment over graph data.", default=None)
 
 
 class MultimodalSubgraphExtractionTool(BaseTool):
@@ -66,9 +62,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
     description: str = "A tool for subgraph extraction based on user's prompt."
     args_schema: type[BaseModel] = MultimodalSubgraphExtractionInput
 
-    def _read_multimodal_files(
-        self, state: Annotated[dict, InjectedState]
-    ) -> df.DataFrame:
+    def _read_multimodal_files(self, state: Annotated[dict, InjectedState]) -> df.DataFrame:
         """
         Read the uploaded multimodal files and return a DataFrame.
 
@@ -104,9 +98,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
             )
             # Since an excel sheet name could not contain a `/`,
             # but the node type can be 'gene/protein' as exists in the PrimeKG
-            multimodal_df["q_node_type"] = multimodal_df["q_node_type"].str.replace(
-                "-", "_"
-            )
+            multimodal_df["q_node_type"] = multimodal_df["q_node_type"].str.replace("-", "_")
 
         return multimodal_df
 
@@ -164,9 +156,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
                 q_node_names = getattr(
                     node_type_df["q_node_name"],
                     "to_pandas",
-                    lambda nt_df=node_type_df: nt_df[
-                        "q_node_name"
-                    ],  # capture current value
+                    lambda nt_df=node_type_df: nt_df["q_node_name"],  # capture current value
                 )().tolist()
                 q_columns = [
                     "node_id",
@@ -194,9 +184,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
                 query_df.append(res_df)
 
             # Concatenate all results into a single DataFrame
-            logger.log(
-                logging.INFO, "Concatenating all results into a single DataFrame"
-            )
+            logger.log(logging.INFO, "Concatenating all results into a single DataFrame")
             query_df = df.concat(query_df, ignore_index=True)
 
             # Update the state by adding the the selected node IDs
@@ -261,9 +249,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
                 verbosity_level=cfg.verbosity_level,
                 use_description=q[1]["use_description"],
                 metric_type=cfg.search_metric_type,
-            ).extract_subgraph(
-                q[1]["desc_emb"], q[1]["feat_emb"], q[1]["node_type"], cfg_db
-            )
+            ).extract_subgraph(q[1]["desc_emb"], q[1]["feat_emb"], q[1]["node_type"], cfg_db)
 
             # Append the extracted subgraph to the dictionary
             unified_subgraph["nodes"].append(subgraph["nodes"].tolist())
@@ -324,18 +310,14 @@ class MultimodalSubgraphExtractionTool(BaseTool):
         """
         # Convert the dict to a cudf DataFrame
         node_colors = {
-            n: cfg.node_colors_dict[k]
-            for k, v in state["selections"].items()
-            for n in v
+            n: cfg.node_colors_dict[k] for k, v in state["selections"].items() for n in v
         }
         color_df = df.DataFrame(list(node_colors.items()), columns=["node_id", "color"])
         # print(color_df)
 
         # Prepare the subgraph dictionary
         graph_dict = {"name": [], "nodes": [], "edges": [], "text": ""}
-        for sub in getattr(subgraph, "to_pandas", lambda: subgraph)().itertuples(
-            index=False
-        ):
+        for sub in getattr(subgraph, "to_pandas", lambda: subgraph)().itertuples(index=False):
             # Prepare the graph name
             print(f"Processing subgraph: {sub.name}")
             print("---")
@@ -360,9 +342,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
                 graph_nodes = graph_nodes.merge(color_df, on="node_id", how="left")
             else:
                 graph_nodes["color"] = "black"  # Default color
-            graph_nodes["color"].fillna(
-                "black", inplace=True
-            )  # Fill NaN colors with black
+            graph_nodes["color"].fillna("black", inplace=True)  # Fill NaN colors with black
             # Edges
             coll_name = f"{cfg_db.milvus_db.database_name}_edges"
             edge_coll = Collection(name=coll_name)
@@ -416,13 +396,13 @@ class MultimodalSubgraphExtractionTool(BaseTool):
                 graph_nodes.rename(columns={"desc": "node_attr"}, inplace=True)
                 graph_edges = graph_edges[["head_id", "edge_type", "tail_id"]]
                 graph_dict["text"] = (
-                    getattr(
-                        graph_nodes, "to_pandas", lambda gn=graph_nodes: gn
-                    )().to_csv(index=False)
+                    getattr(graph_nodes, "to_pandas", lambda gn=graph_nodes: gn)().to_csv(
+                        index=False
+                    )
                     + "\n"
-                    + getattr(
-                        graph_edges, "to_pandas", lambda ge=graph_edges: ge
-                    )().to_csv(index=False)
+                    + getattr(graph_edges, "to_pandas", lambda ge=graph_edges: ge)().to_csv(
+                        index=False
+                    )
                 )
 
         return graph_dict
@@ -488,9 +468,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
         query_df = self._prepare_query_modalities(
             {
                 "text": prompt,
-                "emb": [
-                    self.normalize_vector(state["embedding_model"].embed_query(prompt))
-                ],
+                "emb": [self.normalize_vector(state["embedding_model"].embed_query(prompt))],
             },
             state,
             cfg_db,

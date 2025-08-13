@@ -107,9 +107,7 @@ def test_zotero_agent_tools_assignment(request):
         mock.patch(
             "aiagents4pharma.talk2scholars.agents.zotero_agent.create_react_agent"
         ) as mock_create,
-        mock.patch(
-            "aiagents4pharma.talk2scholars.agents.zotero_agent.ToolNode"
-        ) as mock_toolnode,
+        mock.patch("aiagents4pharma.talk2scholars.agents.zotero_agent.ToolNode") as mock_toolnode,
     ):
         mock_agent = mock.Mock()
         mock_create.return_value = mock_agent
@@ -124,9 +122,7 @@ def test_zotero_agent_tools_assignment(request):
 def test_s2_query_dataframe_tool():
     """Test if the query_dataframe tool is correctly utilized by the agent."""
     thread_id = "test_thread"
-    mock_state = Talk2Scholars(
-        messages=[HumanMessage(content="Query results for AI papers")]
-    )
+    mock_state = Talk2Scholars(messages=[HumanMessage(content="Query results for AI papers")])
     with mock.patch(
         "aiagents4pharma.talk2scholars.agents.zotero_agent.create_react_agent"
     ) as mock_create:

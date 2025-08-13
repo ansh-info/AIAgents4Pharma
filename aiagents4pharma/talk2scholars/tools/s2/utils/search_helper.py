@@ -41,9 +41,7 @@ class SearchData:
     def _load_config(self) -> Any:
         """Load hydra configuration."""
         with hydra.initialize(version_base=None, config_path="../../../configs"):
-            cfg = hydra.compose(
-                config_name="config", overrides=["tools/search=default"]
-            )
+            cfg = hydra.compose(config_name="config", overrides=["tools/search=default"])
             logger.info("Loaded configuration for search tool")
             return cfg.tools.search
 
@@ -65,9 +63,7 @@ class SearchData:
         # Wrap API call in try/except to catch connectivity issues
         for attempt in range(10):
             try:
-                self.response = requests.get(
-                    self.endpoint, params=self.params, timeout=10
-                )
+                self.response = requests.get(self.endpoint, params=self.params, timeout=10)
                 self.response.raise_for_status()  # Raises HTTPError for bad responses
                 break  # Exit loop if request is successful
             except requests.exceptions.RequestException as e:
@@ -83,9 +79,7 @@ class SearchData:
                     ) from e
 
         if self.response is None:
-            raise RuntimeError(
-                "Failed to obtain a response from the Semantic Scholar API."
-            )
+            raise RuntimeError("Failed to obtain a response from the Semantic Scholar API.")
 
         self.data = self.response.json()
 
@@ -100,9 +94,7 @@ class SearchData:
 
         self.papers = self.data.get("data", [])
         if not self.papers:
-            logger.error(
-                "No papers returned from Semantic Scholar API for query: %s", self.query
-            )
+            logger.error("No papers returned from Semantic Scholar API for query: %s", self.query)
             raise RuntimeError(
                 "No papers were found for your query. Consider refining your search "
                 "by using more specific keywords or different terms."

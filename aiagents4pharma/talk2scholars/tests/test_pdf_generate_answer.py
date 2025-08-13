@@ -61,16 +61,12 @@ def test_generate_answer_success(chunks_fixture):
 def test_generate_answer_raises_for_none_config(chunks_fixture):
     """generate_answer should raise ValueError for None config."""
     mock_llm = MagicMock()
-    with pytest.raises(
-        ValueError, match="Configuration for generate_answer is required."
-    ):
+    with pytest.raises(ValueError, match="Configuration for generate_answer is required."):
         generate_answer("Why?", chunks_fixture, mock_llm, config=None)
 
 
 def test_generate_answer_raises_for_missing_template(chunks_fixture):
     """generate_answer should raise ValueError for missing prompt_template in config."""
     mock_llm = MagicMock()
-    with pytest.raises(
-        ValueError, match="The prompt_template is missing from the configuration."
-    ):
+    with pytest.raises(ValueError, match="The prompt_template is missing from the configuration."):
         generate_answer("Why?", chunks_fixture, mock_llm, config={})

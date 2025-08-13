@@ -21,11 +21,7 @@ def test_simulate_model_tool():
     # Upload a model to the state
     app.update_state(
         config,
-        {
-            "sbml_file_path": [
-                "aiagents4pharma/talk2biomodels/tests/BIOMD0000000449_url.xml"
-            ]
-        },
+        {"sbml_file_path": ["aiagents4pharma/talk2biomodels/tests/BIOMD0000000449_url.xml"]},
     )
     prompt = "Simulate model 64 and the uploaded model"
     # Invoke the agent

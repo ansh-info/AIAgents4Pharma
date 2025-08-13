@@ -94,12 +94,8 @@ class TestFindOrCreateCollectionExtra(unittest.TestCase):
         # Simulate no existing collections (so direct match fails)
         self.fake_zot.collections.return_value = []
         # Simulate create_collection returning a dict with a "success" key.
-        self.fake_zot.create_collection.return_value = {
-            "success": {"0": "new_key_success"}
-        }
-        result = find_or_create_collection(
-            self.fake_zot, "/NewCollection", create_missing=True
-        )
+        self.fake_zot.create_collection.return_value = {"success": {"0": "new_key_success"}}
+        result = find_or_create_collection(self.fake_zot, "/NewCollection", create_missing=True)
         self.assertEqual(result, "new_key_success")
         # Verify payload formatting: for a simple (non-nested) path, no parentCollection.
         args, _ = self.fake_zot.create_collection.call_args
@@ -116,9 +112,7 @@ class TestFindOrCreateCollectionExtra(unittest.TestCase):
         self.fake_zot.create_collection.return_value = {
             "successful": {"0": {"data": {"key": "new_key_successful"}}}
         }
-        result = find_or_create_collection(
-            self.fake_zot, "/NewCollection", create_missing=True
-        )
+        result = find_or_create_collection(self.fake_zot, "/NewCollection", create_missing=True)
         self.assertEqual(result, "new_key_successful")
 
     def test_create_collection_exception(self):
@@ -128,9 +122,7 @@ class TestFindOrCreateCollectionExtra(unittest.TestCase):
         """
         self.fake_zot.collections.return_value = []
         self.fake_zot.create_collection.side_effect = Exception("Creation error")
-        result = find_or_create_collection(
-            self.fake_zot, "/NewCollection", create_missing=True
-        )
+        result = find_or_create_collection(self.fake_zot, "/NewCollection", create_missing=True)
         self.assertIsNone(result)
 
 
@@ -230,9 +222,7 @@ class TestZoteroPath:
         mock_zotero.return_value = mock_zot
 
         # Setup collections
-        collections = [
-            {"key": "abc123", "data": {"name": "Curiosity", "parentCollection": None}}
-        ]
+        collections = [{"key": "abc123", "data": {"name": "Curiosity", "parentCollection": None}}]
         mock_zot.collections.return_value = collections
 
         # Setup create_collection response
@@ -251,9 +241,7 @@ class TestZoteroPath:
 
         # Test creating nested "Curiosity/Curiosity2"
         mock_zot.create_collection.reset_mock()
-        result = find_or_create_collection(
-            mock_zot, "/Curiosity/Curiosity2", create_missing=True
-        )
+        result = find_or_create_collection(mock_zot, "/Curiosity/Curiosity2", create_missing=True)
         assert result == "new_key"
         # Check that the call includes parentCollection
         mock_zot.create_collection.assert_called_once()
@@ -316,9 +304,7 @@ class TestZoteroWrite:
             mock_zot_class.return_value = mock_zot
             yield mock_zot
 
-    @patch(
-        "aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.fetch_papers_for_save"
-    )
+    @patch("aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.fetch_papers_for_save")
     def test_zotero_write_no_papers(self, mock_fetch):
         """When no papers exist (even after approval), the function raises a ValueError."""
         mock_fetch.return_value = None
@@ -340,9 +326,7 @@ class TestZoteroWrite:
             )
         assert "No fetched papers were found to save" in str(excinfo.value)
 
-    @patch(
-        "aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.fetch_papers_for_save"
-    )
+    @patch("aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.fetch_papers_for_save")
     @patch(
         "aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.find_or_create_collection"
     )
@@ -377,9 +361,7 @@ class TestZoteroWrite:
         assert "does not exist in Zotero" in msg
         assert "Curiosity, Random" in msg
 
-    @patch(
-        "aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.fetch_papers_for_save"
-    )
+    @patch("aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.fetch_papers_for_save")
     @patch(
         "aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.find_or_create_collection"
     )
@@ -388,12 +370,8 @@ class TestZoteroWrite:
         sample = {"paper1": {"Title": "Test Paper", "Authors": ["Test Author"]}}
         mock_fetch.return_value = sample
         mock_find.return_value = "abc123"
-        mock_zotero.collections.return_value = [
-            {"key": "abc123", "data": {"name": "radiation"}}
-        ]
-        mock_zotero.create_items.return_value = {
-            "successful": {"0": {"key": "item123"}}
-        }
+        mock_zotero.collections.return_value = [{"key": "abc123", "data": {"name": "radiation"}}]
+        mock_zotero.create_items.return_value = {"successful": {"0": {"key": "item123"}}}
         mock_hydra.tools.zotero_write.zotero.max_limit = 50
 
         state = {
@@ -425,9 +403,7 @@ class TestZoteroRead:
     def mock_hydra(self):
         """Fixture to mock hydra configuration."""
         with (
-            patch(
-                "aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.hydra.initialize"
-            ),
+            patch("aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.hydra.initialize"),
             patch(
                 "aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.hydra.compose"
             ) as mock_compose,
@@ -455,9 +431,7 @@ class TestZoteroRead:
             mock_zot_class.return_value = mock_zot
             yield mock_zot
 
-    @patch(
-        "aiagents4pharma.talk2scholars.tools.zotero.utils.zotero_path.get_item_collections"
-    )
+    @patch("aiagents4pharma.talk2scholars.tools.zotero.utils.zotero_path.get_item_collections")
     def test_zotero_read_item_collections_error(
         self, mock_get_collections, mock_hydra, mock_zotero
     ):

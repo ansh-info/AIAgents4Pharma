@@ -163,12 +163,12 @@ def test_main_agent_invokes_t2kg(input_dict):
         mock_cfg.node_colors_dict = {"drug": "blue", "gene/protein": "red"}
         mock_compose.return_value = MagicMock()
         mock_compose.return_value.tools.multimodal_subgraph_extraction = mock_cfg
-        mock_compose.return_value.tools.subgraph_summarization.prompt_subgraph_summarization = "Summarize the following subgraph: {textualized_subgraph}"
+        mock_compose.return_value.tools.subgraph_summarization.prompt_subgraph_summarization = (
+            "Summarize the following subgraph: {textualized_subgraph}"
+        )
 
         # Invoke the agent
-        response = app.invoke(
-            {"messages": [HumanMessage(content=prompt)]}, config=config
-        )
+        response = app.invoke({"messages": [HumanMessage(content=prompt)]}, config=config)
 
     # Check assistant message
     assistant_msg = response["messages"][-1].content

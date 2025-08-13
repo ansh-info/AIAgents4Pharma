@@ -56,9 +56,7 @@ class QuestionAndAnswerInput(BaseModel):
         - llm_model: chat/LLM instance for answer generation.
     """
 
-    question: str = Field(
-        description="User question for generating a PDF-based answer."
-    )
+    question: str = Field(description="User question for generating a PDF-based answer.")
     tool_call_id: Annotated[str, InjectedToolCallId]
     state: Annotated[dict, InjectedState]
 
@@ -133,9 +131,7 @@ def question_and_answer(
     )
 
     # Retrieve and rerank chunks in one step
-    reranked_chunks = retrieve_and_rerank_chunks(
-        vs, question, config, call_id, helper.has_gpu
-    )
+    reranked_chunks = retrieve_and_rerank_chunks(vs, question, config, call_id, helper.has_gpu)
 
     if not reranked_chunks:
         msg = f"No relevant chunks found for question: '{question}'"

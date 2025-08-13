@@ -39,9 +39,7 @@ class ReviewData:
 
     def get_custom_path_approval_message(self, custom_path: str) -> str:
         """Get the formatted approval message for a custom collection path."""
-        return (
-            f"Human approved saving papers to custom Zotero collection '{custom_path}'."
-        )
+        return f"Human approved saving papers to custom Zotero collection '{custom_path}'."
 
     def _create_papers_summary(self) -> list[str]:
         """Create a summary of papers for review."""

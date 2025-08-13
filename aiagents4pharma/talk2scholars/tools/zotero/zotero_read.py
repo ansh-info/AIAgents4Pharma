@@ -35,16 +35,12 @@ class ZoteroSearchInput(BaseModel):
         tool_call_id (str): Internal identifier for this tool invocation.
     """
 
-    query: str = Field(
-        description="Search query string to find papers in Zotero library."
-    )
+    query: str = Field(description="Search query string to find papers in Zotero library.")
     only_articles: bool = Field(
         default=True,
         description="Whether to only search for journal articles/conference papers.",
     )
-    limit: int = Field(
-        default=2, description="Maximum number of results to return", ge=1, le=100
-    )
+    limit: int = Field(default=2, description="Maximum number of results to return", ge=1, le=100)
     download_pdfs: bool = Field(
         default=False,
         description="Whether to download PDF attachments immediately (default True).",

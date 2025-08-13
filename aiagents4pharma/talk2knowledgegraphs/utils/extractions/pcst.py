@@ -80,8 +80,7 @@ class PCSTPruning(NamedTuple):
         last_topk_e_value = topk_e
         for k in range(topk_e):
             indices = (
-                inverse_indices
-                == (unique_prizes == topk_e_values[k]).nonzero(as_tuple=True)[0]
+                inverse_indices == (unique_prizes == topk_e_values[k]).nonzero(as_tuple=True)[0]
             )
             value = min((topk_e - k) / indices.sum().item(), last_topk_e_value)
             e_prizes[indices] = value
@@ -183,9 +182,7 @@ class PCSTPruning(NamedTuple):
             subgraph_edges = np.array(subgraph_edges + virtual_edges)
         edge_index = graph.edge_index[:, subgraph_edges]
         subgraph_nodes = np.unique(
-            np.concatenate(
-                [subgraph_nodes, edge_index[0].numpy(), edge_index[1].numpy()]
-            )
+            np.concatenate([subgraph_nodes, edge_index[0].numpy(), edge_index[1].numpy()])
         )
 
         return {"nodes": subgraph_nodes, "edges": subgraph_edges}

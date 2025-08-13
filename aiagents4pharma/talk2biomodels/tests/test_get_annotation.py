@@ -152,12 +152,8 @@ def test_all_species_annotations(make_graph):
                 # Extact the first and second description of the LacI protein
                 # We already know that the first or second description is missing ('-')
                 dic_annotations_data = current_state.values["dic_annotations_data"][0]
-                first_descp_laci_protein = dic_annotations_data["data"]["Description"][
-                    0
-                ]
-                second_descp_laci_protein = dic_annotations_data["data"]["Description"][
-                    1
-                ]
+                first_descp_laci_protein = dic_annotations_data["data"]["Description"][0]
+                second_descp_laci_protein = dic_annotations_data["data"]["Description"][1]
 
                 # Expect a successful extraction (artifact is True) and that the content
                 # matches what is returned by prepare_content_msg for species.
@@ -166,10 +162,7 @@ def test_all_species_annotations(make_graph):
                     msg.artifact is True
                     and msg.content == prepare_content_msg([])
                     and msg.status == "success"
-                    and (
-                        first_descp_laci_protein == "-"
-                        or second_descp_laci_protein == "-"
-                    )
+                    and (first_descp_laci_protein == "-" or second_descp_laci_protein == "-")
                 ):
                     test_condition = True
                     break

@@ -107,17 +107,12 @@ class DummyHydraContext:
 def dict_to_namespace(d):
     """Convert a dictionary to a SimpleNamespace object."""
     return SimpleNamespace(
-        **{
-            key: dict_to_namespace(val) if isinstance(val, dict) else val
-            for key, val in d.items()
-        }
+        **{key: dict_to_namespace(val) if isinstance(val, dict) else val for key, val in d.items()}
     )
 
 
 dummy_config = {
-    "agents": {
-        "talk2scholars": {"main_agent": {"system_prompt": "Dummy system prompt"}}
-    }
+    "agents": {"talk2scholars": {"main_agent": {"system_prompt": "Dummy system prompt"}}}
 }
 
 
@@ -143,9 +138,7 @@ class DummyHydraCompose:
 @pytest.fixture(autouse=True)
 def patch_hydra(monkeypatch):
     """Patch the hydra.initialize and hydra.compose functions to return dummy objects."""
-    monkeypatch.setattr(
-        hydra, "initialize", lambda version_base, config_path: DummyHydraContext()
-    )
+    monkeypatch.setattr(hydra, "initialize", lambda version_base, config_path: DummyHydraContext())
     monkeypatch.setattr(
         hydra, "compose", lambda config_name, overrides: DummyHydraCompose(dummy_config)
     )
@@ -155,9 +148,7 @@ def dummy_paper_download_agent(uniq_id, llm_model):
     """Return a DummyWorkflow for the paper download agent."""
     dummy_paper_download_agent.called_uniq_id = uniq_id
     dummy_paper_download_agent.called_llm_model = llm_model
-    return DummyWorkflow(
-        supervisor_args={"agent": "paper_download", "uniq_id": uniq_id}
-    )
+    return DummyWorkflow(supervisor_args={"agent": "paper_download", "uniq_id": uniq_id})
 
 
 @pytest.fixture(autouse=True)

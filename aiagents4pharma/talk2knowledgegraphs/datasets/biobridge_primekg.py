@@ -146,9 +146,7 @@ class BioBridgePrimeKG(Dataset):
         )
 
         # Load the downloaded data config file
-        with open(
-            os.path.join(self.local_dir, "data_config.json"), encoding="utf-8"
-        ) as f:
+        with open(os.path.join(self.local_dir, "data_config.json"), encoding="utf-8") as f:
             data_config = json.load(f)
 
         return data_config
@@ -160,9 +158,7 @@ class BioBridgePrimeKG(Dataset):
         Returns:
             The dictionary of node embeddings.
         """
-        processed_file_path = os.path.join(
-            self.local_dir, "embeddings", "embedding_dict.pkl"
-        )
+        processed_file_path = os.path.join(self.local_dir, "embeddings", "embedding_dict.pkl")
         if os.path.exists(processed_file_path):
             # Load the embeddings from the local directory
             with open(processed_file_path, "rb") as f:
@@ -208,22 +204,16 @@ class BioBridgePrimeKG(Dataset):
             The full triplets for BioBridgePrimeKG dataset.
             The dictionary of node information.
         """
-        processed_file_path = os.path.join(
-            self.local_dir, "processed", "triplet_full.tsv.gz"
-        )
+        processed_file_path = os.path.join(self.local_dir, "processed", "triplet_full.tsv.gz")
         if os.path.exists(processed_file_path):
             # Load the file from the local directory
             with open(processed_file_path, "rb") as f:
-                primekg_triplets = pd.read_csv(
-                    f, sep="\t", compression="gzip", low_memory=False
-                )
+                primekg_triplets = pd.read_csv(f, sep="\t", compression="gzip", low_memory=False)
 
             # Load each dataframe in the local directory
             node_info_dict = {}
             for i, node_type in enumerate(self.preselected_node_types):
-                with open(
-                    os.path.join(self.local_dir, "processed", f"{node_type}.csv"), "rb"
-                ) as f:
+                with open(os.path.join(self.local_dir, "processed", f"{node_type}.csv"), "rb") as f:
                     df_node = pd.read_csv(f)
                 node_info_dict[self.node_type_map[node_type]] = df_node
                 print(i)
@@ -262,9 +252,7 @@ class BioBridgePrimeKG(Dataset):
                         f"{self.preselected_node_types[i]}.csv",
                     )
                 )
-                node_info_dict[self.node_type_map[self.preselected_node_types[i]]] = (
-                    df_node
-                )
+                node_info_dict[self.node_type_map[self.preselected_node_types[i]]] = df_node
                 node_index_list.extend(df_node["node_index"].tolist())
                 print(i, file)
 
@@ -285,14 +273,12 @@ class BioBridgePrimeKG(Dataset):
             )
 
             # Perform mapping of relation types
-            primekg_triplets["display_relation"] = primekg_triplets[
-                "display_relation"
-            ].apply(lambda x: self.data_config["relation_type"][x])
+            primekg_triplets["display_relation"] = primekg_triplets["display_relation"].apply(
+                lambda x: self.data_config["relation_type"][x]
+            )
 
             # Store the processed triplets
-            primekg_triplets.to_csv(
-                processed_file_path, sep="\t", compression="gzip", index=False
-            )
+            primekg_triplets.to_csv(processed_file_path, sep="\t", compression="gzip", index=False)
 
         return primekg_triplets, node_info_dict
 
@@ -309,45 +295,25 @@ class BioBridgePrimeKG(Dataset):
             The test nodes for BioBridgePrimeKG dataset.
             The full triplets for BioBridgePrimeKG dataset.
         """
-        if os.path.exists(
-            os.path.join(self.local_dir, "processed", "triplet_full_altered.tsv.gz")
-        ):
+        if os.path.exists(os.path.join(self.local_dir, "processed", "triplet_full_altered.tsv.gz")):
             # Load each dataframe in the local directory
-            with open(
-                os.path.join(self.local_dir, "processed", "triplet_train.tsv.gz"), "rb"
-            ) as f:
-                df_train = pd.read_csv(
-                    f, sep="\t", compression="gzip", low_memory=False
-                )
+            with open(os.path.join(self.local_dir, "processed", "triplet_train.tsv.gz"), "rb") as f:
+                df_train = pd.read_csv(f, sep="\t", compression="gzip", low_memory=False)
 
-            with open(
-                os.path.join(self.local_dir, "processed", "node_train.tsv.gz"), "rb"
-            ) as f:
-                df_node_train = pd.read_csv(
-                    f, sep="\t", compression="gzip", low_memory=False
-                )
+            with open(os.path.join(self.local_dir, "processed", "node_train.tsv.gz"), "rb") as f:
+                df_node_train = pd.read_csv(f, sep="\t", compression="gzip", low_memory=False)
 
-            with open(
-                os.path.join(self.local_dir, "processed", "triplet_test.tsv.gz"), "rb"
-            ) as f:
+            with open(os.path.join(self.local_dir, "processed", "triplet_test.tsv.gz"), "rb") as f:
                 df_test = pd.read_csv(f, sep="\t", compression="gzip", low_memory=False)
 
-            with open(
-                os.path.join(self.local_dir, "processed", "node_test.tsv.gz"), "rb"
-            ) as f:
-                df_node_test = pd.read_csv(
-                    f, sep="\t", compression="gzip", low_memory=False
-                )
+            with open(os.path.join(self.local_dir, "processed", "node_test.tsv.gz"), "rb") as f:
+                df_node_test = pd.read_csv(f, sep="\t", compression="gzip", low_memory=False)
 
             with open(
-                os.path.join(
-                    self.local_dir, "processed", "triplet_full_altered.tsv.gz"
-                ),
+                os.path.join(self.local_dir, "processed", "triplet_full_altered.tsv.gz"),
                 "rb",
             ) as f:
-                triplets = pd.read_csv(
-                    f, sep="\t", compression="gzip", low_memory=False
-                )
+                triplets = pd.read_csv(f, sep="\t", compression="gzip", low_memory=False)
         else:
             # Filtering out some nodes in the embedding dictionary
             triplets = self.primekg_triplets.copy()
@@ -389,18 +355,12 @@ class BioBridgePrimeKG(Dataset):
                 node_index = {}
                 node_index["train"] = df_subs["train"]["head_index"].unique()
                 node_split["train"]["node_index"].extend(node_index["train"].tolist())
-                node_split["train"]["node_type"].extend(
-                    [node_type] * len(node_index["train"])
-                )
+                node_split["train"]["node_type"].extend([node_type] * len(node_index["train"]))
                 node_index["test"] = df_subs["test"]["head_index"].unique()
                 node_split["test"]["node_index"].extend(node_index["test"].tolist())
-                node_split["test"]["node_type"].extend(
-                    [node_type] * len(node_index["test"])
-                )
+                node_split["test"]["node_type"].extend([node_type] * len(node_index["test"]))
 
-                print(
-                    f"Number of {node_type} nodes in train: {len(node_index['train'])}"
-                )
+                print(f"Number of {node_type} nodes in train: {len(node_index['train'])}")
                 print(f"Number of {node_type} nodes in test: {len(node_index['test'])}")
 
             # Prepare train and test DataFrames
@@ -436,9 +396,7 @@ class BioBridgePrimeKG(Dataset):
             )
             # Store altered full triplets as well
             triplets.to_csv(
-                os.path.join(
-                    self.local_dir, "processed", "triplet_full_altered.tsv.gz"
-                ),
+                os.path.join(self.local_dir, "processed", "triplet_full_altered.tsv.gz"),
                 sep="\t",
                 compression="gzip",
                 index=False,

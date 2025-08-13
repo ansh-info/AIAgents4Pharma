@@ -14,9 +14,7 @@ def model_fixture():
     """
     A fixture for the BasicoModel class.
     """
-    return BasicoModel(
-        biomodel_id=64, species={"Pyruvate": 100}, duration=2, interval=2
-    )
+    return BasicoModel(biomodel_id=64, species={"Pyruvate": 100}, duration=2, interval=2)
 
 
 def test_with_biomodel_id(model):
@@ -35,10 +33,7 @@ def test_with_biomodel_id(model):
     # and it should not raise an error
     model.update_parameters(parameters={None: None})
     # check if the model description is updated
-    assert (
-        model.description
-        == basico.biomodels.get_model_info(model.biomodel_id)["description"]
-    )
+    assert model.description == basico.biomodels.get_model_info(model.biomodel_id)["description"]
     # check if an error is raised if an invalid species/parameter (`Pyruv`)
     # is passed and it should raise a ValueError
     with pytest.raises(ValueError):

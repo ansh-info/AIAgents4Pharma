@@ -95,9 +95,7 @@ def display_dataframe(
         artifact = state.get(context_val)
     if not artifact:
         logger.info("No papers found in state, raising NoPapersFoundError")
-        raise NoPapersFoundError(
-            "No papers found. A search/rec needs to be performed first."
-        )
+        raise NoPapersFoundError("No papers found. A search/rec needs to be performed first.")
     content = f"{len(artifact)} papers found. Papers are attached as an artifact."
     return Command(
         update={

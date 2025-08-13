@@ -26,9 +26,7 @@ def cas_rn2pubchem_cid(casrn):
     """
     # Load Hydra configuration for PubChem ID conversion
     with hydra.initialize(version_base=None, config_path="../configs"):
-        cfg = hydra.compose(
-            config_name="config", overrides=["utils/pubchem_utils=default"]
-        )
+        cfg = hydra.compose(config_name="config", overrides=["utils/pubchem_utils=default"])
         cfg = cfg.utils.pubchem_utils
     # Prepare the URL
     pubchem_url_for_drug = f"{cfg.pubchem_casrn2cid_url}{casrn}/record/JSON"
@@ -39,11 +37,7 @@ def cas_rn2pubchem_cid(casrn):
     cid = None
     for substance in data.get("PC_Substances", []):
         for compound in substance.get("compound", []):
-            if (
-                "id" in compound
-                and "type" in compound["id"]
-                and compound["id"]["type"] == 1
-            ):
+            if "id" in compound and "type" in compound["id"] and compound["id"]["type"] == 1:
                 cid = compound["id"].get("id", {}).get("cid")
                 break
         if cid is not None:
@@ -67,9 +61,7 @@ def external_id2pubchem_cid(db, db_id):
     """
     # Load Hydra configuration for PubChem ID conversion
     with hydra.initialize(version_base=None, config_path="../configs"):
-        cfg = hydra.compose(
-            config_name="config", overrides=["utils/pubchem_utils=default"]
-        )
+        cfg = hydra.compose(config_name="config", overrides=["utils/pubchem_utils=default"])
         cfg = cfg.utils.pubchem_utils
     # Prepare the URL
     pubchem_url_for_drug = f"{cfg.pubchem_cid_base_url}/{db}/{db_id}/JSON"
@@ -80,11 +72,7 @@ def external_id2pubchem_cid(db, db_id):
     cid = None
     for substance in data.get("PC_Substances", []):
         for compound in substance.get("compound", []):
-            if (
-                "id" in compound
-                and "type" in compound["id"]
-                and compound["id"]["type"] == 1
-            ):
+            if "id" in compound and "type" in compound["id"] and compound["id"]["type"] == 1:
                 cid = compound["id"].get("id", {}).get("cid")
                 break
     return cid
@@ -102,14 +90,10 @@ def pubchem_cid_description(cid):
     """
     # Load Hydra configuration for PubChem CID description
     with hydra.initialize(version_base=None, config_path="../configs"):
-        cfg = hydra.compose(
-            config_name="config", overrides=["utils/pubchem_utils=default"]
-        )
+        cfg = hydra.compose(config_name="config", overrides=["utils/pubchem_utils=default"])
         cfg = cfg.utils.pubchem_utils
     # Prepare the URL
-    pubchem_url_for_descpription = (
-        f"{cfg.pubchem_cid_description_url}/{cid}/description/JSON"
-    )
+    pubchem_url_for_descpription = f"{cfg.pubchem_cid_description_url}/{cid}/description/JSON"
     # Get the data
     response = requests.get(pubchem_url_for_descpription, timeout=60)
     data = response.json()

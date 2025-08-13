@@ -313,9 +313,7 @@ def test_force_cpu_mode_logs_override(mock_config, mock_embedding):
         assert not vs.has_gpu
 
 
-def test_similarity_metric_override(
-    dummy_embedding, dummy_config, dummy_vectorstore_components
-):
+def test_similarity_metric_override(dummy_embedding, dummy_config, dummy_vectorstore_components):
     """
     Test setting of use_cosine from config.similarity_metric.
     """
@@ -382,16 +380,12 @@ def test_similarity_search_filter_paths(
     assert isinstance(result, list)
 
 
-def test_mmr_search_filter_paths(
-    dummy_embedding, dummy_config, dummy_vectorstore_components
-):
+def test_mmr_search_filter_paths(dummy_embedding, dummy_config, dummy_vectorstore_components):
     """
     Test filter expression generation in max_marginal_relevance_search.
     """
     _, mock_vector_store = dummy_vectorstore_components
-    mock_vector_store.max_marginal_relevance_search.return_value = [
-        Document(page_content="test")
-    ]
+    mock_vector_store.max_marginal_relevance_search.return_value = [Document(page_content="test")]
     vs = Vectorstore(dummy_embedding, config=dummy_config)
     vs.vector_store = mock_vector_store
 

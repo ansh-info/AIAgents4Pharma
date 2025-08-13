@@ -124,9 +124,7 @@ def test_debug_collection_state_failure(mock_utility, mock_collection_cls, reque
     mock_collection.indexes = []
     mock_collection.num_entities = 10
 
-    mock_collection.schema = property(
-        lambda _: (_ for _ in ()).throw(Exception("bad schema"))
-    )
+    mock_collection.schema = property(lambda _: (_ for _ in ()).throw(Exception("bad schema")))
 
     result = collection_manager.ensure_collection_exists(
         "bad_collection", config, index, has_gpu=True
@@ -145,6 +143,4 @@ def test_ensure_collection_exception(mock_utility, mock_collection_cls, request)
     mock_collection_cls.return_value = MagicMock()
 
     with pytest.raises(RuntimeError, match="milvus failure"):
-        collection_manager.ensure_collection_exists(
-            "fail_collection", config, index, has_gpu=False
-        )
+        collection_manager.ensure_collection_exists("fail_collection", config, index, has_gpu=False)

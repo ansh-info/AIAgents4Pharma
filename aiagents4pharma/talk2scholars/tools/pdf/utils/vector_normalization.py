@@ -55,9 +55,7 @@ def normalize_vectors_batch(vectors: list[list[float]]) -> list[list[float]]:
     # Handle zero vectors
     zero_mask = norms.flatten() == 0
     if np.any(zero_mask):
-        logger.warning(
-            "Found %d zero vectors during batch normalization", np.sum(zero_mask)
-        )
+        logger.warning("Found %d zero vectors during batch normalization", np.sum(zero_mask))
         norms[zero_mask] = 1.0  # Avoid division by zero
 
     # Normalize
@@ -84,9 +82,7 @@ class NormalizingEmbeddings(Embeddings):
         self.normalize_for_gpu = normalize_for_gpu
 
         if normalize_for_gpu:
-            logger.info(
-                "Embedding model wrapped with normalization for GPU compatibility"
-            )
+            logger.info("Embedding model wrapped with normalization for GPU compatibility")
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Embed documents and optionally normalize."""
@@ -127,13 +123,9 @@ def should_normalize_vectors(has_gpu: bool, use_cosine: bool) -> bool:
     needs_normalization = has_gpu and use_cosine
 
     if needs_normalization:
-        logger.info(
-            "Vector normalization ENABLED: GPU detected with COSINE similarity request"
-        )
+        logger.info("Vector normalization ENABLED: GPU detected with COSINE similarity request")
     else:
-        logger.info(
-            "Vector normalization DISABLED: GPU=%s, COSINE=%s", has_gpu, use_cosine
-        )
+        logger.info("Vector normalization DISABLED: GPU=%s, COSINE=%s", has_gpu, use_cosine)
 
     return needs_normalization
 

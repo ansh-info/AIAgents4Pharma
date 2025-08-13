@@ -34,9 +34,7 @@ class RetrieveSemanticScholarPaperIdInput(BaseModel):
       tool_call_id: LangGraph-injected identifier for tracking the tool invocation.
     """
 
-    paper_title: str = Field(
-        ..., description="The paper title to search for on Semantic Scholar."
-    )
+    paper_title: str = Field(..., description="The paper title to search for on Semantic Scholar.")
     tool_call_id: Annotated[str, InjectedToolCallId]
 
 

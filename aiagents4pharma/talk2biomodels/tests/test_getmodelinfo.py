@@ -20,11 +20,7 @@ def test_get_modelinfo_tool():
     # Update state
     app.update_state(
         config,
-        {
-            "sbml_file_path": [
-                "aiagents4pharma/talk2biomodels/tests/BIOMD0000000449_url.xml"
-            ]
-        },
+        {"sbml_file_path": ["aiagents4pharma/talk2biomodels/tests/BIOMD0000000449_url.xml"]},
     )
     prompt = "Extract all relevant information from the uploaded model."
     # Test the tool get_modelinfo
@@ -58,8 +54,7 @@ def test_model_with_no_species():
             # Check if the message is an error message
             if (
                 msg.status == "error"
-                and "ValueError('Unable to extract species from the model.')"
-                in msg.content
+                and "ValueError('Unable to extract species from the model.')" in msg.content
             ):
                 test_condition = True
                 break
@@ -90,8 +85,7 @@ def test_model_with_no_parameters():
             # Check if the message is an error message
             if (
                 msg.status == "error"
-                and "ValueError('Unable to extract parameters from the model.')"
-                in msg.content
+                and "ValueError('Unable to extract parameters from the model.')" in msg.content
             ):
                 test_condition = True
                 break

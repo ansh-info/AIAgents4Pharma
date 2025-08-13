@@ -67,19 +67,15 @@ class MultimodalPCSTPruning(NamedTuple):
         if self.use_description:
             graph_df.loc[:, "score"] = torch.nn.CosineSimilarity(dim=-1)(
                 query_emb,
-                torch.tensor(
-                    list(graph_df.desc_x.values)
-                ),  # Using textual description features
+                torch.tensor(list(graph_df.desc_x.values)),  # Using textual description features
             ).tolist()
         else:
-            graph_df.loc[graph_df["node_type"] == modality, "score"] = (
-                torch.nn.CosineSimilarity(dim=-1)(
-                    query_emb,
-                    torch.tensor(
-                        list(graph_df[graph_df["node_type"] == modality].x.values)
-                    ),
-                ).tolist()
-            )
+            graph_df.loc[graph_df["node_type"] == modality, "score"] = torch.nn.CosineSimilarity(
+                dim=-1
+            )(
+                query_emb,
+                torch.tensor(list(graph_df[graph_df["node_type"] == modality].x.values)),
+            ).tolist()
 
         # Set the prizes for nodes based on the similarity scores
         n_prizes = torch.tensor(graph_df.score.values, dtype=torch.float32)
@@ -112,8 +108,7 @@ class MultimodalPCSTPruning(NamedTuple):
         last_topk_e_value = topk_e
         for k in range(topk_e):
             indices = (
-                inverse_indices
-                == (unique_prizes == topk_e_values[k]).nonzero(as_tuple=True)[0]
+                inverse_indices == (unique_prizes == topk_e_values[k]).nonzero(as_tuple=True)[0]
             )
             value = min((topk_e - k) / indices.sum().item(), last_topk_e_value)
             e_prizes[indices] = value
@@ -246,9 +241,7 @@ class MultimodalPCSTPruning(NamedTuple):
             subgraph_edges = np.array(subgraph_edges + virtual_edges)
         edge_index = graph.edge_index[:, subgraph_edges]
         subgraph_nodes = np.unique(
-            np.concatenate(
-                [subgraph_nodes, edge_index[0].numpy(), edge_index[1].numpy()]
-            )
+            np.concatenate([subgraph_nodes, edge_index[0].numpy(), edge_index[1].numpy()])
         )
 
         return {"nodes": subgraph_nodes, "edges": subgraph_edges}

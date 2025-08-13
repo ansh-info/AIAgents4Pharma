@@ -70,9 +70,7 @@ class EnrichmentWithOllama(Enrichments):
         """
         try:
             models_list = ollama.list()["models"]
-            if model_name not in [
-                m["model"].replace(":latest", "") for m in models_list
-            ]:
+            if model_name not in [m["model"].replace(":latest", "") for m in models_list]:
                 ollama.pull(model_name)
                 time.sleep(30)
                 raise ValueError(f"Pulled {model_name} model")

@@ -69,9 +69,7 @@ def get_app(uniq_id, llm_model: BaseChatModel):
             >>> result = zotero_agent_node(current_state)
             >>> papers = result.get("papers", [])
         """
-        logger.log(
-            logging.INFO, "Creating Agent_Zotero node with thread_id %s", uniq_id
-        )
+        logger.log(logging.INFO, "Creating Agent_Zotero node with thread_id %s", uniq_id)
         result = model.invoke(state, {"configurable": {"thread_id": uniq_id}})
 
         return result

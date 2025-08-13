@@ -37,12 +37,8 @@ def retrieve_and_rerank_chunks(
     # Adjust initial retrieval count based on hardware
     if has_gpu:
         # GPU can handle larger initial retrieval efficiently
-        initial_chunks_count = config.get(
-            "initial_retrieval_k", 150
-        )  # Increased for GPU
-        mmr_diversity = config.get(
-            "mmr_diversity", 0.75
-        )  # Slightly more diverse for larger sets
+        initial_chunks_count = config.get("initial_retrieval_k", 150)  # Increased for GPU
+        mmr_diversity = config.get("mmr_diversity", 0.75)  # Slightly more diverse for larger sets
     else:
         # CPU - use conservative settings
         initial_chunks_count = config.get("initial_retrieval_k", 100)  # Original
@@ -92,9 +88,7 @@ def retrieve_and_rerank_chunks(
     )
 
     # Log final results with hardware info
-    final_papers = len(
-        {chunk.metadata.get("paper_id", "unknown") for chunk in reranked_chunks}
-    )
+    final_papers = len({chunk.metadata.get("paper_id", "unknown") for chunk in reranked_chunks})
 
     logger.info(
         "%s: Reranking complete using %s. Final %d chunks from %d unique papers",

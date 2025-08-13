@@ -14,9 +14,7 @@ from ..utils.enrichments.reactome_pathways import EnrichmentWithReactome
 # 3. R-HSA-1234567: Fake pathway
 
 # The expected description of pathway R-HSA-3244647 startswith:
-FIRST_PATHWAY = (
-    "Cyclic GMP-AMP (cGAMP) synthase (cGAS) was identified as a cytosolic DNA"
-)
+FIRST_PATHWAY = "Cyclic GMP-AMP (cGAMP) synthase (cGAS) was identified as a cytosolic DNA"
 # The expected description of pathway R-HSA-9905952 startswith:
 SECOND_PATHWAY = "The P2RX7 (P2X7, P2Z) trimer binds ATP,"
 # The expected description of pathway R-HSA-1234567 is None.

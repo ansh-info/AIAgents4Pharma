@@ -28,9 +28,7 @@ def mock_tools_fixture():
         "aiagents4pharma.talk2scholars.tools.paper_download."
         "download_arxiv_input.download_arxiv_paper"
     ) as mock_download_arxiv_paper:
-        mock_download_arxiv_paper.return_value = {
-            "article_data": {"dummy_key": "dummy_value"}
-        }
+        mock_download_arxiv_paper.return_value = {"article_data": {"dummy_key": "dummy_value"}}
         yield [mock_download_arxiv_paper]
 
 
@@ -54,9 +52,7 @@ def test_paper_download_agent_invocation():
     """Verifies agent processes queries and updates state correctly."""
     _ = mock_tools_fixture  # Prevents unused-argument warning
     thread_id = "test_thread_paper_dl"
-    mock_state = Talk2Scholars(
-        messages=[HumanMessage(content="Download paper 1234.5678")]
-    )
+    mock_state = Talk2Scholars(messages=[HumanMessage(content="Download paper 1234.5678")])
     llm_mock = mock.Mock(spec=BaseChatModel)
 
     with mock.patch(

@@ -41,17 +41,13 @@ class EmbeddingWithHuggingFace(Embeddings):
         try:
             AutoConfig.from_pretrained(self.model_name)
         except OSError as e:
-            raise ValueError(
-                f"Model {self.model_name} is not available on HuggingFace Hub."
-            ) from e
+            raise ValueError(f"Model {self.model_name} is not available on HuggingFace Hub.") from e
 
         # Load HuggingFace tokenizer and model
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_name, cache_dir=self.model_cache_dir
         )
-        self.model = AutoModel.from_pretrained(
-            self.model_name, cache_dir=self.model_cache_dir
-        )
+        self.model = AutoModel.from_pretrained(self.model_name, cache_dir=self.model_cache_dir)
 
     def meanpooling(self, output, mask) -> torch.Tensor:
         """
@@ -63,9 +59,7 @@ class EmbeddingWithHuggingFace(Embeddings):
             output: The output of the model.
             mask: The mask of the model.
         """
-        embeddings = output[
-            0
-        ]  # First element of model_output contains all token embeddings
+        embeddings = output[0]  # First element of model_output contains all token embeddings
         mask = mask.unsqueeze(-1).expand(embeddings.size()).float()
         return torch.sum(embeddings * mask, 1) / torch.clamp(mask.sum(1), min=1e-9)
 

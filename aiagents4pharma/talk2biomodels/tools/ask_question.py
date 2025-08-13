@@ -25,9 +25,7 @@ class AskQuestionInput(BaseModel):
     Input schema for the AskQuestion tool.
     """
 
-    question: str = Field(
-        description="question about the simulation and steady state results"
-    )
+    question: str = Field(description="question about the simulation and steady state results")
     experiment_name: str = Field(
         description="""Name assigned to the simulation
                                             or steady state analysis when the tool
@@ -80,9 +78,7 @@ class AskQuestionTool(BaseTool):
         )
         # Load hydra configuration
         with hydra.initialize(version_base=None, config_path="../configs"):
-            cfg = hydra.compose(
-                config_name="config", overrides=["tools/ask_question=default"]
-            )
+            cfg = hydra.compose(config_name="config", overrides=["tools/ask_question=default"])
             cfg = cfg.tools.ask_question
         # Get the context of the question
         # and based on the context, get the data

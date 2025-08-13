@@ -52,9 +52,7 @@ class TestMultimodalSubgraphExtractionTool(unittest.TestCase):
         "milvus_multimodal_subgraph_extraction.MultimodalPCSTPruning"
     )
     @patch("pymilvus.connections")
-    def test_extract_multimodal_subgraph_wo_doc(
-        self, mock_connections, mock_pcst, mock_collection
-    ):
+    def test_extract_multimodal_subgraph_wo_doc(self, mock_connections, mock_pcst, mock_collection):
         """
         Test the multimodal subgraph extraction tool for only text as modality.
         """
@@ -156,9 +154,7 @@ class TestMultimodalSubgraphExtractionTool(unittest.TestCase):
             )
 
         # Check tool message
-        self.assertEqual(
-            response.update["messages"][-1].tool_call_id, "subgraph_extraction_tool"
-        )
+        self.assertEqual(response.update["messages"][-1].tool_call_id, "subgraph_extraction_tool")
 
         # Check extracted subgraph dictionary
         dic_extracted_graph = response.update["dic_extracted_graph"][0]
@@ -220,16 +216,12 @@ class TestMultimodalSubgraphExtractionTool(unittest.TestCase):
         mock_connections.has_connection.return_value = True
 
         # With uploaded_files (with doc)
-        self.state["uploaded_files"] = [
-            {"file_type": "multimodal", "file_path": "dummy.xlsx"}
-        ]
+        self.state["uploaded_files"] = [{"file_type": "multimodal", "file_path": "dummy.xlsx"}]
         self.state["embedding_model"].embed_query.return_value = [0.1, 0.2, 0.3]
         self.state["selections"] = {"gene/protein": ["JAK1", "JAK2"]}
 
         # Mock pd.read_excel to return a dict of DataFrames
-        df = pd.DataFrame(
-            {"name": ["JAK1", "JAK2"], "node_type": ["gene/protein", "gene/protein"]}
-        )
+        df = pd.DataFrame({"name": ["JAK1", "JAK2"], "node_type": ["gene/protein", "gene/protein"]})
         mock_read_excel.return_value = {"gene/protein": df}
 
         # Mock Collection for nodes and edges
@@ -321,9 +313,7 @@ class TestMultimodalSubgraphExtractionTool(unittest.TestCase):
             )
 
             # Check tool message
-        self.assertEqual(
-            response.update["messages"][-1].tool_call_id, "subgraph_extraction_tool"
-        )
+        self.assertEqual(response.update["messages"][-1].tool_call_id, "subgraph_extraction_tool")
 
         # Check extracted subgraph dictionary
         dic_extracted_graph = response.update["dic_extracted_graph"][0]
@@ -368,8 +358,7 @@ class TestMultimodalSubgraphExtractionTool(unittest.TestCase):
         simulating GPU (cudf/cupy) environment.
         """
         module_name = (
-            "aiagents4pharma.talk2knowledgegraphs.tools."
-            + "milvus_multimodal_subgraph_extraction"
+            "aiagents4pharma.talk2knowledgegraphs.tools." + "milvus_multimodal_subgraph_extraction"
         )
         with patch.dict("sys.modules", {"cupy": np, "cudf": pd}):
             mod = importlib.reload(importlib.import_module(module_name))
@@ -447,9 +436,7 @@ class TestMultimodalSubgraphExtractionTool(unittest.TestCase):
                 ):
                     mock_compose.return_value = MagicMock()
                     mock_compose.return_value.app.frontend = self.cfg_db
-                    mock_compose.return_value.tools.multimodal_subgraph_extraction = (
-                        self.cfg
-                    )
+                    mock_compose.return_value.tools.multimodal_subgraph_extraction = self.cfg
                     self.state["embedding_model"].embed_query.return_value = [
                         0.1,
                         0.2,
@@ -471,9 +458,7 @@ class TestMultimodalSubgraphExtractionTool(unittest.TestCase):
                 )
                 dic_extracted_graph = response.update["dic_extracted_graph"][0]
                 self.assertIsInstance(dic_extracted_graph, dict)
-                self.assertEqual(
-                    dic_extracted_graph["name"], self.arg_data["extraction_name"]
-                )
+                self.assertEqual(dic_extracted_graph["name"], self.arg_data["extraction_name"])
                 self.assertEqual(dic_extracted_graph["graph_source"], "TestGraph")
                 self.assertEqual(dic_extracted_graph["topk_nodes"], 5)
                 self.assertEqual(dic_extracted_graph["topk_edges"], 5)
@@ -490,9 +475,7 @@ class TestMultimodalSubgraphExtractionTool(unittest.TestCase):
                 )
                 self.assertTrue(
                     all(
-                        ",".join(
-                            [str(e[0])] + str(e[2]["label"][0]).split(",") + [str(e[1])]
-                        )
+                        ",".join([str(e[0])] + str(e[2]["label"][0]).split(",") + [str(e[1])])
                         in dic_extracted_graph["graph_text"]
                         .replace('"', "")
                         .replace("[", "")

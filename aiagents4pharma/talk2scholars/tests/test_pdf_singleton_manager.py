@@ -20,9 +20,7 @@ def test_singleton_instance_identity():
     assert a is b
 
 
-@patch(
-    "aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.detect_nvidia_gpu"
-)
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.detect_nvidia_gpu")
 def test_detect_gpu_once(mock_detect):
     """Ensure GPU detection is cached."""
     mock_detect.return_value = True
@@ -115,12 +113,8 @@ def test_get_vectorstore_force_new(mock_vectorstore_cls):
     assert vs1 != vs2
 
 
-@patch(
-    "aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.connections.connect"
-)
-@patch(
-    "aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.connections.has_connection"
-)
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.connections.connect")
+@patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.connections.has_connection")
 @patch("aiagents4pharma.talk2scholars.tools.pdf.utils.singleton_manager.db")
 def test_get_connection_milvus_error(_, mock_has_connection, mock_connect):
     """get_connection should raise MilvusException on connection failure."""

@@ -27,9 +27,7 @@ def _base_args_params():
     "aiagents4pharma.talk2scholars.tools.pdf.utils.document_processor."
     "RecursiveCharacterTextSplitter"
 )
-def test_load_and_split_pdf_success(
-    mock_splitter_cls, mock_loader_cls, base_args_params
-):
+def test_load_and_split_pdf_success(mock_splitter_cls, mock_loader_cls, base_args_params):
     """load_and_split_pdf should load and split PDF correctly."""
     mock_doc = MagicMock()
     mock_doc.metadata = {"page": 1}

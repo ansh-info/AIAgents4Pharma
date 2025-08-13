@@ -77,18 +77,12 @@ class PrimeKG(Dataset):
         """
         local_file = os.path.join(self.local_dir, f"{self.name}_nodes.tsv.gz")
         if os.path.exists(local_file):
-            print(
-                f"{local_file} already exists. Loading the data from the local directory."
-            )
+            print(f"{local_file} already exists. Loading the data from the local directory.")
 
             # Load the dataframe from the local directory and assign it to the nodes attribute
-            nodes = pd.read_csv(
-                local_file, sep="\t", compression="gzip", low_memory=False
-            )
+            nodes = pd.read_csv(local_file, sep="\t", compression="gzip", low_memory=False)
         else:
-            print(
-                f"Downloading node file from {self.server_path}{self.file_ids['nodes']}"
-            )
+            print(f"Downloading node file from {self.server_path}{self.file_ids['nodes']}")
 
             # Download the file from the Harvard Dataverse with designated file_id for node
             self._download_file(
@@ -102,9 +96,7 @@ class PrimeKG(Dataset):
             )
 
             # Further processing of the dataframe
-            nodes = nodes[
-                ["node_index", "node_name", "node_source", "node_id", "node_type"]
-            ]
+            nodes = nodes[["node_index", "node_name", "node_source", "node_id", "node_type"]]
 
             # Store compressed dataframe in the local directory
             nodes.to_csv(local_file, index=False, sep="\t", compression="gzip")
@@ -126,18 +118,12 @@ class PrimeKG(Dataset):
         """
         local_file = os.path.join(self.local_dir, f"{self.name}_edges.tsv.gz")
         if os.path.exists(local_file):
-            print(
-                f"{local_file} already exists. Loading the data from the local directory."
-            )
+            print(f"{local_file} already exists. Loading the data from the local directory.")
 
             # Load the dataframe from the local directory and assign it to the edges attribute
-            edges = pd.read_csv(
-                local_file, sep="\t", compression="gzip", low_memory=False
-            )
+            edges = pd.read_csv(local_file, sep="\t", compression="gzip", low_memory=False)
         else:
-            print(
-                f"Downloading edge file from {self.server_path}{self.file_ids['edges']}"
-            )
+            print(f"Downloading edge file from {self.server_path}{self.file_ids['edges']}")
 
             # Download the file from the Harvard Dataverse with designated file_id for edge
             self._download_file(

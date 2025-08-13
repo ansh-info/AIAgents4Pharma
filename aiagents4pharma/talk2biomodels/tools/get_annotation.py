@@ -39,9 +39,7 @@ def extract_relevant_species_names(model_object, arg_data, state):
     """
     # Load hydra configuration
     with hydra.initialize(version_base=None, config_path="../configs"):
-        cfg = hydra.compose(
-            config_name="config", overrides=["tools/get_annotation=default"]
-        )
+        cfg = hydra.compose(config_name="config", overrides=["tools/get_annotation=default"])
         cfg = cfg.tools.get_annotation
     logger.info(
         "Loaded the following system prompt for the LLM to get a structured output: %s",
@@ -158,20 +156,14 @@ class GetAnnotationTool(BaseTool):
         )
 
         # Prepare the model object
-        sbml_file_path = (
-            state["sbml_file_path"][-1] if state["sbml_file_path"] else None
-        )
+        sbml_file_path = state["sbml_file_path"][-1] if state["sbml_file_path"] else None
         model_object = load_biomodel(sys_bio_model, sbml_file_path=sbml_file_path)
 
         # Extract relevant species names based on the user question
-        list_species_names = extract_relevant_species_names(
-            model_object, arg_data, state
-        )
+        list_species_names = extract_relevant_species_names(model_object, arg_data, state)
         print(list_species_names)
 
-        (annotations_df, species_without_description) = self._fetch_annotations(
-            list_species_names
-        )
+        (annotations_df, species_without_description) = self._fetch_annotations(list_species_names)
 
         # Process annotations
         annotations_df = self._process_annotations(annotations_df)
@@ -179,9 +171,7 @@ class GetAnnotationTool(BaseTool):
         # Prepare the simulated data
         dic_annotations_data = {
             "name": arg_data.experiment_name,
-            "source": (
-                sys_bio_model.biomodel_id if sys_bio_model.biomodel_id else "upload"
-            ),
+            "source": (sys_bio_model.biomodel_id if sys_bio_model.biomodel_id else "upload"),
             "tool_call_id": tool_call_id,
             "data": annotations_df.to_dict(),
         }
@@ -347,19 +337,14 @@ class GetAnnotationTool(BaseTool):
                     [{"Id": id_, "Database": database} for id_ in identifiers]
                 )
                 for identifier in identifiers:
-                    results[identifier] = annotations.get(database, {}).get(
-                        identifier, "-"
-                    )
+                    results[identifier] = annotations.get(database, {}).get(identifier, "-")
             elif database == "kegg.compound":
                 data = [
-                    {"Id": identifier, "Database": "kegg.compound"}
-                    for identifier in identifiers
+                    {"Id": identifier, "Database": "kegg.compound"} for identifier in identifiers
                 ]
                 annotations = fetch_kegg_annotations(data)
                 for identifier in identifiers:
-                    results[identifier] = annotations.get(database, {}).get(
-                        identifier, "-"
-                    )
+                    results[identifier] = annotations.get(database, {}).get(identifier, "-")
             else:
                 for identifier in identifiers:
                     results[identifier] = "-"

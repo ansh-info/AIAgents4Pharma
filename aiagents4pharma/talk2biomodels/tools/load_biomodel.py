@@ -17,13 +17,9 @@ def ensure_biomodel_id(value: Any) -> Any:
     """
     if isinstance(value, int):
         return value
-    if isinstance(value, str) and (
-        value.startswith("BIOMD") or value.startswith("MODEL")
-    ):
+    if isinstance(value, str) and (value.startswith("BIOMD") or value.startswith("MODEL")):
         return value
-    raise ValueError(
-        "biomodel_id must be an integer or a string starting with 'BIOMD' or 'MODEL'."
-    )
+    raise ValueError("biomodel_id must be an integer or a string starting with 'BIOMD' or 'MODEL'.")
 
 
 class ModelData(BaseModel):

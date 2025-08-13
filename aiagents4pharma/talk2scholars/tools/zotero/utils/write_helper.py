@@ -42,9 +42,7 @@ class ZoteroWriteData:
     def _load_config(self) -> Any:
         """Load hydra configuration."""
         with hydra.initialize(version_base=None, config_path="../../../configs"):
-            cfg = hydra.compose(
-                config_name="config", overrides=["tools/zotero_write=default"]
-            )
+            cfg = hydra.compose(config_name="config", overrides=["tools/zotero_write=default"])
             logger.info("Loaded configuration for Zotero write tool")
             return cfg.tools.zotero_write
 
@@ -108,9 +106,7 @@ class ZoteroWriteData:
                     if " " in name
                     else {"creatorType": "author", "lastName": name}
                 )
-                for name in [
-                    author.split(" (ID: ")[0] for author in paper.get("Authors", [])
-                ]
+                for name in [author.split(" (ID: ")[0] for author in paper.get("Authors", [])]
             ]
 
             self.zotero_items.append(

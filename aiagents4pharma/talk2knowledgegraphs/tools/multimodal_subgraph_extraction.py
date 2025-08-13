@@ -40,14 +40,10 @@ class MultimodalSubgraphExtractionInput(BaseModel):
         arg_data: Argument for analytical process over graph data.
     """
 
-    tool_call_id: Annotated[str, InjectedToolCallId] = Field(
-        description="Tool call ID."
-    )
+    tool_call_id: Annotated[str, InjectedToolCallId] = Field(description="Tool call ID.")
     state: Annotated[dict, InjectedState] = Field(description="Injected state.")
     prompt: str = Field(description="Prompt to interact with the backend.")
-    arg_data: ArgumentData = Field(
-        description="Experiment over graph data.", default=None
-    )
+    arg_data: ArgumentData = Field(description="Experiment over graph data.", default=None)
 
 
 class MultimodalSubgraphExtractionTool(BaseTool):
@@ -124,24 +120,16 @@ class MultimodalSubgraphExtractionTool(BaseTool):
             query_df = graph_df.merge(multimodal_df, how="cross")
             query_df = query_df[
                 query_df.apply(
-                    lambda x: (
-                        x["q_node_name"].lower() in x["node_name"].lower()
-                    )  # node name
+                    lambda x: (x["q_node_name"].lower() in x["node_name"].lower())  # node name
                     & (x["node_type"] == x["q_node_type"]),  # node type
                     axis=1,
                 )
             ]
-            query_df = query_df[["node_id", "node_type", "x", "desc_x"]].reset_index(
-                drop=True
-            )
-            query_df["use_description"] = (
-                False  # set to False for modal-specific embeddings
-            )
+            query_df = query_df[["node_id", "node_type", "x", "desc_x"]].reset_index(drop=True)
+            query_df["use_description"] = False  # set to False for modal-specific embeddings
 
             # Update the state by adding the the selected node IDs
-            state["selections"] = (
-                query_df.groupby("node_type")["node_id"].apply(list).to_dict()
-            )
+            state["selections"] = query_df.groupby("node_type")["node_id"].apply(list).to_dict()
 
         # Append a user prompt to the query dataframe
         query_df = pd.concat(
@@ -244,43 +232,27 @@ class MultimodalSubgraphExtractionTool(BaseTool):
             x=[graph["pyg"].x[i] for i in subgraph["nodes"]],
             node_id=np.array(graph["pyg"].node_id)[subgraph["nodes"]].tolist(),
             node_name=np.array(graph["pyg"].node_id)[subgraph["nodes"]].tolist(),
-            enriched_node=np.array(graph["pyg"].enriched_node)[
-                subgraph["nodes"]
-            ].tolist(),
+            enriched_node=np.array(graph["pyg"].enriched_node)[subgraph["nodes"]].tolist(),
             num_nodes=len(subgraph["nodes"]),
             # Edge features
             edge_index=torch.LongTensor(
                 [
-                    [
-                        mapping[i]
-                        for i in graph["pyg"]
-                        .edge_index[:, subgraph["edges"]][0]
-                        .tolist()
-                    ],
-                    [
-                        mapping[i]
-                        for i in graph["pyg"]
-                        .edge_index[:, subgraph["edges"]][1]
-                        .tolist()
-                    ],
+                    [mapping[i] for i in graph["pyg"].edge_index[:, subgraph["edges"]][0].tolist()],
+                    [mapping[i] for i in graph["pyg"].edge_index[:, subgraph["edges"]][1].tolist()],
                 ]
             ),
             edge_attr=graph["pyg"].edge_attr[subgraph["edges"]],
             edge_type=np.array(graph["pyg"].edge_type)[subgraph["edges"]].tolist(),
             relation=np.array(graph["pyg"].edge_type)[subgraph["edges"]].tolist(),
             label=np.array(graph["pyg"].edge_type)[subgraph["edges"]].tolist(),
-            enriched_edge=np.array(graph["pyg"].enriched_edge)[
-                subgraph["edges"]
-            ].tolist(),
+            enriched_edge=np.array(graph["pyg"].enriched_edge)[subgraph["edges"]].tolist(),
         )
 
         # Networkx DiGraph construction to be visualized in the frontend
         nx_graph = nx.DiGraph()
         # Add nodes with attributes
         node_colors = {
-            n: cfg.node_colors_dict[k]
-            for k, v in state["selections"].items()
-            for n in v
+            n: cfg.node_colors_dict[k] for k, v in state["selections"].items() for n in v
         }
         for n in pyg_graph.node_name:
             nx_graph.add_node(n, color=node_colors.get(n, None))
@@ -344,9 +316,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
 
         # Retrieve source graph from the state
         initial_graph = {}
-        initial_graph["source"] = state["dic_source_graph"][
-            -1
-        ]  # The last source graph as of now
+        initial_graph["source"] = state["dic_source_graph"][-1]  # The last source graph as of now
         # logger.log(logging.INFO, "Source graph: %s", source_graph)
 
         # Load the knowledge graph
@@ -357,24 +327,16 @@ class MultimodalSubgraphExtractionTool(BaseTool):
 
         # Prepare the query embeddings and modalities
         query_df = self._prepare_query_modalities(
-            [
-                EmbeddingWithOllama(model_name=cfg.ollama_embeddings[0]).embed_query(
-                    prompt
-                )
-            ],
+            [EmbeddingWithOllama(model_name=cfg.ollama_embeddings[0]).embed_query(prompt)],
             state,
             initial_graph["pyg"],
         )
 
         # Perform subgraph extraction
-        subgraphs = self._perform_subgraph_extraction(
-            state, cfg, initial_graph["pyg"], query_df
-        )
+        subgraphs = self._perform_subgraph_extraction(state, cfg, initial_graph["pyg"], query_df)
 
         # Prepare subgraph as a NetworkX graph and textualized graph
-        final_subgraph = self._prepare_final_subgraph(
-            state, subgraphs, initial_graph, cfg
-        )
+        final_subgraph = self._prepare_final_subgraph(state, subgraphs, initial_graph, cfg)
 
         # Prepare the dictionary of extracted graph
         dic_extracted_graph = {

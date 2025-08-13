@@ -15,9 +15,7 @@ from ..utils.enrichments.pubchem_strings import EnrichmentWithPubChem
 SMILES_FIRST = "C[C@@H]1C[C@H]2[C@@H]3[C@@H](CC4=CC(=O)C=C[C@@]"
 SMILES_FIRST += "4([C@H]3[C@H](C[C@@]2([C@]1(C(=O)CO)O)C)O)C)Cl"
 # The expected description for the first PubChem ID starts with:
-DESCRIPTION_FIRST = (
-    "Alclometasone is a prednisolone compound having an alpha-chloro substituent"
-)
+DESCRIPTION_FIRST = "Alclometasone is a prednisolone compound having an alpha-chloro substituent"
 # The expected SMILES representation and description for the second PubChem ID is None.
 
 

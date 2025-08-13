@@ -162,9 +162,7 @@ class MultimodalPCSTPruning(NamedTuple):
         # e_prizes[e_prizes < topk_e_values[-1]] = 0.0
         last_topk_e_value = topk_e
         for k in range(topk_e):
-            indices = (
-                inverse_indices == (unique_prizes == topk_e_values[k]).nonzero()[0]
-            )
+            indices = inverse_indices == (unique_prizes == topk_e_values[k]).nonzero()[0]
             value = min((topk_e - k) / indices.sum().item(), last_topk_e_value)
             e_prizes[indices] = value
             last_topk_e_value = value * (1 - self.c_const)
@@ -260,9 +258,7 @@ class MultimodalPCSTPruning(NamedTuple):
         virt_["edges_1"] = py.stack([virt_["src"], virt_["node_ids"]], axis=1)
         virt_["edges_2"] = py.stack([virt_["node_ids"], virt_["dst"]], axis=1)
         virt_["edges"] = py.concatenate([virt_["edges_1"], virt_["edges_2"]], axis=0)
-        virt_["costs"] = py.zeros(
-            (virt_["edges"].shape[0],), dtype=real_["costs"].dtype
-        )
+        virt_["costs"] = py.zeros((virt_["edges"].shape[0],), dtype=real_["costs"].dtype)
 
         # Combine real and virtual edges/costs
         logger.log(logging.INFO, "Combining real and virtual edges/costs")
@@ -316,24 +312,18 @@ class MultimodalPCSTPruning(NamedTuple):
         num_prior_edges = edges_dict["num_prior_edges"]
         # Retrieve the selected nodes and edges based on the given vertices and edges
         subgraph_nodes = vertices[vertices < num_nodes]
-        subgraph_edges = [
-            mapping["edges"][e.item()] for e in edges if e < num_prior_edges
-        ]
+        subgraph_edges = [mapping["edges"][e.item()] for e in edges if e < num_prior_edges]
         virtual_vertices = vertices[vertices >= num_nodes]
         if len(virtual_vertices) > 0:
             virtual_vertices = vertices[vertices >= num_nodes]
             virtual_edges = [mapping["nodes"][i.item()] for i in virtual_vertices]
             subgraph_edges = py.array(subgraph_edges + virtual_edges)
         edge_index = edges_dict["edge_index"][:, subgraph_edges]
-        subgraph_nodes = py.unique(
-            py.concatenate([subgraph_nodes, edge_index[0], edge_index[1]])
-        )
+        subgraph_nodes = py.unique(py.concatenate([subgraph_nodes, edge_index[0], edge_index[1]]))
 
         return {"nodes": subgraph_nodes, "edges": subgraph_edges}
 
-    def extract_subgraph(
-        self, text_emb: list, query_emb: list, modality: str, cfg: dict
-    ) -> dict:
+    def extract_subgraph(self, text_emb: list, query_emb: list, modality: str, cfg: dict) -> dict:
         """
         Perform the Prize-Collecting Steiner Tree (PCST) algorithm to extract the subgraph.
 

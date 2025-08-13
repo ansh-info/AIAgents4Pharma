@@ -61,9 +61,7 @@ def extract_relevant_species(question, species_names, state):
 
     # Load hydra configuration
     with hydra.initialize(version_base=None, config_path="../configs"):
-        cfg = hydra.compose(
-            config_name="config", overrides=["tools/custom_plotter=default"]
-        )
+        cfg = hydra.compose(config_name="config", overrides=["tools/custom_plotter=default"])
         cfg = cfg.tools.custom_plotter
     # Get the system prompt
     system_prompt = cfg.system_prompt_custom_header
@@ -71,9 +69,7 @@ def extract_relevant_species(question, species_names, state):
     logging.log(logging.INFO, "LLM model: %s", state["llm_model"])
     llm = state["llm_model"]
     llm_with_structured_output = llm.with_structured_output(CustomHeader)
-    prompt = ChatPromptTemplate.from_messages(
-        [("system", system_prompt), ("human", "{input}")]
-    )
+    prompt = ChatPromptTemplate.from_messages([("system", system_prompt), ("human", "{input}")])
     few_shot_structured_llm = prompt | llm_with_structured_output
     return few_shot_structured_llm.invoke(question)
 
@@ -128,13 +124,9 @@ class CustomPlotterTool(BaseTool):
         Returns:
             str: The answer to the question
         """
-        logger.log(
-            logging.INFO, "Calling custom_plotter tool %s, %s", question, sys_bio_model
-        )
+        logger.log(logging.INFO, "Calling custom_plotter tool %s, %s", question, sys_bio_model)
         # Load the model
-        sbml_file_path = (
-            state["sbml_file_path"][-1] if len(state["sbml_file_path"]) > 0 else None
-        )
+        sbml_file_path = state["sbml_file_path"][-1] if len(state["sbml_file_path"]) > 0 else None
         model_object = load_biomodel(sys_bio_model, sbml_file_path=sbml_file_path)
         dic_simulated_data = {}
         for data in state["dic_simulated_data"]:

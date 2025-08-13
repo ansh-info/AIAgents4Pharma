@@ -102,9 +102,7 @@ def retrieve_relevant_chunks(
         filter=filter_dict,
     )
 
-    logger.info(
-        "Retrieved %d chunks using %s MMR from Milvus", len(results), search_mode
-    )
+    logger.info("Retrieved %d chunks using %s MMR from Milvus", len(results), search_mode)
 
     # Log some details about retrieved chunks for debugging
     if results and logger.isEnabledFor(logging.DEBUG):
@@ -184,9 +182,7 @@ def retrieve_relevant_chunks_with_scores(
         )
 
         # Filter by score threshold
-        filtered_results = [
-            (doc, score) for doc, score in results if score >= score_threshold
-        ]
+        filtered_results = [(doc, score) for doc, score in results if score >= score_threshold]
 
         logger.info(
             "%s search with scores retrieved %d/%d chunks above threshold %.3f",
@@ -198,6 +194,4 @@ def retrieve_relevant_chunks_with_scores(
 
         return filtered_results
 
-    raise NotImplementedError(
-        "Vector store does not support similarity_search_with_score"
-    )
+    raise NotImplementedError("Vector store does not support similarity_search_with_score")

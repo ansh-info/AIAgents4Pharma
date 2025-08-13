@@ -22,12 +22,8 @@ class TestDownloadBiorxivPaper(unittest.TestCase):
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.download_biorxiv_input.hydra.compose"
     )
-    @patch(
-        "aiagents4pharma.talk2scholars.tools.paper_download.download_biorxiv_input.requests.get"
-    )
-    def test_download_biorxiv_paper_success(
-        self, mock_get, mock_compose, mock_initialize
-    ):
+    @patch("aiagents4pharma.talk2scholars.tools.paper_download.download_biorxiv_input.requests.get")
+    def test_download_biorxiv_paper_success(self, mock_get, mock_compose, mock_initialize):
         """Test successful metadata and PDF URL retrieval."""
         dummy_cfg = MagicMock()
         dummy_cfg.tools.download_biorxiv_paper.api_url = "http://dummy.biorxiv.org/api"
@@ -65,21 +61,15 @@ class TestDownloadBiorxivPaper(unittest.TestCase):
         self.assertEqual(metadata["Authors"], "Author One; Author Two")
         self.assertEqual(metadata["Abstract"], "This is a bioRxiv abstract.")
         self.assertEqual(metadata["Publication Date"], "2025-04-25")
-        self.assertEqual(
-            metadata["URL"], f"https://www.biorxiv.org/content/{doi}.full.pdf"
-        )
-        self.assertEqual(
-            metadata["pdf_url"], f"https://www.biorxiv.org/content/{doi}.full.pdf"
-        )
+        self.assertEqual(metadata["URL"], f"https://www.biorxiv.org/content/{doi}.full.pdf")
+        self.assertEqual(metadata["pdf_url"], f"https://www.biorxiv.org/content/{doi}.full.pdf")
         self.assertEqual(metadata["filename"], f"{doi.rsplit('/', maxsplit=1)[-1]}.pdf")
         self.assertEqual(metadata["source"], "biorxiv")
         self.assertEqual(metadata["biorxiv_id"], doi)
 
         self.assertTrue(len(update["messages"]) >= 1)
         self.assertIsInstance(update["messages"][0], ToolMessage)
-        self.assertIn(
-            "Successfully retrieved metadata and PDF URL", update["messages"][0].content
-        )
+        self.assertIn("Successfully retrieved metadata and PDF URL", update["messages"][0].content)
 
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.download_biorxiv_input.hydra.initialize"
@@ -87,9 +77,7 @@ class TestDownloadBiorxivPaper(unittest.TestCase):
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.download_biorxiv_input.hydra.compose"
     )
-    @patch(
-        "aiagents4pharma.talk2scholars.tools.paper_download.download_biorxiv_input.requests.get"
-    )
+    @patch("aiagents4pharma.talk2scholars.tools.paper_download.download_biorxiv_input.requests.get")
     def test_no_entry_found(self, mock_get, mock_compose, mock_initialize):
         """Test behavior when no 'entry' is in response."""
         dummy_cfg = MagicMock()
@@ -118,9 +106,7 @@ class TestDownloadBiorxivPaper(unittest.TestCase):
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.download_biorxiv_input.hydra.compose"
     )
-    @patch(
-        "aiagents4pharma.talk2scholars.tools.paper_download.download_biorxiv_input.requests.get"
-    )
+    @patch("aiagents4pharma.talk2scholars.tools.paper_download.download_biorxiv_input.requests.get")
     def test_no_pdf_url_found(self, mock_get, mock_compose, mock_initialize):
         """Test fallback to DOI-based PDF URL construction when 'link' is missing."""
         dummy_cfg = MagicMock()
@@ -155,8 +141,6 @@ class TestDownloadBiorxivPaper(unittest.TestCase):
 
         # Assert that the PDF URL was constructed from DOI
         expected_suffix = doi.rsplit("/", maxsplit=1)[-1]
-        expected_url = (
-            f"https://www.biorxiv.org/content/10.1101/{expected_suffix}.full.pdf"
-        )
+        expected_url = f"https://www.biorxiv.org/content/10.1101/{expected_suffix}.full.pdf"
 
         self.assertEqual(metadata["pdf_url"], expected_url)

@@ -46,16 +46,12 @@ def run_steady_state(model_object, dic_species_to_be_analyzed_before_experiment)
         raise ValueError("A steady state was not found")
     logger.log(logging.INFO, "Steady state analysis successful")
     # Store the steady state results in a DataFrame
-    df_steady_state = basico.model_info.get_species(
-        model=model_object.copasi_model
-    ).reset_index()
+    df_steady_state = basico.model_info.get_species(model=model_object.copasi_model).reset_index()
     # print (df_steady_state)
     # Rename the column name to species_name
     df_steady_state.rename(columns={"name": "species_name"}, inplace=True)
     # Rename the column concentration to steady_state_concentration
-    df_steady_state.rename(
-        columns={"concentration": "steady_state_concentration"}, inplace=True
-    )
+    df_steady_state.rename(columns={"concentration": "steady_state_concentration"}, inplace=True)
     # Rename the column transition_time to steady_state_transition_time
     df_steady_state.rename(
         columns={"transition_time": "steady_state_transition_time"}, inplace=True
@@ -75,9 +71,7 @@ def run_steady_state(model_object, dic_species_to_be_analyzed_before_experiment)
         ],
         inplace=True,
     )
-    logger.log(
-        logging.INFO, "Steady state results with shape %s", df_steady_state.shape
-    )
+    logger.log(logging.INFO, "Steady state results with shape %s", df_steady_state.shape)
     return df_steady_state
 
 
@@ -134,9 +128,7 @@ class SteadyStateTool(BaseTool):
             arg_data,
         )
         # print (f'Calling steady_state tool {sys_bio_model}, {arg_data}, {tool_call_id}')
-        sbml_file_path = (
-            state["sbml_file_path"][-1] if len(state["sbml_file_path"]) > 0 else None
-        )
+        sbml_file_path = state["sbml_file_path"][-1] if len(state["sbml_file_path"]) > 0 else None
         model_object = load_biomodel(sys_bio_model, sbml_file_path=sbml_file_path)
         # Prepare the dictionary of species data
         # that will be passed to the simulate method
@@ -164,9 +156,7 @@ class SteadyStateTool(BaseTool):
         # that will be passed to the state of the graph
         dic_steady_state_data = {
             "name": arg_data.experiment_name,
-            "source": (
-                sys_bio_model.biomodel_id if sys_bio_model.biomodel_id else "upload"
-            ),
+            "source": (sys_bio_model.biomodel_id if sys_bio_model.biomodel_id else "upload"),
             "tool_call_id": tool_call_id,
             "data": df_steady_state.to_dict(orient="records"),
         }
@@ -190,9 +180,7 @@ class SteadyStateTool(BaseTool):
                         f" {arg_data.experiment_name}"
                         " was successful.",
                         tool_call_id=tool_call_id,
-                        artifact={
-                            "dic_data": df_steady_state.to_dict(orient="records")
-                        },
+                        artifact={"dic_data": df_steady_state.to_dict(orient="records")},
                     )
                 ],
             }

@@ -26,9 +26,7 @@ class SearchModelsInput(BaseModel):
     """
 
     query: str = Field(description="Search models query", default=None)
-    num_query: int = Field(
-        description="Top number of models to search", default=10, le=100
-    )
+    num_query: int = Field(description="Top number of models to search", default=10, le=100)
     tool_call_id: Annotated[str, InjectedToolCallId]
 
 
@@ -80,7 +78,9 @@ class SearchModelsTool(BaseTool):
         # to avoid hallucinations
         content += f" Here is the summary of the first {first_n} models:"
         for i in range(first_n):
-            content += f"\nModel {i + 1}: {search_results[i]['name']} (ID: {search_results[i]['id']})"
+            content += (
+                f"\nModel {i + 1}: {search_results[i]['name']} (ID: {search_results[i]['id']})"
+            )
         # Return the updated state of the tool
         return Command(
             update={

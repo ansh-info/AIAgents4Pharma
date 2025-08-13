@@ -34,9 +34,7 @@ class SearchInput(BaseModel):
         tool_call_id: Internal tool call identifier injected by the system.
     """
 
-    query: str = Field(
-        description="Full or partial paper title or keywords to search for"
-    )
+    query: str = Field(description="Full or partial paper title or keywords to search for")
     limit: int = Field(
         default=10,
         description="Maximum number of search results to return (1-100)",

@@ -68,12 +68,8 @@ class SimulateModelTool(BaseTool):
         Returns:
             str: The result of the simulation.
         """
-        logger.log(
-            logging.INFO, "Calling simulate_model tool %s, %s", sys_bio_model, arg_data
-        )
-        sbml_file_path = (
-            state["sbml_file_path"][-1] if len(state["sbml_file_path"]) > 0 else None
-        )
+        logger.log(logging.INFO, "Calling simulate_model tool %s, %s", sys_bio_model, arg_data)
+        sbml_file_path = state["sbml_file_path"][-1] if len(state["sbml_file_path"]) > 0 else None
         model_object = load_biomodel(sys_bio_model, sbml_file_path=sbml_file_path)
         # Prepare the dictionary of species data
         # that will be passed to the simulate method
@@ -110,9 +106,7 @@ class SimulateModelTool(BaseTool):
         logger.log(logging.INFO, "Simulation results ready with shape %s", df.shape)
         dic_simulated_data = {
             "name": arg_data.experiment_name,
-            "source": (
-                sys_bio_model.biomodel_id if sys_bio_model.biomodel_id else "upload"
-            ),
+            "source": (sys_bio_model.biomodel_id if sys_bio_model.biomodel_id else "upload"),
             "tool_call_id": tool_call_id,
             "data": df.to_dict(),
         }

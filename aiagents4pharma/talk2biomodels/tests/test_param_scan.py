@@ -61,11 +61,7 @@ def test_param_scan_tool():
     assert any(
         (df["status"] == "error")
         & (df["name"] == "parameter_scan")
-        & (
-            df["content"].str.startswith(
-                "Error: ValueError('Invalid species or parameter name:"
-            )
-        )
+        & (df["content"].str.startswith("Error: ValueError('Invalid species or parameter name:"))
     )
     assert any(
         (df["status"] == "success")

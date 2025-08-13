@@ -45,9 +45,7 @@ class BasicoModel(SysBioModel):
             raise ValueError("Either biomodel_id or sbml_file_path must be provided.")
         if self.biomodel_id:
             self.copasi_model = basico.load_biomodel(self.biomodel_id)
-            self.description = basico.biomodels.get_model_info(self.biomodel_id)[
-                "description"
-            ]
+            self.description = basico.biomodels.get_model_info(self.biomodel_id)["description"]
             self.name = basico.model_info.get_model_name(model=self.copasi_model)
         elif self.sbml_file_path:
             self.copasi_model = basico.load_model(self.sbml_file_path)
@@ -85,9 +83,7 @@ class BasicoModel(SysBioModel):
                 )
             else:
                 logger.error("Parameter/Species %s not found in the model.", param_name)
-                raise ValueError(
-                    f"Parameter/Species {param_name} not found in the model."
-                )
+                raise ValueError(f"Parameter/Species {param_name} not found in the model.")
 
     def simulate(self, duration: int | float = 10, interval: int = 10) -> pd.DataFrame:
         """

@@ -32,9 +32,7 @@ class SubgraphSummarizationInput(BaseModel):
         extraction_name: Name assigned to the subgraph extraction process
     """
 
-    tool_call_id: Annotated[str, InjectedToolCallId] = Field(
-        description="Tool call ID."
-    )
+    tool_call_id: Annotated[str, InjectedToolCallId] = Field(description="Tool call ID.")
     state: Annotated[dict, InjectedState] = Field(description="Injected state.")
     prompt: str = Field(description="Prompt to interact with the backend.")
     extraction_name: str = Field(
@@ -70,9 +68,7 @@ class SubgraphSummarizationTool(BaseTool):
             prompt: The prompt to interact with the backend.
             extraction_name: The name assigned to the subgraph extraction process.
         """
-        logger.log(
-            logging.INFO, "Invoking subgraph_summarization tool for %s", extraction_name
-        )
+        logger.log(logging.INFO, "Invoking subgraph_summarization tool for %s", extraction_name)
 
         # Load hydra configuration
         with hydra.initialize(version_base=None, config_path="../configs"):

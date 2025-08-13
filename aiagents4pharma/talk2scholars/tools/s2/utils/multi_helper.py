@@ -94,9 +94,7 @@ class MultiPaperRecData:
                     ) from e
 
         if self.response is None:
-            raise RuntimeError(
-                "Failed to obtain a response from the Semantic Scholar API."
-            )
+            raise RuntimeError("Failed to obtain a response from the Semantic Scholar API.")
 
         logger.info(
             "API Response Status for multi-paper recommendations: %s",
@@ -117,9 +115,7 @@ class MultiPaperRecData:
 
         self.recommendations = self.data.get("recommendedPapers", [])
         if not self.recommendations:
-            logger.error(
-                "No recommendations returned from API for paper IDs: %s", self.paper_ids
-            )
+            logger.error("No recommendations returned from API for paper IDs: %s", self.paper_ids)
             raise RuntimeError(
                 "No recommendations were found for your query. Consider refining your search "
                 "by using more specific keywords or different terms."
@@ -202,9 +198,7 @@ class MultiPaperRecData:
             "Papers are attached as an artifact."
         )
         self.content += " Here is a summary of the recommendations:\n"
-        self.content += (
-            f"Number of recommended papers found: {self.get_paper_count()}\n"
-        )
+        self.content += f"Number of recommended papers found: {self.get_paper_count()}\n"
         self.content += f"Query Paper IDs: {', '.join(self.paper_ids)}\n"
         self.content += f"Year: {self.year}\n" if self.year else ""
         self.content += "Here are a few of these papers:\n" + top_papers_info

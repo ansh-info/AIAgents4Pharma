@@ -80,9 +80,7 @@ def get_optimal_index_config(
                 "GPU indexes don't support COSINE distance. "
                 "Vectors will be normalized and IP distance will be used instead."
             )
-            metric_type = (
-                "IP"  # Inner Product for normalized vectors = cosine similarity
-            )
+            metric_type = "IP"  # Inner Product for normalized vectors = cosine similarity
         else:
             metric_type = "IP"  # Default to IP for GPU
 
@@ -120,9 +118,7 @@ def get_optimal_index_config(
             "index_type": "IVF_FLAT",
             "metric_type": metric_type,
             "params": {
-                "nlist": min(
-                    1024, max(64, embedding_dim // 8)
-                )  # Dynamic nlist based on dimension
+                "nlist": min(1024, max(64, embedding_dim // 8))  # Dynamic nlist based on dimension
             },
         }
 

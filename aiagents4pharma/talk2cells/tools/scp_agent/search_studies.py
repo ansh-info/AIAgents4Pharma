@@ -32,17 +32,13 @@ def search_studies(
 
     """
     logger.log(logging.INFO, "Calling the tool search_studies")
-    scp_endpoint = (
-        "https://singlecell.broadinstitute.org/single_cell/api/v1/search?type=study"
-    )
+    scp_endpoint = "https://singlecell.broadinstitute.org/single_cell/api/v1/search?type=study"
     # params = {'terms': search_term, 'facets': 'MONDO_0005011'}
     params = {"terms": search_term}
     status_code = 0
     while status_code != 200:
         # Make a GET request to the single cell portal
-        search_response = requests.get(
-            scp_endpoint, params=params, timeout=10, verify=False
-        )
+        search_response = requests.get(scp_endpoint, params=params, timeout=10, verify=False)
         status_code = search_response.status_code
         logger.log(logging.INFO, "Status code %s received from SCP")
 
