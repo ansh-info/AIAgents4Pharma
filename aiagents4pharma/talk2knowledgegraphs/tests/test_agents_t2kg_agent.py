@@ -170,11 +170,11 @@ def test_t2kg_agent_openai_milvus_mock(input_dict):
         mock_cfg.node_colors_dict = {"drug": "blue", "gene/protein": "red"}
         mock_compose.return_value = MagicMock()
         mock_compose.return_value.tools.multimodal_subgraph_extraction = mock_cfg
-        mock_compose.return_value.tools.subgraph_summarization.prompt_subgraph_summarization = "Summarize the following subgraph: {textualized_subgraph}"
-
-        response = app.invoke(
-            {"messages": [HumanMessage(content=prompt)]}, config=config
+        mock_compose.return_value.tools.subgraph_summarization.prompt_subgraph_summarization = (
+            "Summarize the following subgraph: {textualized_subgraph}"
         )
+
+        response = app.invoke({"messages": [HumanMessage(content=prompt)]}, config=config)
 
     assistant_msg = response["messages"][-1].content
     assert isinstance(assistant_msg, str)
