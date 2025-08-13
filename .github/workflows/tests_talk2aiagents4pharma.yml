@@ -81,6 +81,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
+          export PATH="/usr/local/bin:$PATH"
+          echo "/usr/local/bin" >> $GITHUB_PATH
           ollama serve &
           sleep 10
 
@@ -118,15 +120,31 @@ jobs:
             C:\Users\runneradmin\.ollama\models
           key: ${{ runner.os }}-ollama-llama3.2-1b
 
-      - name: Pull Ollama model
-        if: steps.cache_ollama.outputs.cache-hit != 'true'
+      - name: Pull Ollama model (Ubuntu/macOS)
+        if: steps.cache_ollama.outputs.cache-hit != 'true' && (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-15')
         run: |
           ollama pull llama3.2:1b
 
-      - name: Verify Ollama setup
+      - name: Pull Ollama model (Windows)
+        if: steps.cache_ollama.outputs.cache-hit != 'true' && matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          export PATH="$PWD/ollama_dir:$PATH"
+          ./ollama_dir/ollama.exe pull llama3.2:1b
+
+      - name: Verify Ollama setup (Ubuntu/macOS)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-15'
         run: |
           echo "Cache Hit Status - ${{ steps.cache_ollama.outputs.cache-hit }}"
           ollama list
+
+      - name: Verify Ollama setup (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          echo "Cache Hit Status - ${{ steps.cache_ollama.outputs.cache-hit }}"
+          export PATH="$PWD/ollama_dir:$PATH"
+          ./ollama_dir/ollama.exe list
 
       - name: Run tests with coverage
         run: |
