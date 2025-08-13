@@ -78,11 +78,13 @@ git clone https://github.com/VirtualPatientEngine/AIAgents4Pharma && cd AIAgents
 
 2. **Install dependencies:**
 
-We use Conda as our environment manager, Follow the official [Quickstart](https://www.anaconda.com/docs/getting-started/miniconda/install#quickstart-install-instructions) install instructions provided by anaconda/miniconda.
+We use `uv` for fast and reliable dependency management. Install uv first following the [official installation guide](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```python
-conda create --name AIAgents4Pharma python=3.12 -y && conda activate AIAgents4Pharma && pip install --upgrade pip && pip install -r requirements.txt
+uv sync
 ```
+
+This will create a virtual environment and install all dependencies defined in `pyproject.toml`.
 
 3. **Initialize API Keys**
 
