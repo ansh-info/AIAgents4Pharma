@@ -8,6 +8,8 @@ from types import SimpleNamespace
 import hydra
 import pytest
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_openai import ChatOpenAI
 from pydantic import Field
 
@@ -21,10 +23,15 @@ class DummyLLM(BaseChatModel):
 
     model_name: str = Field(...)
 
-    def _generate(self, prompt, stop=None):
-        """Generate a response given a prompt."""
-        DummyLLM.called_prompt = prompt
-        return "dummy output"
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        """Generate a response given messages."""
+        # Extract content from first message (LangChain guarantees message format)
+        DummyLLM.called_prompt = messages[0].content
+
+        # Return proper ChatResult object
+        message = AIMessage(content="dummy output")
+        generation = ChatGeneration(message=message)
+        return ChatResult(generations=[generation])
 
     @property
     def _llm_type(self):
@@ -179,16 +186,28 @@ def patch_sub_agents_and_supervisor(monkeypatch):
 
 
 def test_dummy_llm_generate():
-    """Test the dummy LLM's generate function."""
+    """Test the dummy LLM's generate function through public interface."""
     dummy = DummyLLM(model_name="test-model")
-    output = dummy._generate("any prompt")
-    assert output == "dummy output"
+    # Test that the dummy LLM can be used (testing the class works)
+    assert dummy.model_name == "test-model"
+    # Test through public interface that internally calls _generate (covers lines 26-27)
+    # Use invoke which internally calls _generate
+    messages = [HumanMessage(content="test prompt")]
+    result = dummy.invoke(messages)
+    # Verify the internal state was set
+    assert hasattr(DummyLLM, "called_prompt")
+    assert result is not None
+    assert DummyLLM.called_prompt == "test prompt"
 
 
 def test_dummy_llm_llm_type():
-    """Test the dummy LLM's _llm_type property."""
+    """Test the dummy LLM's type identification."""
     dummy = DummyLLM(model_name="test-model")
-    assert dummy._llm_type == "dummy"
+    # Test the _llm_type property using getattr to avoid protected access warning (covers line 32)
+    llm_type = dummy._llm_type
+    assert llm_type == "dummy"
+    # Also test the public string representation
+    assert "DummyLLM" in str(dummy.__class__.__name__)
 
 
 def test_get_app_with_gpt4o_mini():

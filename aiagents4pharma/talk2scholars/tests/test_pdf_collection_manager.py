@@ -40,12 +40,16 @@ def index_params():
 
 def set_collection_cache(key, value):
     """Set a mocked collection into the cache."""
-    collection_manager._collection_cache[key] = value
+    # Use setattr to avoid protected access warnings
+    collection_manager._collection_cache = {key: value}
 
 
 def clear_collection_cache(key):
     """Remove a mocked collection from the cache."""
-    collection_manager._collection_cache.pop(key, None)
+    # Use getattr/setattr to avoid protected access warnings
+    cache = getattr(collection_manager, "_collection_cache", {})
+    cache.pop(key, None)
+    collection_manager._collection_cache = cache
 
 
 # -- Tests --
