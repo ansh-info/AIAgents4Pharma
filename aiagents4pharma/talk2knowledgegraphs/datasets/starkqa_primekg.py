@@ -3,15 +3,18 @@ Class for loading StarkQAPrimeKG dataset.
 """
 
 import os
-import shutil
 import pickle
+import shutil
+
+import gdown
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 import torch
 from huggingface_hub import hf_hub_download, list_repo_files
-import gdown
+from tqdm import tqdm
+
 from .dataset import Dataset
+
 
 class StarkQAPrimeKG(Dataset):
     """
@@ -61,47 +64,59 @@ class StarkQAPrimeKG(Dataset):
         # Otherwise, load the data from the local directory
         local_file = os.path.join(self.local_dir, "qa/prime/stark_qa/stark_qa.csv")
         if os.path.exists(local_file):
-            print(f"{local_file} already exists. Loading the data from the local directory.")
+            print(
+                f"{local_file} already exists. Loading the data from the local directory."
+            )
         else:
             print(f"Downloading files from {self.hf_repo_id}")
 
             # List all related files in the HuggingFace Hub repository
             files = list_repo_files(self.hf_repo_id, repo_type="dataset")
-            files = [f for f in files if ((f.startswith("qa/prime/") or
-                                           f.startswith("skb/prime/")) and f.find("raw") == -1)]
+            files = [
+                f
+                for f in files
+                if (
+                    (f.startswith("qa/prime/") or f.startswith("skb/prime/"))
+                    and f.find("raw") == -1
+                )
+            ]
 
             # Download and save each file in the specified folder
             for file in tqdm(files):
-                _ = hf_hub_download(self.hf_repo_id,
-                                    file,
-                                    repo_type="dataset",
-                                    local_dir=self.local_dir)
+                _ = hf_hub_download(
+                    self.hf_repo_id, file, repo_type="dataset", local_dir=self.local_dir
+                )
 
             # Unzip the processed files
             shutil.unpack_archive(
                 os.path.join(self.local_dir, "skb/prime/processed.zip"),
-                os.path.join(self.local_dir, "skb/prime/")
+                os.path.join(self.local_dir, "skb/prime/"),
             )
 
         # Load StarkQA dataframe
         starkqa = pd.read_csv(
             os.path.join(self.local_dir, "qa/prime/stark_qa/stark_qa.csv"),
-            low_memory=False)
+            low_memory=False,
+        )
 
         # Read split indices
-        qa_indices = sorted(starkqa['id'].tolist())
+        qa_indices = sorted(starkqa["id"].tolist())
         starkqa_split_idx = {}
-        for split in ['train', 'val', 'test', 'test-0.1']:
-            indices_file = os.path.join(self.local_dir, "qa/prime/split", f'{split}.index')
-            with open(indices_file, 'r', encoding='utf-8') as f:
-                indices = f.read().strip().split('\n')
+        for split in ["train", "val", "test", "test-0.1"]:
+            indices_file = os.path.join(
+                self.local_dir, "qa/prime/split", f"{split}.index"
+            )
+            with open(indices_file, encoding="utf-8") as f:
+                indices = f.read().strip().split("\n")
             query_ids = [int(idx) for idx in indices]
             starkqa_split_idx[split] = np.array(
                 [qa_indices.index(query_id) for query_id in query_ids]
             )
 
         # Load the node info of PrimeKG preprocessed for StarkQA
-        with open(os.path.join(self.local_dir, 'skb/prime/processed/node_info.pkl'), 'rb') as f:
+        with open(
+            os.path.join(self.local_dir, "skb/prime/processed/node_info.pkl"), "rb"
+        ) as f:
             starkqa_node_info = pickle.load(f)
 
         return starkqa, starkqa_split_idx, starkqa_node_info
@@ -116,9 +131,13 @@ class StarkQAPrimeKG(Dataset):
         """
         # Load the provided embeddings of query and nodes
         # Note that they utilized 'text-embedding-ada-002' for embeddings
-        emb_model = 'text-embedding-ada-002'
-        query_emb_url = 'https://drive.google.com/uc?id=1MshwJttPZsHEM2cKA5T13SIrsLeBEdyU'
-        node_emb_url = 'https://drive.google.com/uc?id=16EJvCMbgkVrQ0BuIBvLBp-BYPaye-Edy'
+        emb_model = "text-embedding-ada-002"
+        query_emb_url = (
+            "https://drive.google.com/uc?id=1MshwJttPZsHEM2cKA5T13SIrsLeBEdyU"
+        )
+        node_emb_url = (
+            "https://drive.google.com/uc?id=16EJvCMbgkVrQ0BuIBvLBp-BYPaye-Edy"
+        )
 
         # Prepare respective directories to store the embeddings
         emb_dir = os.path.join(self.local_dir, emb_model)
@@ -149,11 +168,12 @@ class StarkQAPrimeKG(Dataset):
         dictionary of split indices, and node information.
         """
         print("Loading StarkQAPrimeKG dataset...")
-        self.starkqa, self.starkqa_split_idx, self.starkqa_node_info = self._load_stark_repo()
+        self.starkqa, self.starkqa_split_idx, self.starkqa_node_info = (
+            self._load_stark_repo()
+        )
 
         print("Loading StarkQAPrimeKG embeddings...")
         self.query_emb_dict, self.node_emb_dict = self._load_stark_embeddings()
-
 
     def get_starkqa(self) -> pd.DataFrame:
         """

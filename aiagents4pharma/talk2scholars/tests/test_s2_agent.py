@@ -3,9 +3,11 @@ Updated Unit Tests for the S2 agent (Semantic Scholar sub-agent).
 """
 
 from unittest import mock
+
 import pytest
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
+
 from ..agents.s2_agent import get_app
 from ..state.state_talk2scholars import Talk2Scholars
 

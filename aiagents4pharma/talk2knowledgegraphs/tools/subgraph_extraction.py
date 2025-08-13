@@ -2,29 +2,31 @@
 Tool for performing subgraph extraction.
 """
 
-from typing import Type, Annotated
 import logging
 import pickle
-import numpy as np
-import pandas as pd
+from typing import Annotated
+
 import hydra
 import networkx as nx
-from pydantic import BaseModel, Field
-from langchain.chains.retrieval import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.vectorstores import InMemoryVectorStore
-from langchain_core.tools import BaseTool
-from langchain_core.messages import ToolMessage
-from langchain_core.tools.base import InjectedToolCallId
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langgraph.types import Command
-from langgraph.prebuilt import InjectedState
+import numpy as np
+import pandas as pd
 import torch
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains.retrieval import create_retrieval_chain
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.messages import ToolMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import BaseTool
+from langchain_core.tools.base import InjectedToolCallId
+from langchain_core.vectorstores import InMemoryVectorStore
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langgraph.prebuilt import InjectedState
+from langgraph.types import Command
+from pydantic import BaseModel, Field
 from torch_geometric.data import Data
-from ..utils.extractions.pcst import PCSTPruning
+
 from ..utils.embeddings.ollama import EmbeddingWithOllama
+from ..utils.extractions.pcst import PCSTPruning
 from .load_arguments import ArgumentData
 
 # Initialize logger
@@ -61,7 +63,7 @@ class SubgraphExtractionTool(BaseTool):
 
     name: str = "subgraph_extraction"
     description: str = "A tool for subgraph extraction based on user's prompt."
-    args_schema: Type[BaseModel] = SubgraphExtractionInput
+    args_schema: type[BaseModel] = SubgraphExtractionInput
 
     def perform_endotype_filtering(
         self,
@@ -125,10 +127,9 @@ class SubgraphExtractionTool(BaseTool):
 
         return prompt
 
-    def prepare_final_subgraph(self,
-                               subgraph: dict,
-                               pyg_graph: Data,
-                               textualized_graph: pd.DataFrame) -> dict:
+    def prepare_final_subgraph(
+        self, subgraph: dict, pyg_graph: Data, textualized_graph: pd.DataFrame
+    ) -> dict:
         """
         Prepare the subgraph based on the extracted subgraph.
 
@@ -230,7 +231,9 @@ class SubgraphExtractionTool(BaseTool):
 
         # Retrieve source graph from the state
         initial_graph = {}
-        initial_graph["source"] = state["dic_source_graph"][-1]  # The last source graph as of now
+        initial_graph["source"] = state["dic_source_graph"][
+            -1
+        ]  # The last source graph as of now
         # logger.log(logging.INFO, "Source graph: %s", source_graph)
 
         # Load the knowledge graph
@@ -293,7 +296,8 @@ class SubgraphExtractionTool(BaseTool):
 
         # Return the updated state of the tool
         return Command(
-            update=dic_updated_state_for_model | {
+            update=dic_updated_state_for_model
+            | {
                 # update the message history
                 "messages": [
                     ToolMessage(

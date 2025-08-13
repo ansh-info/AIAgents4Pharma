@@ -4,6 +4,7 @@ Test cases for utils/enrichments/enrichments.py
 
 from ..utils.enrichments.enrichments import Enrichments
 
+
 class TestEnrichments(Enrichments):
     """Test implementation of the Enrichments interface for testing purposes."""
 
@@ -17,6 +18,7 @@ class TestEnrichments(Enrichments):
         # Thus, we will just call the enrich_documents method instead.
         return self.enrich_documents(texts)
 
+
 def test_enrich_documents():
     """Test enriching documents using the Enrichments interface."""
     enrichments = TestEnrichments()
@@ -26,6 +28,7 @@ def test_enrich_documents():
         "Additional text description of text1 as the input.",
         "Additional text description of text2 as the input.",
     ]
+
 
 def test_enrich_documents_with_rag():
     """Test enriching documents with RAG using the Enrichments interface."""

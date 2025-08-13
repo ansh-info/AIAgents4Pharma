@@ -5,7 +5,6 @@ and use IP (Inner Product) distance instead.
 """
 
 import logging
-from typing import List, Union
 
 import numpy as np
 from langchain_core.embeddings import Embeddings
@@ -13,7 +12,7 @@ from langchain_core.embeddings import Embeddings
 logger = logging.getLogger(__name__)
 
 
-def normalize_vector(vector: Union[List[float], np.ndarray]) -> List[float]:
+def normalize_vector(vector: list[float] | np.ndarray) -> list[float]:
     """
     Normalize a single vector to unit length.
 
@@ -34,7 +33,7 @@ def normalize_vector(vector: Union[List[float], np.ndarray]) -> List[float]:
     return normalized.tolist()
 
 
-def normalize_vectors_batch(vectors: List[List[float]]) -> List[List[float]]:
+def normalize_vectors_batch(vectors: list[list[float]]) -> list[list[float]]:
     """
     Normalize a batch of vectors to unit length.
 
@@ -89,7 +88,7 @@ class NormalizingEmbeddings(Embeddings):
                 "Embedding model wrapped with normalization for GPU compatibility"
             )
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Embed documents and optionally normalize."""
         embeddings = self.embedding_model.embed_documents(texts)
 
@@ -99,7 +98,7 @@ class NormalizingEmbeddings(Embeddings):
 
         return embeddings
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         """Embed query and optionally normalize."""
         embedding = self.embedding_model.embed_query(text)
 

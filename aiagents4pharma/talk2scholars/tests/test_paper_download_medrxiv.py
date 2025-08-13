@@ -5,6 +5,7 @@ Unit tests for medrXiv paper downloading functionality, including:
 
 import unittest
 from unittest.mock import MagicMock, patch
+
 from langchain_core.messages import ToolMessage
 
 from aiagents4pharma.talk2scholars.tools.paper_download.download_medrxiv_input import (
@@ -24,7 +25,9 @@ class TestDownloadMedrxivPaper(unittest.TestCase):
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.download_medrxiv_input.requests.get"
     )
-    def test_download_medrxiv_paper_success(self, mock_get, mock_compose, mock_initialize):
+    def test_download_medrxiv_paper_success(
+        self, mock_get, mock_compose, mock_initialize
+    ):
         """Test successful metadata and PDF URL retrieval."""
         dummy_cfg = MagicMock()
         dummy_cfg.tools.download_medrxiv_paper.api_url = "http://dummy.medrxiv.org/api"
@@ -45,7 +48,7 @@ class TestDownloadMedrxivPaper(unittest.TestCase):
                     "abstract": "This is a medRxiv abstract.",
                     "date": "2025-04-25",
                     "doi": doi,
-                    "link": f"https://www.medrxiv.org/content/{doi}.full.pdf"
+                    "link": f"https://www.medrxiv.org/content/{doi}.full.pdf",
                 }
             ]
         }
@@ -62,15 +65,21 @@ class TestDownloadMedrxivPaper(unittest.TestCase):
         self.assertEqual(metadata["Authors"], "Author One; Author Two")
         self.assertEqual(metadata["Abstract"], "This is a medRxiv abstract.")
         self.assertEqual(metadata["Publication Date"], "2025-04-25")
-        self.assertEqual(metadata["URL"], f"https://www.medrxiv.org/content/{doi}.full.pdf")
-        self.assertEqual(metadata["pdf_url"], f"https://www.medrxiv.org/content/{doi}.full.pdf")
+        self.assertEqual(
+            metadata["URL"], f"https://www.medrxiv.org/content/{doi}.full.pdf"
+        )
+        self.assertEqual(
+            metadata["pdf_url"], f"https://www.medrxiv.org/content/{doi}.full.pdf"
+        )
         self.assertEqual(metadata["filename"], f"{doi.rsplit('/', maxsplit=1)[-1]}.pdf")
         self.assertEqual(metadata["source"], "medrxiv")
         self.assertEqual(metadata["medrxiv_id"], doi)
 
         self.assertTrue(len(update["messages"]) >= 1)
         self.assertIsInstance(update["messages"][0], ToolMessage)
-        self.assertIn("Successfully retrieved metadata and PDF URL", update["messages"][0].content)
+        self.assertIn(
+            "Successfully retrieved metadata and PDF URL", update["messages"][0].content
+        )
 
     @patch(
         "aiagents4pharma.talk2scholars.tools.paper_download.download_medrxiv_input.hydra.initialize"
@@ -132,7 +141,7 @@ class TestDownloadMedrxivPaper(unittest.TestCase):
                     "authors": "Author One; Author Two",
                     "abstract": "This is a medRxiv abstract.",
                     "date": "2025-04-25",
-                    "doi": doi
+                    "doi": doi,
                     # 'link' is intentionally omitted
                 }
             ]
@@ -145,7 +154,9 @@ class TestDownloadMedrxivPaper(unittest.TestCase):
         metadata = update["article_data"][doi]
 
         # Assert that the PDF URL was constructed from DOI
-        expected_suffix = doi.rsplit('/', maxsplit=1)[-1]
-        expected_url = f"https://www.medrxiv.org/content/10.1101/{expected_suffix}.full.pdf"
+        expected_suffix = doi.rsplit("/", maxsplit=1)[-1]
+        expected_url = (
+            f"https://www.medrxiv.org/content/10.1101/{expected_suffix}.full.pdf"
+        )
 
         self.assertEqual(metadata["pdf_url"], expected_url)

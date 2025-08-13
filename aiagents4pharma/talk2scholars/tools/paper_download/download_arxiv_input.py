@@ -5,7 +5,7 @@ Tool for downloading arXiv paper metadata and retrieving the PDF URL.
 
 import logging
 import xml.etree.ElementTree as ET
-from typing import Annotated, Any, List
+from typing import Annotated, Any
 
 import hydra
 import requests
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class DownloadArxivPaperInput(BaseModel):
     """Input schema for the arXiv paper download tool."""
 
-    arxiv_ids: List[str] = Field(
+    arxiv_ids: list[str] = Field(
         description="List of arXiv paper IDs used to retrieve paper details and PDF URLs."
     )
     tool_call_id: Annotated[str, InjectedToolCallId]
@@ -113,7 +113,7 @@ def _build_summary(article_data: dict[str, Any]) -> str:
         pub_date = paper.get("Publication Date", "N/A")
         url = paper.get("URL", "")
         snippet = _get_snippet(paper.get("Abstract", ""))
-        line = f"{idx+1}. {title} ({pub_date})"
+        line = f"{idx + 1}. {title} ({pub_date})"
         if url:
             line += f"\n   View PDF: {url}"
         if snippet:
@@ -133,7 +133,7 @@ def _build_summary(article_data: dict[str, Any]) -> str:
     parse_docstring=True,
 )
 def download_arxiv_paper(
-    arxiv_ids: List[str],
+    arxiv_ids: list[str],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command[Any]:
     """

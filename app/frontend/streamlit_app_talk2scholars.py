@@ -64,11 +64,12 @@ st.set_page_config(
     page_title=cfg.page.title, page_icon=cfg.page.icon, layout=cfg.page.layout
 )
 
+
 # Set the logo, detect if we're in container or local development
 def get_logo_path():
-    container_path = '/app/docs/assets/VPE.png'
-    local_path = 'docs/assets/VPE.png'
-    
+    container_path = "/app/docs/assets/VPE.png"
+    local_path = "docs/assets/VPE.png"
+
     if os.path.exists(container_path):
         return container_path
     elif os.path.exists(local_path):
@@ -76,18 +77,17 @@ def get_logo_path():
     else:
         # Fallback: try to find it relative to script location
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        relative_path = os.path.join(script_dir, '../../docs/assets/VPE.png')
+        relative_path = os.path.join(script_dir, "../../docs/assets/VPE.png")
         if os.path.exists(relative_path):
             return relative_path
-    
+
     return None  # File not found
+
 
 logo_path = get_logo_path()
 if logo_path:
     st.logo(
-        image=logo_path,
-        size='large',
-        link='https://github.com/VirtualPatientEngine'
+        image=logo_path, size="large", link="https://github.com/VirtualPatientEngine"
     )
 
 
@@ -179,7 +179,6 @@ def process_pdf_upload():
     )
 
     if pdf_files:
-
         # Step 1: Initialize or get existing article_data
         article_data = st.session_state.get("article_data", {})
 
@@ -566,7 +565,7 @@ with main_col2:
         if len(st.session_state.messages) <= 1:
             for count, question in enumerate(streamlit_utils.sample_questions_t2s()):
                 if st.button(
-                    f"Q{count+1}. {question}", key=f"sample_question_{count+1}"
+                    f"Q{count + 1}. {question}", key=f"sample_question_{count + 1}"
                 ):
                     # Trigger the question
                     prompt = question
@@ -575,8 +574,8 @@ with main_col2:
                     {
                         "type": "button",
                         "question": question,
-                        "content": f"Q{count+1}. {question}",
-                        "key": f"sample_question_{count+1}",
+                        "content": f"Q{count + 1}. {question}",
+                        "key": f"sample_question_{count + 1}",
                     }
                 )
 

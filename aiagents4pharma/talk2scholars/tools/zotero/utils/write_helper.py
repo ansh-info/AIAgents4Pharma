@@ -5,14 +5,15 @@ Utility for zotero write tool.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
+
 import hydra
 from pyzotero import zotero
-from .zotero_path import (
-    find_or_create_collection,
-    fetch_papers_for_save,
-)
 
+from .zotero_path import (
+    fetch_papers_for_save,
+    find_or_create_collection,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -152,13 +153,13 @@ class ZoteroWriteData:
         top_papers = list(self.fetched_papers.values())[:2]
         top_papers_info = "\n".join(
             [
-                f"{i+1}. {paper.get('Title', 'N/A')} ({paper.get('URL', 'N/A')})"
+                f"{i + 1}. {paper.get('Title', 'N/A')} ({paper.get('URL', 'N/A')})"
                 for i, paper in enumerate(top_papers)
             ]
         )
         self.content += "Here are a few of these articles:\n" + top_papers_info
 
-    def process_write(self) -> Dict[str, Any]:
+    def process_write(self) -> dict[str, Any]:
         """Process the write operation and return results."""
         self._validate_papers()
         matched_collection_key = self._find_collection()

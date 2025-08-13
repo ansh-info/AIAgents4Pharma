@@ -6,10 +6,8 @@ With automatic GPU/CPU search parameter optimization.
 
 import logging
 import os
-from typing import List, Optional
 
 from langchain_core.documents import Document
-
 
 # Set up logging with configurable level
 log_level = os.environ.get("LOG_LEVEL", "INFO")
@@ -21,10 +19,10 @@ logger.setLevel(getattr(logging, log_level))
 def retrieve_relevant_chunks(
     vector_store,
     query: str,
-    paper_ids: Optional[List[str]] = None,
+    paper_ids: list[str] | None = None,
     top_k: int = 100,  # Increased default to cast wider net before reranking
     mmr_diversity: float = 0.8,  # Slightly reduced for better diversity
-) -> List[Document]:
+) -> list[Document]:
     """
     Retrieve the most relevant chunks for a query using maximal marginal relevance.
     Automatically uses GPU-optimized search parameters if GPU is available.
@@ -132,10 +130,10 @@ def retrieve_relevant_chunks(
 def retrieve_relevant_chunks_with_scores(
     vector_store,
     query: str,
-    paper_ids: Optional[List[str]] = None,
+    paper_ids: list[str] | None = None,
     top_k: int = 100,
     score_threshold: float = 0.0,
-) -> List[tuple[Document, float]]:
+) -> list[tuple[Document, float]]:
     """
     Retrieve chunks with similarity scores, optimized for GPU/CPU.
 

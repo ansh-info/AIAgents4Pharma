@@ -1,6 +1,7 @@
 """Tests for singleton_manager: manages vector store connections and event loops."""
 
 from unittest.mock import MagicMock, patch
+
 import pytest
 from pymilvus.exceptions import MilvusException
 
@@ -26,7 +27,7 @@ def test_detect_gpu_once(mock_detect):
     """Ensure GPU detection is cached."""
     mock_detect.return_value = True
     singleton = VectorstoreSingleton()
-    setattr(singleton, "_gpu_detected", None)
+    singleton._gpu_detected = None
 
     result = singleton.detect_gpu_once()
     assert result is True
@@ -66,15 +67,15 @@ def test_get_connection_creates_connection(_, mock_db, mock_conns):
 def test_get_vector_store_creates_if_missing(mock_milvus):
     """get_vector_store should create a new vector store if missing."""
     singleton = VectorstoreSingleton()
-    setattr(singleton, "_vector_stores", {})
-    setattr(singleton, "_event_loops", {})
+    singleton._vector_stores = {}
+    singleton._event_loops = {}
 
     mock_embed = MagicMock()
     connection_args = {"host": "localhost", "port": 19530}
 
     vs = singleton.get_vector_store("collection1", mock_embed, connection_args)
 
-    vector_stores = getattr(singleton, "_vector_stores")
+    vector_stores = singleton._vector_stores
     assert vs is vector_stores["collection1"]
     assert "collection1" in vector_stores
     mock_milvus.assert_called_once()
@@ -124,7 +125,7 @@ def test_get_vectorstore_force_new(mock_vectorstore_cls):
 def test_get_connection_milvus_error(_, mock_has_connection, mock_connect):
     """get_connection should raise MilvusException on connection failure."""
     manager = VectorstoreSingleton()
-    setattr(manager, "_connections", {})
+    manager._connections = {}
 
     mock_has_connection.return_value = False
     mock_connect.side_effect = MilvusException("Connection failed")
@@ -136,7 +137,7 @@ def test_get_connection_milvus_error(_, mock_has_connection, mock_connect):
 def test_get_event_loop_creates_new_loop_on_closed():
     """Ensure get_event_loop creates a new loop if current one is closed."""
     manager = VectorstoreSingleton()
-    setattr(manager, "_event_loops", {})
+    manager._event_loops = {}
 
     mock_loop = MagicMock()
     mock_loop.is_closed.return_value = True

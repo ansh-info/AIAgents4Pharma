@@ -1,6 +1,7 @@
 """generate_answer tests for the PDF tool"""
 
 from unittest.mock import MagicMock
+
 import pytest
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.generate_answer import (

@@ -12,17 +12,15 @@ only displays the existing list. If no papers are available, it raises NoPapersF
 to signal that a search or recommendation must be executed first.
 """
 
-
 import logging
-
 from typing import Annotated
-from pydantic import BaseModel, Field
+
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
-
+from pydantic import BaseModel, Field
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

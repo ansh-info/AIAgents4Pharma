@@ -5,22 +5,23 @@ Agent for interacting with Zotero with human-in-the-loop features
 """
 
 import logging
-from typing import Any, Dict
-import hydra
+from typing import Any
 
+import hydra
 from langchain_core.language_models.chat_models import BaseChatModel
-from langgraph.graph import START, StateGraph
-from langgraph.prebuilt import create_react_agent, ToolNode
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import START, StateGraph
+from langgraph.prebuilt import ToolNode, create_react_agent
+
 from ..state.state_talk2scholars import Talk2Scholars
-from ..tools.zotero.zotero_read import zotero_read
-from ..tools.zotero.zotero_review import zotero_review
-from ..tools.zotero.zotero_write import zotero_write
 from ..tools.s2.display_dataframe import display_dataframe
 from ..tools.s2.query_dataframe import query_dataframe
 from ..tools.s2.retrieve_semantic_scholar_paper_id import (
     retrieve_semantic_scholar_paper_id,
 )
+from ..tools.zotero.zotero_read import zotero_read
+from ..tools.zotero.zotero_review import zotero_review
+from ..tools.zotero.zotero_write import zotero_write
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
@@ -49,7 +50,7 @@ def get_app(uniq_id, llm_model: BaseChatModel):
         >>> result = app.invoke(initial_state)
     """
 
-    def zotero_agent_node(state: Talk2Scholars) -> Dict[str, Any]:
+    def zotero_agent_node(state: Talk2Scholars) -> dict[str, Any]:
         """
         Processes the user query and retrieves relevant research papers from Zotero.
 

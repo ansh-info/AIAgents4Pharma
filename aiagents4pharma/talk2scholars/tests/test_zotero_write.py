@@ -4,7 +4,7 @@ Unit tests for Zotero write tool in zotero_write.py.
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from aiagents4pharma.talk2scholars.tools.zotero.zotero_write import zotero_write
 

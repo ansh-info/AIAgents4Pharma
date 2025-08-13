@@ -8,7 +8,7 @@ Supports both GPU and CPU configurations.
 import logging
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
@@ -39,7 +39,7 @@ class Vectorstore:
     def __init__(
         self,
         embedding_model: Embeddings,
-        metadata_fields: Optional[List[str]] = None,
+        metadata_fields: list[str] | None = None,
         config: Any = None,
     ):
         """
@@ -139,8 +139,8 @@ class Vectorstore:
         self._ensure_collection_loaded()
 
         # Store for document metadata (keeping for compatibility)
-        self.documents: Dict[str, Document] = {}
-        self.paper_metadata: Dict[str, Dict[str, Any]] = {}
+        self.documents: dict[str, Document] = {}
+        self.paper_metadata: dict[str, dict[str, Any]] = {}
 
         # Log final configuration
         metric_info = (
@@ -204,14 +204,14 @@ class Vectorstore:
             )
 
             # Extract unique paper IDs
-            existing_paper_ids = set(result["paper_id"] for result in results)
+            existing_paper_ids = {result["paper_id"] for result in results}
             self.loaded_papers.update(existing_paper_ids)
 
             logger.info("Found %d unique papers in collection", len(existing_paper_ids))
         else:
             logger.info("Collection is empty - no existing papers")
 
-    def similarity_search(self, query: str, **kwargs: Any) -> List[Document]:
+    def similarity_search(self, query: str, **kwargs: Any) -> list[Document]:
         """
         Perform similarity search on the vector store.
         Query embedding will be automatically normalized if using GPU with COSINE.
@@ -222,7 +222,7 @@ class Vectorstore:
         """
         # Extract our parameters
         k: int = kwargs.pop("k", 4)
-        filter_: Optional[Dict[str, Any]] = kwargs.pop("filter", None)
+        filter_: dict[str, Any] | None = kwargs.pop("filter", None)
 
         # Build Milvus expr from filter_, if present
         expr = None
@@ -247,7 +247,7 @@ class Vectorstore:
 
     def max_marginal_relevance_search(
         self, query: str, **kwargs: Any
-    ) -> List[Document]:
+    ) -> list[Document]:
         """
         Perform MMR search on the vector store.
         Query embedding will be automatically normalized if using GPU with COSINE.
@@ -262,7 +262,7 @@ class Vectorstore:
         k: int = kwargs.pop("k", 4)
         fetch_k: int = kwargs.pop("fetch_k", 20)
         lambda_mult: float = kwargs.pop("lambda_mult", 0.5)
-        filter_: Optional[Dict[str, Any]] = kwargs.pop("filter", None)
+        filter_: dict[str, Any] | None = kwargs.pop("filter", None)
 
         # Build Milvus expr from filter_, if present
         expr = None
@@ -330,7 +330,7 @@ class Vectorstore:
         else:
             logger.info("Collection is empty, skipping load operation")
 
-    def get_embedding_info(self) -> Dict[str, Any]:
+    def get_embedding_info(self) -> dict[str, Any]:
         """Get information about the embedding configuration."""
         return {
             "has_gpu": self.has_gpu,

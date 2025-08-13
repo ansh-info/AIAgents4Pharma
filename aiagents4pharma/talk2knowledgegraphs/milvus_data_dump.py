@@ -18,7 +18,7 @@ import os
 import platform
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Union
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="[DATA LOADER] %(message)s")
@@ -57,7 +57,7 @@ class SystemDetector:
         ):
             return False
 
-    def get_required_packages(self) -> List[str]:
+    def get_required_packages(self) -> list[str]:
         """Get list of packages to install based on system capabilities - matches original logic."""
         if self.use_gpu and self.os_type == "linux":
             # Exact package list from original script for GPU mode
@@ -130,7 +130,7 @@ class SystemDetector:
 class DynamicDataLoader:
     """Dynamic data loader that adapts to system capabilities."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """Initialize with system detection and dynamic library loading."""
         self.config = config
         self.detector = SystemDetector()
@@ -222,7 +222,7 @@ class DynamicDataLoader:
                     self.use_gpu = False
 
     def _read_dataframe(
-        self, file_path: str, columns: Optional[List[str]] = None
+        self, file_path: str, columns: list[str] | None = None
     ) -> Union["pd.DataFrame", "cudf.DataFrame"]:  # type: ignore[reportUndefinedVariable]  # noqa: F821
         """Read dataframe using appropriate library."""
         if self.use_gpu:
@@ -231,7 +231,7 @@ class DynamicDataLoader:
             return self.pd.read_parquet(file_path, columns=columns)
 
     def _concat_dataframes(
-        self, df_list: List, ignore_index: bool = True
+        self, df_list: list, ignore_index: bool = True
     ) -> Union["pd.DataFrame", "cudf.DataFrame"]:  # type: ignore[reportUndefinedVariable]  # noqa: F821
         """Concatenate dataframes using appropriate library."""
         if self.use_gpu:
@@ -639,7 +639,7 @@ class DynamicDataLoader:
                 collection.num_entities,
             )
 
-    def create_edges_collection(self, edges_enrichment_df, edges_embedding_df: List):
+    def create_edges_collection(self, edges_enrichment_df, edges_embedding_df: list):
         """Create and populate the edges collection - exact original logic."""
         logger.info("Creating edges collection...")
 

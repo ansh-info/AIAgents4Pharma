@@ -1,6 +1,7 @@
 """Unit tests for PDF document processing utilities."""
 
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.document_processor import (

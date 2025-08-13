@@ -1,9 +1,11 @@
 """Unit tests for the paper download agent in Talk2Scholars."""
 
 from unittest import mock
+
 import pytest
-from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, HumanMessage
+
 from ..agents.paper_download_agent import get_app
 from ..state.state_talk2scholars import Talk2Scholars
 
@@ -130,6 +132,6 @@ def test_paper_download_agent_model_failure():
     ):
         with pytest.raises(Exception) as exc_info:
             get_app(thread_id, llm_mock)
-        assert "Mock model failure" in str(
-            exc_info.value
-        ), "Model initialization failure should raise an exception."
+        assert "Mock model failure" in str(exc_info.value), (
+            "Model initialization failure should raise an exception."
+        )

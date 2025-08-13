@@ -1,6 +1,7 @@
 """Tests for the PDF batch processor module."""
 
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils.batch_processor import (

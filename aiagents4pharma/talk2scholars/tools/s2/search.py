@@ -8,12 +8,14 @@ optionally filtered by publication year.
 """
 
 import logging
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
+
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.types import Command
 from pydantic import BaseModel, Field
+
 from .utils.search_helper import SearchData
 
 # Configure logging
@@ -41,7 +43,7 @@ class SearchInput(BaseModel):
         ge=1,
         le=100,
     )
-    year: Optional[str] = Field(
+    year: str | None = Field(
         default=None,
         description="Publication year filter; supports formats:"
         "'YYYY', 'YYYY-', '-YYYY', 'YYYY:YYYY'",
@@ -58,7 +60,7 @@ def search_tool(
     query: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
     limit: int = 10,
-    year: Optional[str] = None,
+    year: str | None = None,
 ) -> Command[Any]:
     """
     Return academic papers from Semantic Scholar matching a title or keyword query.

@@ -1,11 +1,11 @@
 """collection_manager for managing Milvus collections for PDF chunks."""
 
-from unittest.mock import MagicMock, patch
 from dataclasses import dataclass, field
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from aiagents4pharma.talk2scholars.tools.pdf.utils import collection_manager
-
 
 # -- Fixtures --
 
@@ -40,12 +40,12 @@ def index_params():
 
 def set_collection_cache(key, value):
     """Set a mocked collection into the cache."""
-    getattr(collection_manager, "_collection_cache")[key] = value
+    collection_manager._collection_cache[key] = value
 
 
 def clear_collection_cache(key):
     """Remove a mocked collection from the cache."""
-    getattr(collection_manager, "_collection_cache").pop(key, None)
+    collection_manager._collection_cache.pop(key, None)
 
 
 # -- Tests --

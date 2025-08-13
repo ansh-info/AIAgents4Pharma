@@ -19,7 +19,7 @@ def fixture_chunks():
     return [
         Document(
             page_content=f"chunk {i}",
-            metadata={"paper_id": f"P{i%2}", "relevance_score": 0.9 - 0.01 * i},
+            metadata={"paper_id": f"P{i % 2}", "relevance_score": 0.9 - 0.01 * i},
         )
         for i in range(10)
     ]

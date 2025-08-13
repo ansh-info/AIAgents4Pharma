@@ -3,10 +3,10 @@
 Utility functions for downloading PDFs from Zotero.
 """
 
+import concurrent.futures
 import logging
 import tempfile
-from typing import Optional, Tuple, Dict
-import concurrent.futures
+
 import requests
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ def download_zotero_pdf(
     api_key: str,
     attachment_key: str,
     **kwargs,
-) -> Optional[Tuple[str, str]]:
+) -> tuple[str, str] | None:
     """
     Download a PDF from Zotero by attachment key.
 
@@ -38,13 +38,15 @@ def download_zotero_pdf(
     timeout = kwargs.get("timeout", 10)
     chunk_size = kwargs.get("chunk_size")
     # Log configured parameters for verification
-    logger.info("download_zotero_pdf params -> timeout=%s, chunk_size=%s", timeout, chunk_size)
+    logger.info(
+        "download_zotero_pdf params -> timeout=%s, chunk_size=%s", timeout, chunk_size
+    )
     # Log download start
     logger.info(
         "Downloading Zotero PDF for attachment %s from Zotero API", attachment_key
     )
     zotero_pdf_url = (
-        f"https://api.zotero.org/users/{user_id}/items/" f"{attachment_key}/file"
+        f"https://api.zotero.org/users/{user_id}/items/{attachment_key}/file"
     )
     headers = {"Zotero-API-Key": api_key}
 
@@ -85,9 +87,9 @@ def download_pdfs_in_parallel(
     session: requests.Session,
     user_id: str,
     api_key: str,
-    attachment_item_map: Dict[str, str],
+    attachment_item_map: dict[str, str],
     **kwargs,
-) -> Dict[str, Tuple[str, str, str]]:
+) -> dict[str, tuple[str, str, str]]:
     """
     Download multiple PDFs in parallel using ThreadPoolExecutor.
 
@@ -108,11 +110,11 @@ def download_pdfs_in_parallel(
     chunk_size = kwargs.get("chunk_size")
     # Log configured parameters for verification
     logger.info(
-        "download_pdfs_in_parallel params -> max_workers=%s, chunk_size=%s", 
+        "download_pdfs_in_parallel params -> max_workers=%s, chunk_size=%s",
         max_workers,
         chunk_size,
     )
-    results: Dict[str, Tuple[str, str, str]] = {}
+    results: dict[str, tuple[str, str, str]] = {}
     if not attachment_item_map:
         return results
 

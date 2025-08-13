@@ -4,11 +4,13 @@ Unit tests for S2 tools functionality.
 
 import json
 from types import SimpleNamespace
+
+import hydra
 import pytest
 import requests
-from langgraph.types import Command
 from langchain_core.messages import ToolMessage
-import hydra
+from langgraph.types import Command
+
 from aiagents4pharma.talk2scholars.tools.s2.multi_paper_rec import (
     get_multi_paper_recommendations,
 )

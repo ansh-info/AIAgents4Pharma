@@ -4,11 +4,13 @@ Tests the supervisor agent's routing logic and state management.
 """
 
 from types import SimpleNamespace
-import pytest
+
 import hydra
+import pytest
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from pydantic import Field
+
 from aiagents4pharma.talk2scholars.agents.main_agent import get_app
 
 # --- Dummy LLM Implementation ---
@@ -188,14 +190,14 @@ def patch_sub_agents_and_supervisor(monkeypatch):
 def test_dummy_llm_generate():
     """Test the dummy LLM's generate function."""
     dummy = DummyLLM(model_name="test-model")
-    output = getattr(dummy, "_generate")("any prompt")
+    output = dummy._generate("any prompt")
     assert output == "dummy output"
 
 
 def test_dummy_llm_llm_type():
     """Test the dummy LLM's _llm_type property."""
     dummy = DummyLLM(model_name="test-model")
-    assert getattr(dummy, "_llm_type") == "dummy"
+    assert dummy._llm_type == "dummy"
 
 
 def test_get_app_with_gpt4o_mini():
@@ -225,11 +227,13 @@ def test_get_app_with_other_model():
     assert supervisor_args.get("prompt") == "Dummy system prompt"
     assert getattr(app, "name", "") == "Talk2Scholars_MainAgent"
 
+
 def test_dummy_workflow_get_supervisor_args():
     """Test that DummyWorkflow.get_supervisor_args returns the stored args."""
     dummy_args = {"agent": "test", "uniq_id": "id123"}
     wf = DummyWorkflow(supervisor_args=dummy_args)
     assert wf.get_supervisor_args() is dummy_args
+
 
 def test_dummy_hydra_compose_get_config():
     """Test that DummyHydraCompose.get_config returns the raw config."""

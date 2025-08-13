@@ -112,7 +112,7 @@ nav:
           - Subgraph Summarization: talk2knowledgegraphs/tools/subgraph_summarization.md
           - GraphRAG Reasoning: talk2knowledgegraphs/tools/graphrag_reasoning.md
           - Load Arguments: talk2knowledgegraphs/tools/load_arguments.md
-          
+
 
   - Talk2Scholars:
       - Introduction: talk2scholars/intro.md

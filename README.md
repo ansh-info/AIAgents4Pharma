@@ -145,7 +145,7 @@ Check out the tutorials on each agent for detailed instructions.
 
 ## Contributing
 
-We welcome your support to make **AIAgents4Pharma** even better.  
+We welcome your support to make **AIAgents4Pharma** even better.
 All types of contributions are appreciated — whether you're fixing bugs, adding features, improving documentation, or helping with testing, every contribution is valuable.
 
 #### How to contribute
@@ -188,5 +188,5 @@ Please refer to our [CONTRIBUTING.md](CONTRIBUTING.md) for more detailed contrib
 
 ## Feedback
 
-If you have questions, bug reports, feature requests, comments, or suggestions, we would love to hear from you.  
+If you have questions, bug reports, feature requests, comments, or suggestions, we would love to hear from you.
 Please open an `issue` or start a `discussion`

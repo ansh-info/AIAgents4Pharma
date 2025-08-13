@@ -5,7 +5,8 @@ Utility for fetching recommendations based on a single paper.
 """
 
 import logging
-from typing import Any, Optional, Dict
+from typing import Any
+
 import hydra
 import requests
 
@@ -21,7 +22,7 @@ class SearchData:
         self,
         query: str,
         limit: int,
-        year: Optional[str],
+        year: str | None,
         tool_call_id: str,
     ):
         self.query = query
@@ -46,7 +47,7 @@ class SearchData:
             logger.info("Loaded configuration for search tool")
             return cfg.tools.search
 
-    def _create_params(self) -> Dict[str, Any]:
+    def _create_params(self) -> dict[str, Any]:
         """Create parameters for the API request."""
         params = {
             "query": self.query,
@@ -110,7 +111,7 @@ class SearchData:
     def _filter_papers(self) -> None:
         """Filter and format papers."""
         # Build filtered papers mapping with unified paper_ids list
-        filtered: Dict[str, Any] = {}
+        filtered: dict[str, Any] = {}
         for paper in self.papers:
             if not paper.get("title") or not paper.get("authors"):
                 continue
@@ -175,7 +176,7 @@ class SearchData:
             title = paper.get("Title", "N/A")
             year = paper.get("Year", "N/A")
             snippet = self._get_snippet(paper.get("Abstract", ""))
-            entry = f"{i+1}. {title} ({year})"
+            entry = f"{i + 1}. {title} ({year})"
             if snippet:
                 entry += f"\n   Abstract snippet: {snippet}"
             entries.append(entry)
@@ -192,7 +193,7 @@ class SearchData:
         self.content += f"Year: {self.year}\n" if self.year else ""
         self.content += "Top 3 papers:\n" + top_papers_info
 
-    def process_search(self) -> Dict[str, Any]:
+    def process_search(self) -> dict[str, Any]:
         """Process the search request and return results."""
         self._fetch_papers()
         self._filter_papers()

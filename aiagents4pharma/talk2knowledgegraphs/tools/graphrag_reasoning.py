@@ -3,20 +3,21 @@ Tool for performing Graph RAG reasoning.
 """
 
 import logging
-from typing import Type, Annotated
-from pydantic import BaseModel, Field
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import ToolMessage
-from langchain_core.tools.base import InjectedToolCallId
-from langchain_core.tools import BaseTool
-from langchain_core.vectorstores import InMemoryVectorStore
-from langchain.chains.retrieval import create_retrieval_chain
+from typing import Annotated
+
+import hydra
 from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains.retrieval import create_retrieval_chain
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
-from langgraph.types import Command
+from langchain_core.messages import ToolMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import BaseTool
+from langchain_core.tools.base import InjectedToolCallId
+from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.prebuilt import InjectedState
-import hydra
+from langgraph.types import Command
+from pydantic import BaseModel, Field
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
@@ -53,7 +54,7 @@ class GraphRAGReasoningTool(BaseTool):
     name: str = "graphrag_reasoning"
     description: str = """A tool to perform reasoning using a Graph RAG approach
                         by considering textualized subgraph context and document context."""
-    args_schema: Type[BaseModel] = GraphRAGReasoningInput
+    args_schema: type[BaseModel] = GraphRAGReasoningInput
 
     def _run(
         self,

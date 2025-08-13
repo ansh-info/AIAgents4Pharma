@@ -17,7 +17,6 @@ from aiagents4pharma.talk2scholars.tools.zotero.utils.zotero_pdf_downloader impo
 )
 from aiagents4pharma.talk2scholars.tools.zotero.zotero_read import zotero_read
 
-
 # Dummy Hydra configuration to be used in tests
 dummy_zotero_read_config = SimpleNamespace(
     user_id="dummy_user",

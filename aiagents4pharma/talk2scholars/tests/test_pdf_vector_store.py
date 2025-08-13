@@ -202,7 +202,7 @@ def test_load_existing_papers_with_exception(mock_embedding, mock_config):
         vs.vector_store = bad_store
 
         with pytest.raises(Exception) as excinfo:
-            getattr(vs, "_load_existing_paper_ids")()
+            vs._load_existing_paper_ids()
         assert "flush failed" in str(excinfo.value)
 
 
@@ -234,7 +234,7 @@ def test_ensure_collection_loaded_with_entities(mock_embedding, mock_config):
 
         vs = Vectorstore(embedding_model=mock_embedding, config=mock_config)
         vs.vector_store = mock_store
-        getattr(vs, "_ensure_collection_loaded")()
+        vs._ensure_collection_loaded()
 
         assert mock_collection.load.called
 
@@ -277,7 +277,7 @@ def test_ensure_collection_loaded_handles_exception(mock_embedding, mock_config)
         vs.vector_store = bad_store
 
         with pytest.raises(Exception) as excinfo:
-            getattr(vs, "_ensure_collection_loaded")()
+            vs._ensure_collection_loaded()
         assert "flush error" in str(excinfo.value)
 
 
@@ -339,7 +339,7 @@ def test_load_existing_paper_ids_fallback_to_collection(
 
     vs = Vectorstore(dummy_embedding, config=dummy_config)
     vs.vector_store = mock_vector_store
-    getattr(vs, "_load_existing_paper_ids")()
+    vs._load_existing_paper_ids()
     assert isinstance(vs.loaded_papers, set)
 
 
@@ -357,7 +357,7 @@ def test_load_existing_papers_collection_empty_logs(
 
     vs = Vectorstore(dummy_embedding, config=dummy_config)
     vs.vector_store = mock_vector_store
-    getattr(vs, "_load_existing_paper_ids")()
+    vs._load_existing_paper_ids()
     assert len(vs.loaded_papers) == 0
 
 
@@ -413,7 +413,7 @@ def test_ensure_collection_loaded_no_col_and_no_collection(
 
     vs = Vectorstore(dummy_embedding, config=dummy_config)
     vs.vector_store = mock_vector_store
-    getattr(vs, "_ensure_collection_loaded")()
+    vs._ensure_collection_loaded()
     # no exception
 
 
@@ -430,5 +430,5 @@ def test_ensure_collection_loaded_empty_logs(
 
     vs = Vectorstore(dummy_embedding, config=dummy_config)
     vs.vector_store = mock_vector_store
-    getattr(vs, "_ensure_collection_loaded")()
+    vs._ensure_collection_loaded()
     # no exception

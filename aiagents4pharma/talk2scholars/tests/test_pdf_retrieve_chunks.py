@@ -21,7 +21,7 @@ def mock_vector_store():
 def mock_chunks():
     """Fixture to simulate PDF chunks."""
     return [
-        Document(page_content=f"chunk {i}", metadata={"paper_id": f"P{i%2}"})
+        Document(page_content=f"chunk {i}", metadata={"paper_id": f"P{i % 2}"})
         for i in range(5)
     ]
 

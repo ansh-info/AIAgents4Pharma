@@ -11,6 +11,7 @@ use this tool for broad literature search; use the `search` tool instead.
 
 import logging
 from typing import Annotated, Any
+
 import hydra
 import requests
 from langchain_core.messages import ToolMessage
@@ -18,7 +19,6 @@ from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.types import Command
 from pydantic import BaseModel, Field
-
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

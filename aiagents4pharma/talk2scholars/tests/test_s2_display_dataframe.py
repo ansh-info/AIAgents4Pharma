@@ -4,9 +4,12 @@ Unit tests for S2 tools functionality.
 
 import pytest
 from langgraph.types import Command
+
+from ..tools.s2.display_dataframe import (
+    NoPapersFoundError as raised_error,
+)
 from ..tools.s2.display_dataframe import (
     display_dataframe,
-    NoPapersFoundError as raised_error,
 )
 
 

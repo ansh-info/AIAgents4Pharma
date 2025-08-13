@@ -10,7 +10,7 @@ or summarization. For PDF-level question answering, use the 'question_and_answer
 """
 
 import logging
-from typing import Annotated, Optional, Any
+from typing import Annotated, Any
 
 import pandas as pd
 from langchain_core.messages import ToolMessage
@@ -72,7 +72,7 @@ class QueryDataFrameInput(BaseModel):
             "extract when extract_ids=True."
         ),
     )
-    row_number: Optional[int] = Field(
+    row_number: int | None = Field(
         default=None,
         description=(
             "1-based index of the ID to extract from the list; if provided, returns only"
@@ -154,7 +154,7 @@ def query_dataframe(
             raise ValueError("Must specify 'id_column' when extract_ids=True.")
         if row_number is not None:
             question_to_agent = (
-                f"df['{id_column}'].dropna().str[0].tolist()[{row_number-1}]"
+                f"df['{id_column}'].dropna().str[0].tolist()[{row_number - 1}]"
             )
         else:
             question_to_agent = f"df['{id_column}'].dropna().str[0].tolist()"

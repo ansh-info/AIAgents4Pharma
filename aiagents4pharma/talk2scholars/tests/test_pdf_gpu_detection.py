@@ -4,7 +4,6 @@ import subprocess
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-
 from aiagents4pharma.talk2scholars.tools.pdf.utils.gpu_detection import (
     detect_nvidia_gpu,
     get_optimal_index_config,

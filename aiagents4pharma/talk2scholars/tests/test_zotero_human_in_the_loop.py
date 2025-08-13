@@ -3,7 +3,8 @@ Unit tests for Zotero human in the loop in zotero_review.py with structured outp
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from aiagents4pharma.talk2scholars.tools.zotero.zotero_review import zotero_review
 
 

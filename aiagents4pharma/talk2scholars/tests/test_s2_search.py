@@ -3,11 +3,13 @@ Unit tests for S2 tools functionality.
 """
 
 from types import SimpleNamespace
-import pytest
+
 import hydra
+import pytest
 import requests
-from langgraph.types import Command
 from langchain_core.messages import ToolMessage
+from langgraph.types import Command
+
 from aiagents4pharma.talk2scholars.tools.s2.search import search_tool
 from aiagents4pharma.talk2scholars.tools.s2.utils import search_helper
 

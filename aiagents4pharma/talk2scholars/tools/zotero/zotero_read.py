@@ -10,13 +10,14 @@ for each found item and makes the results available as an artifact.
 
 import logging
 from typing import Annotated, Any
+
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.types import Command
 from pydantic import BaseModel, Field
-from .utils.read_helper import ZoteroSearchData
 
+from .utils.read_helper import ZoteroSearchData
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

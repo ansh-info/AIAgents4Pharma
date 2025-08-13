@@ -7,12 +7,12 @@ Utils for Streamlit.
 import datetime
 import os
 import pickle
+import re
 import tempfile
 
 import gravis
 import hydra
 import networkx as nx
-import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -27,10 +27,8 @@ from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_openai.embeddings import OpenAIEmbeddings
 from langsmith import Client
+from pymilvus import Collection, connections, db
 
-import glob
-import re
-from pymilvus import db, connections, Collection
 
 def submit_feedback(user_response):
     """
@@ -132,7 +130,7 @@ def render_plotly(
         save_chart: bool: Flag to save the chart to the chat history
     """
     # toggle_state = st.session_state[f'toggle_plotly_{tool_name}_{key.split("_")[-1]}']\
-    toggle_state = st.session_state[f'toggle_plotly_{key.split("plotly_")[1]}']
+    toggle_state = st.session_state[f"toggle_plotly_{key.split('plotly_')[1]}"]
     if toggle_state:
         df_simulation_results = df.melt(
             id_vars="Time", var_name="Species", value_name="Concentration"
@@ -178,7 +176,7 @@ def render_table(df: pd.DataFrame, key: str, save_table: bool = False):
     """
     # print (st.session_state['toggle_simulate_model_'+key.split("_")[-1]])
     # toggle_state = st.session_state[f'toggle_table_{tool_name}_{key.split("_")[-1]}']
-    toggle_state = st.session_state[f'toggle_table_{key.split("dataframe_")[1]}']
+    toggle_state = st.session_state[f"toggle_table_{key.split('dataframe_')[1]}"]
     if toggle_state:
         st.dataframe(df, use_container_width=True, key=key)
     if save_table:
@@ -627,7 +625,8 @@ def get_response(agent, graphs_visuals, app, st, prompt):
             )
             # print (df_selected)
             df_selected["Id"] = df_selected.apply(
-                lambda row: row["Link"], axis=1  # Ensure "Id" has the correct links
+                lambda row: row["Link"],
+                axis=1,  # Ensure "Id" has the correct links
             )
             df_selected = df_selected.drop(columns=["Link"])
             # Directly use the "Link" column for the "Id" column
@@ -759,15 +758,16 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
         key: The key for the graph
         save_graph: Whether to save the graph in the chat history
     """
+
     def extract_inner_html(html):
         match = re.search(r"<body[^>]*>(.*?)</body>", html, re.DOTALL)
         return match.group(1) if match else html
 
     figures_inner_html = ""
 
-    for name, subgraph_nodes, subgraph_edges in zip(graph_dict["name"],
-                                                    graph_dict["nodes"],
-                                                    graph_dict["edges"]):
+    for name, subgraph_nodes, subgraph_edges in zip(
+        graph_dict["name"], graph_dict["nodes"], graph_dict["edges"], strict=False
+    ):
         # Create a directed graph
         graph = nx.DiGraph()
 
@@ -797,18 +797,18 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
         )
         # components.html(fig.to_html(), height=475)
         inner_html = extract_inner_html(fig.to_html())
-        wrapped_html = f'''
+        wrapped_html = f"""
         <div class="graph-content">
             {inner_html}
         </div>
-        '''
+        """
 
-        figures_inner_html += f'''
+        figures_inner_html += f"""
         <div class="graph-box">
             <h3 class="graph-title">{name}</h3>
             {wrapped_html}
         </div>
-        '''
+        """
 
     if save_graph:
         # Add data to the chat history
@@ -883,6 +883,7 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
     """
     components.html(full_html, height=550, scrolling=False)
 
+
 # def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
 #     """
 #     Function to render the graph in the chat.
@@ -930,6 +931,7 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
 #                 "key": key,
 #             }
 #         )
+
 
 def get_text_embedding_model(model_name) -> Embeddings:
     """
@@ -1117,9 +1119,7 @@ def get_file_type_icon(file_type: str) -> str:
     Returns:
         str: The icon for the file type.
     """
-    return {"article": "📜",
-            "drug_data": "💊",
-            "multimodal": "📦"}.get(file_type)
+    return {"article": "📜", "drug_data": "💊", "multimodal": "📦"}.get(file_type)
 
 
 @st.fragment
@@ -1143,7 +1143,7 @@ def get_t2b_uploaded_files(app):
         type=["pdf"],
         key=f"article_{st.session_state.t2b_article_key}",
     )
-    
+
     # Update the agent state with the uploaded article
     if article:
         # print (article.name)
@@ -1199,7 +1199,7 @@ def initialize_selections() -> None:
         cfg: The configuration object.
     """
     # with open(st.session_state.config["kg_pyg_path"], "rb") as f:
-        # pyg_graph = pickle.load(f)
+    # pyg_graph = pickle.load(f)
     # graph_nodes = pd.read_parquet(st.session_state.config["kg_nodes_path"])
     node_types = st.session_state.config["kg_node_types"]
 
@@ -1295,6 +1295,7 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
                     st.session_state.multimodal_key += 1
                     st.rerun(scope="fragment")
 
+
 def setup_milvus(cfg: dict):
     """
     Function to connect to the Milvus database.
@@ -1311,7 +1312,7 @@ def setup_milvus(cfg: dict):
             host=cfg.milvus_db.host,
             port=cfg.milvus_db.port,
             user=cfg.milvus_db.user,
-            password=cfg.milvus_db.password
+            password=cfg.milvus_db.password,
         )
         print("Connected to Milvus database.")
     else:
@@ -1321,6 +1322,7 @@ def setup_milvus(cfg: dict):
     db.using_database(cfg.milvus_db.database_name)
 
     return connections.get_connection_addr(cfg.milvus_db.alias)
+
 
 def get_cache_edge_index(cfg: dict):
     """

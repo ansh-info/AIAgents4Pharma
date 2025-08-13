@@ -99,9 +99,9 @@ def test_question_and_answer_no_reranked_chunks(dependencies_fixture, input_fixt
     dependencies_fixture["mock_load_config"].return_value = {"config_key": "value"}
     dependencies_fixture["mock_get_vectorstore"].return_value = MagicMock()
     dependencies_fixture["mock_retrieve_rerank"].return_value = []
-    dependencies_fixture["mock_format_answer"].return_value = (
-        "No relevant information found."
-    )
+    dependencies_fixture[
+        "mock_format_answer"
+    ].return_value = "No relevant information found."
 
     result = question_and_answer.invoke(input_fixture)
 

@@ -2,9 +2,10 @@
 Test cases for utils/kg_utils.py
 """
 
-import pytest
 import networkx as nx
 import pandas as pd
+import pytest
+
 from ..utils import kg_utils
 
 
