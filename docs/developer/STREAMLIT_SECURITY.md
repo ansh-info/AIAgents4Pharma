@@ -133,9 +133,11 @@ UPLOAD_SECURITY_CONFIG = {
 
 The system automatically blocks files containing:
 - Script tags: `<script>`, `javascript:`, `vbscript:`
-- Server-side code: `<?php>`, `<%>`, `#!/bin/`
+- Server-side code: `<?php>`, `#!/bin/`
 - Dangerous functions: `eval()`, `exec()`, `system()`
 - Shell commands: `#!/usr/bin/`, `shell_exec()`
+
+**Note**: The pattern `<%` is only blocked in non-PDF files, as it's part of legitimate PDF syntax. For PDFs, only truly suspicious patterns like `<% eval` or `<% system` are blocked.
 
 ## Application Integration
 
@@ -360,6 +362,11 @@ dependencies = [
   - **Linux**: `sudo apt-get install libmagic1`
   - **macOS**: `brew install libmagic`
   - **Windows**: Bundled with python-magic-bin
+
+**Important**: Install `libmagic` before running Streamlit apps, or you'll get:
+```
+ImportError: failed to find libmagic. Check your installation
+```
 
 ## Testing
 

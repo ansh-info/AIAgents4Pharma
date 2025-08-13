@@ -26,6 +26,10 @@ This guide covers the complete development setup, tooling, and workflow for AIAg
 - Python 3.12+
 - Git
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (modern Python package manager)
+- libmagic (for file security validation):
+  - **macOS**: `brew install libmagic`
+  - **Linux**: `sudo apt-get install libmagic1`
+  - **Windows**: Bundled with python-magic-bin
 
 ### Installation
 
