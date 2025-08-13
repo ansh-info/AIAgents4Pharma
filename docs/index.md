@@ -80,6 +80,8 @@ git clone https://github.com/VirtualPatientEngine/AIAgents4Pharma && cd AIAgents
 
 We use `uv` for fast and reliable dependency management. Install uv first following the [official installation guide](https://docs.astral.sh/uv/getting-started/installation/).
 
+> **For developers**: See [developer/README.md](developer/README.md) for detailed setup instructions including system prerequisites.
+
 ```python
 uv sync
 ```
@@ -99,7 +101,19 @@ export LANGCHAIN_API_KEY=...        # Optional for all agents
 
 4. **Launch the app:**
 
+**Option A: Using UV (recommended)**
 ```sh
+uv run streamlit run app/frontend/streamlit_app_<agent>.py
+```
+
+**Option B: Traditional approach**
+```sh
+# Activate virtual environment
+source .venv/bin/activate  # Linux/macOS
+# or
+.venv\Scripts\activate     # Windows
+
+# Then run the app
 streamlit run app/frontend/streamlit_app_<agent>.py
 ```
 
