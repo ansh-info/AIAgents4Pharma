@@ -58,8 +58,8 @@ cd AIAgents4Pharma
 # Sync dependencies (creates .venv and installs everything)
 uv sync
 
-# Install development dependencies (optional, already included)
-uv sync --group dev
+# Install with development dependencies
+uv sync --extra dev
 ```
 
 ### 3. System Prerequisites
@@ -77,6 +77,98 @@ sudo yum install file-libs
 ```
 
 **Windows users:** libmagic is bundled automatically with python-magic.
+
+---
+
+## Package Management with UV
+
+### Adding New Dependencies
+
+#### Add Runtime Dependencies
+```bash
+# Add a new package to main dependencies
+uv add "package-name"
+
+# Add with specific version constraint
+uv add "package-name>=1.0.0,<2.0.0"
+
+# Add with exact version
+uv add "package-name==1.2.3"
+
+# Add from specific index
+uv add "package-name" --index-url https://pypi.org/simple/
+```
+
+#### Add Development Dependencies
+```bash
+# Add to development dependencies
+uv add --dev "pytest-mock"
+
+# Add to specific extra group
+uv add --extra dev "black>=23.0.0"
+```
+
+#### Add from Git Repository
+```bash
+# Install from Git repository
+uv add "git+https://github.com/user/repo.git"
+
+# Install from specific branch/tag
+uv add "git+https://github.com/user/repo.git@main"
+uv add "git+https://github.com/user/repo.git@v1.0.0"
+```
+
+### Removing Dependencies
+```bash
+# Remove a package
+uv remove "package-name"
+
+# Remove development dependency
+uv remove --dev "package-name"
+```
+
+### Updating Dependencies
+```bash
+# Update all dependencies
+uv lock --upgrade
+
+# Update specific package
+uv add "package-name" --upgrade
+
+# Update to latest compatible versions
+uv sync --upgrade
+```
+
+### Managing Virtual Environments
+```bash
+# Create virtual environment (automatic with uv sync)
+uv venv
+
+# Activate virtual environment
+source .venv/bin/activate  # Unix/macOS
+.venv\Scripts\activate     # Windows
+
+# Install current project in development mode
+uv pip install -e .
+
+# List installed packages
+uv pip list
+
+# Show package information
+uv pip show "package-name"
+```
+
+### Lock File Management
+```bash
+# Generate/update uv.lock
+uv lock
+
+# Install from lock file (exact versions)
+uv sync --frozen
+
+# Check for dependency conflicts
+uv pip check
+```
 
 ---
 
@@ -572,12 +664,17 @@ uv run coverage combine
 
 ### Common Issues
 
-#### UV Cache Problems
+#### Dependency Conflicts
 ```bash
-# Clear UV cache
-uv cache clean
+# Fix dependency conflicts using uv
+uv add "package>=new-version"
+uv lock --upgrade
 
-# Reinstall dependencies
+# Example: Fix PyArrow compatibility
+uv add "pyarrow>=14.0.0"
+uv add "datasets>=4.0.0"
+
+# Clear and reinstall if needed
 rm -rf .venv
 uv sync
 ```
