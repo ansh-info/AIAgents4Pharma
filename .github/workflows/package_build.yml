@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - "pyproject.toml"
-      - "release_version.txt"
+      - "uv.lock"
       - "aiagents4pharma/**"
   workflow_dispatch:
 
@@ -25,20 +25,23 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
         run: uv python install 3.12
 
       - name: Install build dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra dev
+
+      - name: Run pre-build quality checks
+        run: |
+          uv run ruff check aiagents4pharma/
+          uv run bandit -c pyproject.toml -r aiagents4pharma/
 
       - name: Get package version
         id: version
         run: |
-          VERSION=$(cat release_version.txt)
+          # Use VCS versioning - get version from git or fallback to dev version
+          VERSION=$(git describe --tags --exact-match 2>/dev/null || echo "dev-$(git rev-parse --short HEAD)")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Package version: $VERSION"
 
@@ -86,7 +89,7 @@ jobs:
       - name: Test wheel installation
         run: |
           uv pip install --system dist/*.whl
-          python -c "import aiagents4pharma; print('✅ Package import successful')"
+          python -c "import aiagents4pharma; print('Package import successful')"
 
   # Summary job
   package-validation:
@@ -100,11 +103,11 @@ jobs:
         run: |
           echo "Package build validation completed"
           if [ "${{ needs.build.result }}" != "success" ]; then
-            echo "❌ Package build failed"
+            echo "Package build failed"
             exit 1
           fi
           if [ "${{ needs.test-package.result }}" != "success" ]; then
-            echo "❌ Package installation test failed"
+            echo "Package installation test failed"
             exit 1
           fi
-          echo "✅ All package validation checks passed"
+          echo "All package validation checks passed"
