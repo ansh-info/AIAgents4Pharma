@@ -37,11 +37,11 @@ jobs:
           uv run ruff check aiagents4pharma/
           uv run bandit -c pyproject.toml -r aiagents4pharma/
 
-      - name: Get package version
+      - name: Get package version (git tags only)
         id: version
         run: |
-          # Use VCS versioning - get version from git or fallback to dev version
-          VERSION=$(git describe --tags --exact-match 2>/dev/null || echo "dev-$(git rev-parse --short HEAD)")
+          # Only use git tags for versioning - fail if no tag
+          VERSION=$(git describe --tags --exact-match)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Package version: $VERSION"
 
