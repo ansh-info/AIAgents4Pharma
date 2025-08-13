@@ -109,6 +109,18 @@ jobs:
           ./ollama_dir/ollama.exe serve &
           sleep 15
 
+      # Ensure Ollama model directories exist
+      - name: Create Ollama model directories
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            mkdir -p ~/.ollama/models
+          elif [ "${{ matrix.os }}" = "macos-15" ]; then
+            mkdir -p ~/.ollama/models
+          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mkdir -p "C:\Users\runneradmin\.ollama\models"
+          fi
+        shell: bash
+
       # Cache and pull Ollama models
       - name: Cache Ollama models
         uses: actions/cache@v4
@@ -156,6 +168,7 @@ jobs:
           uv run coverage xml
 
       - name: Check coverage threshold
+        shell: bash
         run: |
           TOTAL_COVERAGE=$(uv run coverage report -m | awk 'END {print int($NF)}')
           if [[ $TOTAL_COVERAGE -ne 100 ]]; then
