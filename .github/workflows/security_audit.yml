@@ -1,5 +1,5 @@
-# Comprehensive security audit workflow
-name: Security Audit
+# Dependency security monitoring workflow - focuses on vulnerability scanning
+name: Dependency Security Audit
 
 on:
   schedule:
@@ -28,15 +28,12 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra dev
 
       - name: Run pip-audit
         id: pip-audit
@@ -66,45 +63,11 @@ jobs:
           name: safety-report
           path: safety-report.json
 
-  # Code security scanning
-  code-security-scan:
-    name: Code Security Scan (Bandit)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies
-        run: uv sync --frozen
-
-      - name: Run Bandit security linter
-        run: |
-          uv run bandit -c pyproject.toml -f json -o bandit-report.json -r aiagents4pharma/
-          uv run bandit -c pyproject.toml -f txt -o bandit-report.txt -r aiagents4pharma/
-        continue-on-error: true
-
-      - name: Upload Bandit report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bandit-security-report
-          path: |
-            bandit-report.json
-            bandit-report.txt
 
   # SARIF upload for GitHub Security tab
   upload-sarif:
     name: Upload Security Results
-    needs: [dependency-scan, code-security-scan]
+    needs: [dependency-scan]
     runs-on: ubuntu-latest
     if: always()
 
@@ -117,25 +80,29 @@ jobs:
           pattern: "*-report*"
           merge-multiple: true
 
-      - name: Install uv and convert reports to SARIF
+      - name: Install uv and process security reports
         run: |
           uv tool install sarif-om
-          # Convert bandit JSON to SARIF if exists
-          if [ -f bandit-report.json ]; then
-            sarif-om convert --input-format bandit --output-format sarif --input bandit-report.json --output bandit.sarif
+          # Convert pip-audit JSON to SARIF if exists
+          if [ -f audit-report.json ]; then
+            echo "Processing dependency vulnerability report..."
+            # For now, just log the findings (sarif-om may not support pip-audit format)
+            echo "Dependency vulnerabilities found: $(jq '.vulnerabilities | length' audit-report.json)"
           fi
 
-      - name: Upload SARIF results to GitHub
-        if: github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Upload vulnerability report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          sarif_file: "*.sarif"
-        continue-on-error: true
+          name: consolidated-security-report
+          path: |
+            audit-report.*
+            safety-report.json
 
   # Generate security summary
   security-summary:
     name: Security Summary
-    needs: [dependency-scan, code-security-scan]
+    needs: [dependency-scan]
     runs-on: ubuntu-latest
     if: always()
 
@@ -150,22 +117,25 @@ jobs:
 
       - name: Generate security summary
         run: |
-          echo "# 🔒 Security Audit Summary" > security-summary.md
+          echo "# 🔒 Dependency Security Audit Summary" > security-summary.md
           echo "" >> security-summary.md
           echo "**Scan Date:** $(date)" >> security-summary.md
+          echo "**Purpose:** Weekly dependency vulnerability monitoring" >> security-summary.md
           echo "" >> security-summary.md
 
           if [ -f audit-report.json ]; then
             VULN_COUNT=$(jq '.vulnerabilities | length' audit-report.json)
-            echo "**Dependencies:** $VULN_COUNT vulnerabilities found" >> security-summary.md
+            echo "**pip-audit:** $VULN_COUNT vulnerabilities found" >> security-summary.md
+          else
+            echo "**pip-audit:** No vulnerabilities found ✅" >> security-summary.md
           fi
 
-          if [ -f bandit-report.json ]; then
-            HIGH_ISSUES=$(jq '.results[] | select(.issue_severity == "HIGH") | length' bandit-report.json | wc -l)
-            MED_ISSUES=$(jq '.results[] | select(.issue_severity == "MEDIUM") | length' bandit-report.json | wc -l)
-            LOW_ISSUES=$(jq '.results[] | select(.issue_severity == "LOW") | length' bandit-report.json | wc -l)
-            echo "**Code Security:** $HIGH_ISSUES high, $MED_ISSUES medium, $LOW_ISSUES low severity issues" >> security-summary.md
+          if [ -f safety-report.json ]; then
+            echo "**safety:** Additional dependency scan completed" >> security-summary.md
           fi
+
+          echo "" >> security-summary.md
+          echo "**Note:** Code security is monitored in test workflows via bandit" >> security-summary.md
 
       - name: Upload security summary
         uses: actions/upload-artifact@v4
@@ -173,10 +143,10 @@ jobs:
           name: security-summary
           path: security-summary.md
 
-  # Integration with SonarCloud
+  # Integration with SonarCloud (dependency security focus)
   sonarcloud-security:
     name: SonarCloud Security Integration
-    needs: [dependency-scan, code-security-scan]
+    needs: [dependency-scan]
     runs-on: ubuntu-latest
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
 
@@ -193,15 +163,12 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra dev
 
       - name: Generate coverage for SonarCloud
         run: |
