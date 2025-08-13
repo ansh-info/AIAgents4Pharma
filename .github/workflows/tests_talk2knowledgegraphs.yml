@@ -26,9 +26,6 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
         run: uv python install 3.12
@@ -64,9 +61,6 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -107,26 +101,14 @@ jobs:
           ./ollama_dir/ollama.exe serve &
           sleep 15
 
-      # Cache and pull Ollama models
-      - name: Cache Ollama models
-        uses: actions/cache@v4
-        id: cache_ollama
-        with:
-          path: |
-            ~/.ollama/models
-            /Users/runner/.ollama/models
-            C:\Users\runneradmin\.ollama\models
-          key: ${{ runner.os }}-ollama-llama3.2-1b-v2
-          restore-keys: |
-            ${{ runner.os }}-ollama-llama3.2-1b-
-
+      # Pull Ollama model
       - name: Pull Ollama model (Ubuntu/macOS)
-        if: steps.cache_ollama.outputs.cache-hit != 'true' && (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-15')
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-15'
         run: |
           ollama pull llama3.2:1b
 
       - name: Pull Ollama model (Windows)
-        if: steps.cache_ollama.outputs.cache-hit != 'true' && matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest'
         shell: bash
         run: |
           export PATH="$PWD/ollama_dir:$PATH"
@@ -135,14 +117,12 @@ jobs:
       - name: Verify Ollama setup (Ubuntu/macOS)
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-15'
         run: |
-          echo "Cache Hit Status - ${{ steps.cache_ollama.outputs.cache-hit }}"
           ollama list
 
       - name: Verify Ollama setup (Windows)
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          echo "Cache Hit Status - ${{ steps.cache_ollama.outputs.cache-hit }}"
           export PATH="$PWD/ollama_dir:$PATH"
           ./ollama_dir/ollama.exe list
 
