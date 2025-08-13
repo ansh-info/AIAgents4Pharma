@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -59,6 +61,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -93,9 +97,10 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          curl -L https://ollama.com/download/ollama-windows-amd64.zip -o ollama.zip
-          mkdir ollama_dir
-          powershell -command "Expand-Archive -Path ollama.zip -DestinationPath ollama_dir -Force"
+          curl -L https://ollama.com/download/ollama-windows-amd64.zip -o ollama-windows-amd64.zip
+          mkdir -p ollama_dir
+          powershell -command "Expand-Archive -Path ollama-windows-amd64.zip -DestinationPath ollama_dir -Force"
+          ls -la ollama_dir/
           chmod +x ollama_dir/*
           export PATH="$PWD/ollama_dir:$PATH"
           echo "$PWD/ollama_dir" >> $GITHUB_PATH
@@ -120,6 +125,7 @@ jobs:
 
       - name: Verify Ollama setup
         run: |
+          echo "Cache Hit Status - ${{ steps.cache_ollama.outputs.cache-hit }}"
           ollama list
 
       - name: Run tests with coverage
