@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -95,8 +95,10 @@ dev = [
 ]
 
 [tool.hatch.version]
-path = "release_version.txt"
-pattern = "(?P<version>.*)"
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "_version.py"
 
 
 
