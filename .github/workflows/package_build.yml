@@ -88,8 +88,8 @@ jobs:
 
       - name: Test wheel installation
         run: |
-          uv pip install --system dist/*.whl
-          python -c "import aiagents4pharma; print('Package import successful')"
+          uv pip install dist/*.whl
+          uv run python -c "import aiagents4pharma; print('Package import successful')"
 
   # Summary job
   package-validation:
