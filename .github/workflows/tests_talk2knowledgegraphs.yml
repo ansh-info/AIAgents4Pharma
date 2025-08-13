@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -32,7 +34,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra dev
 
       - name: Run pylint
         run: uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2knowledgegraphs
@@ -57,6 +59,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -70,6 +74,88 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
+      # Ollama setup for Ubuntu
+      - name: Setup Ollama (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          export PATH="/usr/local/bin:$PATH"
+          echo "/usr/local/bin" >> $GITHUB_PATH
+          ollama serve &
+          sleep 10
+
+      # Ollama setup for macOS
+      - name: Setup Ollama (macOS)
+        if: matrix.os == 'macos-15'
+        run: |
+          brew install ollama
+          ollama serve &
+          sleep 10
+
+      # Ollama setup for Windows
+      - name: Setup Ollama (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          curl -L https://ollama.com/download/ollama-windows-amd64.zip -o ollama-windows-amd64.zip
+          mkdir -p ollama_dir
+          powershell -command "Expand-Archive -Path ollama-windows-amd64.zip -DestinationPath ollama_dir -Force"
+          ls -la ollama_dir/
+          chmod +x ollama_dir/*
+          export PATH="$PWD/ollama_dir:$PATH"
+          echo "$PWD/ollama_dir" >> $GITHUB_PATH
+          ./ollama_dir/ollama.exe serve &
+          sleep 15
+
+      # Ensure Ollama model directories exist
+      - name: Create Ollama model directories
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            mkdir -p ~/.ollama/models
+          elif [ "${{ matrix.os }}" = "macos-15" ]; then
+            mkdir -p ~/.ollama/models
+          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mkdir -p "C:\Users\runneradmin\.ollama\models"
+          fi
+        shell: bash
+
+      # Cache and pull Ollama models
+      - name: Cache Ollama models
+        uses: actions/cache@v4
+        id: cache_ollama
+        with:
+          path: |
+            ~/.ollama/models
+            /Users/runner/.ollama/models
+            C:\Users\runneradmin\.ollama\models
+          key: ${{ runner.os }}-ollama-llama3.2-1b
+
+      - name: Pull Ollama model (Ubuntu/macOS)
+        if: steps.cache_ollama.outputs.cache-hit != 'true' && (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-15')
+        run: |
+          ollama pull llama3.2:1b
+
+      - name: Pull Ollama model (Windows)
+        if: steps.cache_ollama.outputs.cache-hit != 'true' && matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          export PATH="$PWD/ollama_dir:$PATH"
+          ./ollama_dir/ollama.exe pull llama3.2:1b
+
+      - name: Verify Ollama setup (Ubuntu/macOS)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-15'
+        run: |
+          echo "Cache Hit Status - ${{ steps.cache_ollama.outputs.cache-hit }}"
+          ollama list
+
+      - name: Verify Ollama setup (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          echo "Cache Hit Status - ${{ steps.cache_ollama.outputs.cache-hit }}"
+          export PATH="$PWD/ollama_dir:$PATH"
+          ./ollama_dir/ollama.exe list
+
       - name: Run tests with coverage
         run: |
           uv run coverage run --include=aiagents4pharma/talk2knowledgegraphs/* -m pytest --cache-clear aiagents4pharma/talk2knowledgegraphs/tests/
@@ -80,6 +166,7 @@ jobs:
           uv run coverage xml
 
       - name: Check coverage threshold
+        shell: bash
         run: |
           TOTAL_COVERAGE=$(uv run coverage report -m | awk 'END {print int($NF)}')
           if [[ $TOTAL_COVERAGE -ne 100 ]]; then
