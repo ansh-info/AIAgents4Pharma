@@ -33,6 +33,7 @@ dependencies = [
     { name = "cell2sentence" },
     { name = "copasi-basico" },
     { name = "coverage" },
+    { name = "datasets" },
     { name = "einops" },
     { name = "gdown" },
     { name = "gravis" },
@@ -71,6 +72,7 @@ dependencies = [
     { name = "plotly" },
     { name = "plotly-express" },
     { name = "pubchempy" },
+    { name = "pyarrow" },
     { name = "pydantic" },
     { name = "pygeneconverter" },
     { name = "pylint" },
@@ -118,6 +120,7 @@ requires-dist = [
     { name = "cell2sentence", specifier = "==1.1.0" },
     { name = "copasi-basico", specifier = "==0.84" },
     { name = "coverage", specifier = "==7.6.4" },
+    { name = "datasets", specifier = ">=4.0.0" },
     { name = "einops", specifier = "==0.8.0" },
     { name = "gdown", specifier = "==5.2.0" },
     { name = "gravis", specifier = "==0.1.0" },
@@ -159,6 +162,7 @@ requires-dist = [
     { name = "plotly-express", specifier = "==0.4.1" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
     { name = "pubchempy", specifier = "==1.0.4" },
+    { name = "pyarrow", specifier = ">=14.0.0" },
     { name = "pydantic", specifier = "==2.10.5" },
     { name = "pygeneconverter", specifier = "==0.3" },
     { name = "pylint", specifier = "==3.3.1" },
@@ -5420,7 +5424,7 @@ wheels = [
 
 [[package]]
 name = "transformers"
-version = "4.55.1"
+version = "4.55.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
@@ -5434,9 +5438,9 @@ dependencies = [
     { name = "tokenizers" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fd/f4/5227c3275b3ea92df639a763d819ade8726d6a23fe6b1f497d989ebd8931/transformers-4.55.1.tar.gz", hash = "sha256:0de83246bdc4abdff6475302cd2fbd19f1c9f7ae7c1d7ec580e06df2f0ae93aa", size = 9571228, upload-time = "2025-08-13T08:57:32.357Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/a5/d8b8a1f3a051daeb5f11253bb69fc241f193d1c0566e299210ed9220ff4e/transformers-4.55.2.tar.gz", hash = "sha256:a45ec60c03474fd67adbce5c434685051b7608b3f4f167c25aa6aeb1cad16d4f", size = 9571466, upload-time = "2025-08-13T18:25:43.767Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/09/a2/5b840892d7ec3b91d2bc57f503ee91cb37d6d4d0b1720ccbe661f35b48db/transformers-4.55.1-py3-none-any.whl", hash = "sha256:9e936d9c106924579f509f63da66aa899401e2d1fb4a4f964a3c494476b5110f", size = 11269726, upload-time = "2025-08-13T08:57:25.19Z" },
+    { url = "https://files.pythonhosted.org/packages/db/5a/022ac010bedfb5119734cf9d743cf1d830cb4c604f53bb1552216f4344dc/transformers-4.55.2-py3-none-any.whl", hash = "sha256:097e3c2e2c0c9681db3da9d748d8f9d6a724c644514673d0030e8c5a1109f1f1", size = 11269748, upload-time = "2025-08-13T18:25:40.394Z" },
 ]
 
 [[package]]
@@ -5604,16 +5608,16 @@ wheels = [
 
 [[package]]
 name = "virtualenv"
-version = "20.33.1"
+version = "20.34.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "distlib" },
     { name = "filelock" },
     { name = "platformdirs" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8b/60/4f20960df6c7b363a18a55ab034c8f2bcd5d9770d1f94f9370ec104c1855/virtualenv-20.33.1.tar.gz", hash = "sha256:1b44478d9e261b3fb8baa5e74a0ca3bc0e05f21aa36167bf9cbf850e542765b8", size = 6082160, upload-time = "2025-08-05T16:10:55.605Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/14/37fcdba2808a6c615681cd216fecae00413c9dab44fb2e57805ecf3eaee3/virtualenv-20.34.0.tar.gz", hash = "sha256:44815b2c9dee7ed86e387b842a84f20b93f7f417f95886ca1996a72a4138eb1a", size = 6003808, upload-time = "2025-08-13T14:24:07.464Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/ff/ded57ac5ff40a09e6e198550bab075d780941e0b0f83cbeabd087c59383a/virtualenv-20.33.1-py3-none-any.whl", hash = "sha256:07c19bc66c11acab6a5958b815cbcee30891cd1c2ccf53785a28651a0d8d8a67", size = 6060362, upload-time = "2025-08-05T16:10:52.81Z" },
+    { url = "https://files.pythonhosted.org/packages/76/06/04c8e804f813cf972e3262f3f8584c232de64f0cde9f703b46cf53a45090/virtualenv-20.34.0-py3-none-any.whl", hash = "sha256:341f5afa7eee943e4984a9207c025feedd768baff6753cd660c857ceb3e36026", size = 5983279, upload-time = "2025-08-13T14:24:05.111Z" },
 ]
 
 [[package]]

@@ -80,6 +80,8 @@ dependencies = [
   "umap-learn==0.5.7",
   "xlsxwriter>=3.0.0,!=3.2.3",
   "python-magic>=0.4.27",
+  "pyarrow>=14.0.0",
+  "datasets>=4.0.0",
 ]
 dynamic = ["version"]
 
