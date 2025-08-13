@@ -68,7 +68,9 @@ The SonarCloud workflow runs on:
 1. **Code Coverage Report**: `coverage.xml`
 2. **PyLint Analysis**: `pylint-report.json`
 3. **Security Scan**: `bandit-report.json`
-4. **SonarCloud Dashboard**: Available on sonarcloud.io
+4. **Dependency Security**: `pip-audit` and `safety` reports
+5. **SonarCloud Dashboard**: Available on sonarcloud.io
+6. **SARIF Reports**: Uploaded to GitHub Security tab
 
 ## Quality Standards
 
@@ -81,6 +83,8 @@ The SonarCloud workflow runs on:
 - **Security Rating**: A (no vulnerabilities)
 - **Security Hotspots**: All reviewed
 - **Bandit Issues**: Critical issues must be resolved
+- **Dependency Security**: pip-audit and safety scans clean
+- **File Upload Security**: Streamlit uploads validated and secure
 
 ### Maintainability
 - **Maintainability Rating**: A

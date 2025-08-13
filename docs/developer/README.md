@@ -13,7 +13,9 @@ This guide covers the complete development setup, tooling, and workflow for AIAg
 7. [Testing](#testing)
 8. [CI/CD Pipeline](#cicd-pipeline)
 9. [Docker & Deployment](#docker--deployment)
-10. [Troubleshooting](#troubleshooting)
+10. [Security Best Practices](#security-best-practices)
+11. [Common Development Tasks](#common-development-tasks)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -174,9 +176,9 @@ uv run pre-commit run mypy
 ### What runs on each commit:
 1. **Black** - Formats code
 2. **Ruff** - Lints and fixes imports
-3. **MyPy** - Type checking
+3. **MyPy** - Type checking (configured but currently disabled in pre-commit)
 4. **Bandit** - Security scanning
-5. **Safety** - Dependency vulnerability check
+5. **pip-audit** - Dependency vulnerability check
 6. **General checks** - Trailing whitespace, YAML validation, etc.
 
 ### Bypassing Pre-commit (Emergency Only)
@@ -288,8 +290,26 @@ jobs:
 # Run the same checks as CI locally
 uv run pytest                    # Tests
 uv run pip-audit                # Security scan
+uv run safety check             # Alternative security scan
 uv run bandit -r aiagents4pharma/ # Security scan
 uv run mypy aiagents4pharma/     # Type checking
+```
+
+### Automated Security Workflows
+
+The project includes comprehensive automated security scanning:
+
+```bash
+# Weekly security audit (runs automatically)
+.github/workflows/security_audit.yml   # pip-audit + safety + bandit
+
+# SonarCloud analysis (runs on push/PR)
+.github/workflows/sonarcloud.yml       # Code quality + security
+
+# Manual security audit
+uv run pip-audit --desc
+uv run safety check --json
+uv run bandit -c pyproject.toml -r aiagents4pharma/
 ```
 
 ---
@@ -311,8 +331,8 @@ docker-compose build
 ### Production Deployment
 
 ```bash
-# Install production dependencies only
-uv sync --frozen --no-dev
+# Install production dependencies only (excludes dev tools)
+uv sync --frozen
 
 # Build production package
 uv build
@@ -328,20 +348,55 @@ pip install dist/aiagents4pharma-*.whl
 ### Regular Security Scans
 
 ```bash
-# Weekly security scan
-uv run pip-audit
-uv run safety check
-uv run bandit -r aiagents4pharma/
+# Weekly security scan (runs automatically in CI)
+uv run pip-audit --desc
+uv run safety check --json
+uv run bandit -c pyproject.toml -r aiagents4pharma/
 
 # Check for outdated packages with vulnerabilities
-uv run pip-audit --desc
+uv run pip-audit --desc --format=json
 ```
+
+### Streamlit File Upload Security
+
+The project implements comprehensive file upload security:
+
+```python
+# Use secure file upload wrapper
+from app.frontend.utils.streamlit_utils import secure_file_upload
+
+# Secure PDF upload with validation
+pdf_file = secure_file_upload(
+    "Upload PDF",
+    allowed_types=["pdf"],
+    help_text="Upload a research paper",
+    max_size_mb=50,
+    accept_multiple_files=False
+)
+
+# Secure data upload with multiple types
+data_files = secure_file_upload(
+    "Upload Data",
+    allowed_types=["spreadsheet", "text"],
+    help_text="Upload CSV or Excel files",
+    max_size_mb=25,
+    accept_multiple_files=True
+)
+```
+
+#### Security Features:
+- **File type validation** - Only allowed extensions (prevents malware.exe → report.pdf)
+- **MIME type checking** - Detects file masquerading attacks
+- **File size limits** - Prevents DoS attacks (configurable 25-50MB)
+- **Content scanning** - Blocks suspicious patterns and scripts
+- **Filename sanitization** - Prevents directory traversal attacks
 
 ### Dependency Updates
 
-- **Dependabot** automatically creates PRs for security updates
+- **Dependabot** automatically creates PRs for security updates (weekly)
 - **Pre-commit hooks** catch vulnerabilities before commit
 - **CI pipeline** blocks PRs with security issues
+- **Weekly security audits** with SARIF uploads to GitHub Security
 
 ### API Key Management
 
@@ -349,6 +404,8 @@ uv run pip-audit --desc
 # Set environment variables (never commit these!)
 export OPENAI_API_KEY=sk-...
 export NVIDIA_API_KEY=nvapi-...
+export ZOTERO_API_KEY=...
+export ZOTERO_USER_ID=...
 
 # Use .env file for local development (add to .gitignore!)
 echo "OPENAI_API_KEY=sk-..." >> .env
@@ -452,11 +509,25 @@ uv lock --verbose
 
 ## 📚 Additional Resources
 
-- [uv Documentation](https://docs.astral.sh/uv/)
-- [Black Code Style](https://black.readthedocs.io/)
-- [Ruff Rules](https://docs.astral.sh/ruff/rules/)
-- [MyPy Configuration](https://mypy.readthedocs.io/en/stable/config_file.html)
-- [Pre-commit Hooks](https://pre-commit.com/)
+### Core Tools
+- [uv Documentation](https://docs.astral.sh/uv/) - Modern Python package manager
+- [Hatchling](https://hatch.pypa.io/latest/) - Modern build backend
+- [Black Code Style](https://black.readthedocs.io/) - Code formatting
+- [Ruff Rules](https://docs.astral.sh/ruff/rules/) - Fast Python linter
+- [MyPy Configuration](https://mypy.readthedocs.io/en/stable/config_file.html) - Static type checking
+- [Pre-commit Hooks](https://pre-commit.com/) - Git hook framework
+
+### Security Tools
+- [Bandit](https://bandit.readthedocs.io/) - Security linter for Python
+- [pip-audit](https://pypi.org/project/pip-audit/) - Dependency vulnerability scanner
+- [Safety](https://pyup.io/safety/) - Dependency vulnerability checker
+- [python-magic](https://pypi.org/project/python-magic/) - File type detection
+- [Streamlit Security Guide](STREAMLIT_SECURITY.md) - File upload security implementation
+
+### CI/CD & Quality
+- [SonarCloud](https://sonarcloud.io/) - Code quality and security analysis
+- [GitHub Actions](https://docs.github.com/en/actions) - CI/CD workflows
+- [Dependabot](https://docs.github.com/en/code-security/dependabot) - Automated dependency updates
 
 ---
 
@@ -471,10 +542,12 @@ uv lock --verbose
 7. **Push** to your fork and create Pull Request
 
 All contributions are automatically scanned for:
-- Code formatting and style
-- Type safety
-- Security vulnerabilities
-- Test coverage
+- **Code formatting and style** (Black + Ruff)
+- **Type safety** (MyPy - configured, ready to enable)
+- **Security vulnerabilities** (Bandit + pip-audit + Safety)
+- **Test coverage** (pytest with coverage reporting)
+- **Code quality** (SonarCloud analysis)
+- **Dependency security** (Automated weekly scans)
 
 ---
 
