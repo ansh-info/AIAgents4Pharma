@@ -1,0 +1,64 @@
+# SonarCloud code quality analysis workflow
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sonarcloud:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run tests with coverage
+        run: |
+          uv run coverage run --source=aiagents4pharma -m pytest
+          uv run coverage xml
+
+      - name: Run pylint with JSON output
+        run: |
+          uv run pylint aiagents4pharma --output-format=json --reports=no > pylint-report.json || true
+        continue-on-error: true
+
+      - name: Run bandit security scan
+        run: |
+          uv run bandit -c pyproject.toml -f json -o bandit-report.json -r aiagents4pharma/ || true
+        continue-on-error: true
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}     # Generate a token on Sonarcloud.io
+
+      - name: Upload analysis artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonarcloud-analysis
+          path: |
+            coverage.xml
+            pylint-report.json
+            bandit-report.json
+          retention-days: 30
