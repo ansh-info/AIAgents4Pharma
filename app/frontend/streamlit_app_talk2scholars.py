@@ -166,24 +166,31 @@ def get_pdf_hash(file_bytes):
 @st.fragment
 def process_pdf_upload():
     """
-    Upload and process multiple PDF files.
+    Upload and process multiple PDF files with security validation.
     Saves them as a nested dictionary in session state under 'article_data',
     and updates the LangGraph agent state accordingly.
     """
-    pdf_files = st.file_uploader(
+    # Use secure file upload with validation
+    pdf_files = streamlit_utils.secure_file_upload(
         "Upload articles",
-        help="Upload one or more articles in PDF format.",
-        type=["pdf"],
-        key="pdf_upload",
+        allowed_types=["pdf"],
+        help_text="Upload one or more articles in PDF format.",
+        max_size_mb=50,  # Reasonable size for academic PDFs
         accept_multiple_files=True,
+        key="secure_pdf_upload"
     )
 
     if pdf_files:
         # Step 1: Initialize or get existing article_data
         article_data = st.session_state.get("article_data", {})
 
-        # Step 2: Process each uploaded file
-        for pdf_file in pdf_files:
+        # Step 2: Process each uploaded file (now pre-validated)
+        files_to_process = pdf_files if isinstance(pdf_files, list) else [pdf_files]
+
+        for pdf_file in files_to_process:
+            # Sanitize filename for security
+            safe_filename = streamlit_utils.sanitize_filename(pdf_file.name)
+
             file_bytes = pdf_file.read()
 
             # Generate a stable hash-based ID
@@ -194,7 +201,7 @@ def process_pdf_upload():
             if pdf_id in article_data:
                 # Optionally skip or update existing
                 logging.info(
-                    f"Duplicate detected for: {pdf_file.name}. Skipping re-upload."
+                    f"Duplicate detected for: {safe_filename}. Skipping re-upload."
                 )
                 continue
 
@@ -203,14 +210,14 @@ def process_pdf_upload():
                 f.write(file_bytes)
                 file_path = f.name
 
-            # Create metadata dict
+            # Create metadata dict with sanitized filename
             pdf_metadata = {
-                "Title": pdf_file.name,
+                "Title": safe_filename,  # Use sanitized filename
                 "Authors": ["Uploaded by user"],
                 "Abstract": "User uploaded PDF",
                 "Publication Date": "N/A",
                 "pdf_url": file_path,
-                "filename": pdf_file.name,
+                "filename": safe_filename,  # Use sanitized filename
                 "source": "upload",
             }
 
