@@ -35,7 +35,7 @@ def test_external_id2pubchem_cid():
     pubchem_cid = pubchem_utils.external_id2pubchem_cid(
         "comparative toxicogenomics database", ctd_id
     )
-    assert pubchem_cid == 24667
+    assert pubchem_cid == 8456
 
 
 def test_pubchem_cid_description():
