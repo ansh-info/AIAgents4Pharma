@@ -10,23 +10,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Configure Git Credentials
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-      - uses: actions/setup-python@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          python-version: 3.12
-      - name: Install the requirements
-        shell: bash -l {0}
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install MkDocs and dependencies
         run: |
-          pip3 install mkdocs mkdocs-material mkdocs-material-extensions mkdocstrings mkdocstrings-python mkdocs-include-markdown-plugin mkdocs-jupyter
-      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
-      - uses: actions/cache@v3
+          uv pip install --system mkdocs mkdocs-material mkdocs-material-extensions mkdocstrings mkdocstrings-python mkdocs-include-markdown-plugin mkdocs-jupyter
+
+      - name: Setup cache
+        run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
         with:
           key: mkdocs-material-${{ env.cache_id }}
           path: .cache
           restore-keys: |
             mkdocs-material-
-      - run: pip install mkdocs-material
-      - run: mkdocs gh-deploy --clean --force
+
+      - name: Deploy documentation
+        run: mkdocs gh-deploy --clean --force

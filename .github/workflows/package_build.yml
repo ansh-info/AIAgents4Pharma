@@ -1,0 +1,110 @@
+# Package testing workflow - validates package builds without publishing
+name: Package Build Test
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "pyproject.toml"
+      - "release_version.txt"
+      - "aiagents4pharma/**"
+  workflow_dispatch:
+
+jobs:
+  # Build the package
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install build dependencies
+        run: uv sync --frozen
+
+      - name: Get package version
+        id: version
+        run: |
+          VERSION=$(cat release_version.txt)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Package version: $VERSION"
+
+      - name: Build package
+        run: |
+          uv build
+
+      - name: Verify build artifacts
+        run: |
+          ls -la dist/
+          uv run pip install dist/*.whl --dry-run
+          uv run twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-artifacts
+          path: dist/
+          retention-days: 7
+
+  # Test the built package
+  test-package:
+    name: Test Package Installation
+    needs: build
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-15, windows-latest]
+        python-version: ["3.12"]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-artifacts
+          path: dist/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Test wheel installation
+        run: |
+          uv pip install --system dist/*.whl
+          python -c "import aiagents4pharma; print('✅ Package import successful')"
+
+  # Summary job
+  package-validation:
+    name: Package Validation Summary
+    needs: [build, test-package]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check results
+        run: |
+          echo "Package build validation completed"
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "❌ Package build failed"
+            exit 1
+          fi
+          if [ "${{ needs.test-package.result }}" != "success" ]; then
+            echo "❌ Package installation test failed"
+            exit 1
+          fi
+          echo "✅ All package validation checks passed"

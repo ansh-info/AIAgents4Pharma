@@ -1,0 +1,174 @@
+# Comprehensive security audit workflow
+name: Security Audit
+
+on:
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  push:
+    branches: [main]
+    paths:
+      - 'pyproject.toml'
+      - 'uv.lock'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'pyproject.toml'
+      - 'uv.lock'
+  workflow_dispatch:
+
+jobs:
+  # Dependency vulnerability scanning
+  dependency-scan:
+    name: Dependency Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run pip-audit
+        id: pip-audit
+        run: |
+          uv run pip-audit --desc --format=json --output=audit-report.json
+          uv run pip-audit --desc --format=markdown --output=audit-report.md
+        continue-on-error: true
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-report
+          path: |
+            audit-report.json
+            audit-report.md
+
+      - name: Run safety check
+        run: |
+          uv run safety check --json --output safety-report.json
+        continue-on-error: true
+
+      - name: Upload safety report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-report
+          path: safety-report.json
+
+  # Code security scanning
+  code-security-scan:
+    name: Code Security Scan (Bandit)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run Bandit security linter
+        run: |
+          uv run bandit -c pyproject.toml -f json -o bandit-report.json -r aiagents4pharma/
+          uv run bandit -c pyproject.toml -f txt -o bandit-report.txt -r aiagents4pharma/
+        continue-on-error: true
+
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: |
+            bandit-report.json
+            bandit-report.txt
+
+  # SARIF upload for GitHub Security tab
+  upload-sarif:
+    name: Upload Security Results
+    needs: [dependency-scan, code-security-scan]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-report*"
+          merge-multiple: true
+
+      - name: Install uv and convert reports to SARIF
+        run: |
+          uv tool install sarif-om
+          # Convert bandit JSON to SARIF if exists
+          if [ -f bandit-report.json ]; then
+            sarif-om convert --input-format bandit --output-format sarif --input bandit-report.json --output bandit.sarif
+          fi
+
+      - name: Upload SARIF results to GitHub
+        if: github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "*.sarif"
+        continue-on-error: true
+
+  # Generate security summary
+  security-summary:
+    name: Security Summary
+    needs: [dependency-scan, code-security-scan]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-report*"
+          merge-multiple: true
+
+      - name: Generate security summary
+        run: |
+          echo "# 🔒 Security Audit Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "**Scan Date:** $(date)" >> security-summary.md
+          echo "" >> security-summary.md
+
+          if [ -f audit-report.json ]; then
+            VULN_COUNT=$(jq '.vulnerabilities | length' audit-report.json)
+            echo "**Dependencies:** $VULN_COUNT vulnerabilities found" >> security-summary.md
+          fi
+
+          if [ -f bandit-report.json ]; then
+            HIGH_ISSUES=$(jq '.results[] | select(.issue_severity == "HIGH") | length' bandit-report.json | wc -l)
+            MED_ISSUES=$(jq '.results[] | select(.issue_severity == "MEDIUM") | length' bandit-report.json | wc -l)
+            LOW_ISSUES=$(jq '.results[] | select(.issue_severity == "LOW") | length' bandit-report.json | wc -l)
+            echo "**Code Security:** $HIGH_ISSUES high, $MED_ISSUES medium, $LOW_ISSUES low severity issues" >> security-summary.md
+          fi
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.md

@@ -1,3 +1,4 @@
+# Modernized release workflow with uv and semantic versioning
 name: RELEASE
 
 on:
@@ -6,58 +7,85 @@ on:
     paths:
       - aiagents4pharma/**
       - app/**
+      - pyproject.toml
+      - uv.lock
 
 jobs:
-  on-success:
+  release:
+    name: Release & Publish
     permissions:
       contents: write
       issues: write
       pull-requests: write
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v3
-      - uses: actions/setup-node@v4
+        with:
+          fetch-depth: 0  # Needed for semantic-release
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Setup Node.js for semantic-release
+        uses: actions/setup-node@v4
         with:
           node-version: "20.8.1"
-      - run: npm ci
+          cache: 'npm'
+
+      - name: Install semantic-release
+        run: npm ci
 
       - name: Run semantic-release
         run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get release version
+      - name: Get release version and update version file
         run: |
-          RELEASE_VERSION=$(git describe --tags --abbrev=0)
-          echo $RELEASE_VERSION > release_version.txt
+          # Get the latest tag created by semantic-release
+          RELEASE_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")
+          # Remove 'v' prefix if present
+          CLEAN_VERSION=${RELEASE_VERSION#v}
+          echo $CLEAN_VERSION > release_version.txt
+          echo "Release version: $CLEAN_VERSION"
 
-      - name: Build the package
+      - name: Build package with uv
         run: |
-          python -m pip install --upgrade pip
-          pip install build
-          python -m build
+          uv build
 
-      - name: Publish package
-        uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      - name: Verify package integrity
+        run: |
+          uv run twine check dist/*
+
+      - name: Test package installation
+        run: |
+          # Test that the built package can be installed
+          uv pip install --system dist/*.whl --dry-run
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
+          verify-metadata: true
+          verbose: true
 
-    #   - name: commit files
-    #     run: |
-    #       git config --local user.email "action@github.com"
-    #       git config --local user.name "GitHub Action"
-    #       git add -f dist/*
-    #       git commit -m "new release"
-
-    #   # push
-    #   - name: push changes
-    #     uses: ad-m/github-push-action@v0.6.0
-    #     with:
-    #       github_token: ${{ secrets.GITHUB_TOKEN }}
-    #       branch: main
+      - name: Upload build artifacts to release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
+          tag_name: ${{ env.RELEASE_VERSION }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
