@@ -109,18 +109,6 @@ jobs:
           ./ollama_dir/ollama.exe serve &
           sleep 15
 
-      # Ensure Ollama model directories exist
-      - name: Create Ollama model directories
-        run: |
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            mkdir -p ~/.ollama/models
-          elif [ "${{ matrix.os }}" = "macos-15" ]; then
-            mkdir -p ~/.ollama/models
-          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            mkdir -p "C:\Users\runneradmin\.ollama\models"
-          fi
-        shell: bash
-
       # Cache and pull Ollama models
       - name: Cache Ollama models
         uses: actions/cache@v4
@@ -130,7 +118,9 @@ jobs:
             ~/.ollama/models
             /Users/runner/.ollama/models
             C:\Users\runneradmin\.ollama\models
-          key: ${{ runner.os }}-ollama-llama3.2-1b
+          key: ${{ runner.os }}-ollama-llama3.2-1b-v2
+          restore-keys: |
+            ${{ runner.os }}-ollama-llama3.2-1b-
 
       - name: Pull Ollama model (Ubuntu/macOS)
         if: steps.cache_ollama.outputs.cache-hit != 'true' && (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-15')
