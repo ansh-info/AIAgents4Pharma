@@ -171,17 +171,18 @@ nav:
 
   # Developer Documentation Section
   - Documentation:
-      - Setup Guide: developer/README.md
-      - Testing & Linting: developer/TESTING_LINTING.md
-      - GitHub Workflows: developer/WORKFLOWS.md
-      - Streamlit Security: developer/STREAMLIT_SECURITY.md
-      - SonarCloud Setup: developer/SONARCLOUD_SETUP.md
-      - Ops:
-          - Introduction: ops/Documentation_intro.md
-          - CodeOps: ops/CodeOps.md
-          - DevOps: ops/DevOps.md
-      - Contributing:
-          - Contributing: CONTRIBUTING.md
+      - Developer Guides:
+          - Setup Guide: developer/README.md
+          - Testing & Linting: developer/TESTING_LINTING.md
+          - GitHub Workflows: developer/WORKFLOWS.md
+          - Streamlit Security: developer/STREAMLIT_SECURITY.md
+          - SonarCloud Setup: developer/SONARCLOUD_SETUP.md
+      - Operations:
+          - Operations Overview: ops/Documentation_intro.md
+          - Code Operations: ops/CodeOps.md
+          - Dev Operations: ops/DevOps.md
+      - Project Guidelines:
+          - Contributing Guide: CONTRIBUTING.md
 
 repo_url: https://github.com/VirtualPatientEngine/AIAgents4Pharma
 repo_name: VPE/AIAgents4Pharma
