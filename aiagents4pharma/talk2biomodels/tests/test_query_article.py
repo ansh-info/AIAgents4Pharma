@@ -2,6 +2,8 @@
 Test cases for Talk2Biomodels query_article tool.
 """
 
+from unittest.mock import MagicMock, patch
+
 from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
 from langchain_openai import ChatOpenAI
@@ -108,48 +110,75 @@ def test_query_article_without_an_article():
     assert tool_status_is_error
 
 
-def test_query_article_direct_tool_execution():
+@patch("aiagents4pharma.talk2biomodels.tools.query_article.PyPDFLoader")
+@patch("aiagents4pharma.talk2biomodels.tools.query_article.InMemoryVectorStore")
+def test_query_article_similarity_search_and_return(mock_vector_store, mock_pdf_loader):
     """
-    Test the query_article tool directly to ensure similarity search and return are covered.
+    Test that lines 62-64 are covered: similarity search and return join operation.
     """
+    # Mock PDF loader
+    mock_page = MagicMock()
+    mock_page.page_content = "Sample article content about research methodology"
+    mock_loader_instance = MagicMock()
+    mock_loader_instance.lazy_load.return_value = [mock_page]
+    mock_pdf_loader.return_value = mock_loader_instance
+
+    # Mock vector store and similarity search
+    mock_doc1 = MagicMock()
+    mock_doc1.page_content = "First relevant document content"
+    mock_doc2 = MagicMock()
+    mock_doc2.page_content = "Second relevant document content"
+    mock_vector_store_instance = MagicMock()
+    mock_vector_store_instance.similarity_search.return_value = [mock_doc1, mock_doc2]
+    mock_vector_store.from_documents.return_value = mock_vector_store_instance
+
+    # Create tool and run
     tool = QueryArticle()
     state = {
-        "pdf_file_name": "aiagents4pharma/talk2biomodels/tests/article_on_model_537.pdf",
-        "text_embedding_model": NVIDIAEmbeddings(model="nvidia/llama-3.2-nv-embedqa-1b-v2"),
+        "pdf_file_name": "test_file.pdf",
+        "text_embedding_model": MagicMock(),
     }
 
-    tool_input = {"question": "What is the main topic of this article?", "state": state}
-    result = tool.run(tool_input)
+    tool_input = {"question": "What is the methodology?", "state": state}
+    result = tool.invoke(tool_input)
 
-    # Ensure result is a string (covers the return join operation)
+    # Verify similarity_search was called (line 62)
+    mock_vector_store_instance.similarity_search.assert_called_once_with("What is the methodology?")
+
+    # Verify return join operation (line 64)
+    expected_result = "First relevant document content\nSecond relevant document content"
+    assert result == expected_result
     assert isinstance(result, str)
-    # Ensure result is not empty (covers similarity search execution)
-    assert len(result) > 0
-    # Result should contain text content from the PDF
-    assert result.strip() != ""
+    assert "\n" in result
 
 
-def test_query_article_with_different_questions():
+@patch("aiagents4pharma.talk2biomodels.tools.query_article.PyPDFLoader")
+@patch("aiagents4pharma.talk2biomodels.tools.query_article.InMemoryVectorStore")
+def test_query_article_empty_search_results(mock_vector_store, mock_pdf_loader):
     """
-    Test the query_article tool with multiple different questions to ensure robustness.
+    Test edge case where similarity search returns empty results.
     """
+    # Mock PDF loader
+    mock_page = MagicMock()
+    mock_page.page_content = "Sample content"
+    mock_loader_instance = MagicMock()
+    mock_loader_instance.lazy_load.return_value = [mock_page]
+    mock_pdf_loader.return_value = mock_loader_instance
+
+    # Mock vector store with empty search results
+    mock_vector_store_instance = MagicMock()
+    mock_vector_store_instance.similarity_search.return_value = []
+    mock_vector_store.from_documents.return_value = mock_vector_store_instance
+
     tool = QueryArticle()
     state = {
-        "pdf_file_name": "aiagents4pharma/talk2biomodels/tests/article_on_model_537.pdf",
-        "text_embedding_model": NVIDIAEmbeddings(model="nvidia/llama-3.2-nv-embedqa-1b-v2"),
+        "pdf_file_name": "test_file.pdf",
+        "text_embedding_model": MagicMock(),
     }
 
-    questions = [
-        "What is the methodology used?",
-        "What are the key findings?",
-        "What is the abstract?",
-    ]
+    tool_input = {"question": "Nonexistent topic", "state": state}
+    result = tool.invoke(tool_input)
 
-    for question in questions:
-        tool_input = {"question": question, "state": state}
-        result = tool.run(tool_input)
-        # Each query should return content
-        assert isinstance(result, str)
-        assert len(result) > 0
-        # Ensure the join operation on line 64 executes properly
-        assert "\n" in result or len(result.split()) > 0
+    # Should return empty string when no documents found
+    assert result == ""
+    assert isinstance(result, str)
