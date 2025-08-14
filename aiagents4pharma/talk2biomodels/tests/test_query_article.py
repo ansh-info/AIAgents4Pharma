@@ -8,6 +8,7 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from ..agents.t2b_agent import get_app
+from ..tools.query_article import QueryArticle
 
 LLM_MODEL = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
@@ -105,3 +106,50 @@ def test_query_article_without_an_article():
                 tool_status_is_error = True
                 break
     assert tool_status_is_error
+
+
+def test_query_article_direct_tool_execution():
+    """
+    Test the query_article tool directly to ensure similarity search and return are covered.
+    """
+    tool = QueryArticle()
+    state = {
+        "pdf_file_name": "aiagents4pharma/talk2biomodels/tests/article_on_model_537.pdf",
+        "text_embedding_model": NVIDIAEmbeddings(model="nvidia/llama-3.2-nv-embedqa-1b-v2"),
+    }
+
+    tool_input = {"question": "What is the main topic of this article?", "state": state}
+    result = tool.run(tool_input)
+
+    # Ensure result is a string (covers the return join operation)
+    assert isinstance(result, str)
+    # Ensure result is not empty (covers similarity search execution)
+    assert len(result) > 0
+    # Result should contain text content from the PDF
+    assert result.strip() != ""
+
+
+def test_query_article_with_different_questions():
+    """
+    Test the query_article tool with multiple different questions to ensure robustness.
+    """
+    tool = QueryArticle()
+    state = {
+        "pdf_file_name": "aiagents4pharma/talk2biomodels/tests/article_on_model_537.pdf",
+        "text_embedding_model": NVIDIAEmbeddings(model="nvidia/llama-3.2-nv-embedqa-1b-v2"),
+    }
+
+    questions = [
+        "What is the methodology used?",
+        "What are the key findings?",
+        "What is the abstract?",
+    ]
+
+    for question in questions:
+        tool_input = {"question": question, "state": state}
+        result = tool.run(tool_input)
+        # Each query should return content
+        assert isinstance(result, str)
+        assert len(result) > 0
+        # Ensure the join operation on line 64 executes properly
+        assert "\n" in result or len(result.split()) > 0
