@@ -8,7 +8,6 @@ on:
       - "aiagents4pharma/**"
       - "pyproject.toml"
       - "uv.lock"
-  workflow_dispatch:
 
 jobs:
   release:
