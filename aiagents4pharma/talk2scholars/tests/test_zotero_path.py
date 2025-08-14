@@ -305,8 +305,23 @@ class TestZoteroWrite:
             yield mock_zot
 
     @patch("aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.fetch_papers_for_save")
-    def test_zotero_write_no_papers(self, mock_fetch):
+    @patch("aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.hydra.initialize")
+    @patch("aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.hydra.compose")
+    @patch("aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.zotero.Zotero")
+    def test_zotero_write_no_papers(self, mock_zotero_class, mock_compose, _, mock_fetch):
         """When no papers exist (even after approval), the function raises a ValueError."""
+        # Mock hydra configuration
+        cfg = MagicMock()
+        cfg.user_id = "test_user"
+        cfg.library_type = "user"
+        cfg.api_key = "test_key"
+        mock_compose.return_value = MagicMock()
+        mock_compose.return_value.tools.zotero_write = cfg
+
+        # Mock Zotero client
+        mock_zot = MagicMock()
+        mock_zotero_class.return_value = mock_zot
+
         mock_fetch.return_value = None
 
         state = {
@@ -330,15 +345,32 @@ class TestZoteroWrite:
     @patch(
         "aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.find_or_create_collection"
     )
-    def test_zotero_write_invalid_collection(self, mock_find, mock_fetch, mock_zotero):
+    @patch("aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.hydra.initialize")
+    @patch("aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.hydra.compose")
+    @patch("aiagents4pharma.talk2scholars.tools.zotero.utils.write_helper.zotero.Zotero")
+    def test_zotero_write_invalid_collection(
+        self, mock_zotero_class, mock_compose, _, mock_find, mock_fetch
+    ):
         """Saving to a nonexistent Zotero collection returns an error Command."""
-        sample = {"paper1": {"Title": "Test Paper"}}
-        mock_fetch.return_value = sample
-        mock_find.return_value = None
-        mock_zotero.collections.return_value = [
+        # Mock hydra configuration
+        cfg = MagicMock()
+        cfg.user_id = "test_user"
+        cfg.library_type = "user"
+        cfg.api_key = "test_key"
+        mock_compose.return_value = MagicMock()
+        mock_compose.return_value.tools.zotero_write = cfg
+
+        # Mock Zotero client
+        mock_zot = MagicMock()
+        mock_zotero_class.return_value = mock_zot
+        mock_zot.collections.return_value = [
             {"key": "k1", "data": {"name": "Curiosity"}},
             {"key": "k2", "data": {"name": "Random"}},
         ]
+
+        sample = {"paper1": {"Title": "Test Paper"}}
+        mock_fetch.return_value = sample
+        mock_find.return_value = None
 
         state = {
             "zotero_write_approval_status": {
