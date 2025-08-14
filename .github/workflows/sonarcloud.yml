@@ -57,8 +57,13 @@ jobs:
           uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma --output-format=json --reports=no > pylint-report.json || true
         continue-on-error: true
 
+      - name: Run bandit security scan with JSON output
+        run: |
+          uv run bandit -c pyproject.toml -r aiagents4pharma -f json -o bandit-report.json || true
+        continue-on-error: true
+
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarqube-scan-action@v5.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} # Generate a token on Sonarcloud.io
@@ -71,4 +76,5 @@ jobs:
           path: |
             coverage.xml
             pylint-report.json
+            bandit-report.json
           retention-days: 30
