@@ -210,6 +210,8 @@ theme:
     - navigation.tabs
     - navigation.instant
     - navigation.expand
+    - navigation.sections
+    - navigation.indexes
     - search.suggest
     - search.highlight
     - content.code.copy
