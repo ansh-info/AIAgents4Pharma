@@ -56,13 +56,16 @@ jobs:
         id: version
         run: |
           if [ -n "${{ github.event.inputs.compose_version }}" ]; then
-            # Manual version provided
-            VERSION="${{ github.event.inputs.compose_version }}"
+            # Manual version provided - ensure it has compose prefix
+            if [[ "${{ github.event.inputs.compose_version }}" == compose-* ]]; then
+              VERSION="${{ github.event.inputs.compose_version }}"
+            else
+              VERSION="compose-${{ github.event.inputs.compose_version }}"
+            fi
           else
-            # Get latest app version tag (same as app releases)
+            # Get latest app version tag and add compose prefix
             LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")
-            # Use the same version as the app (tied to app releases)
-            VERSION="${LATEST_TAG}"
+            VERSION="compose-${LATEST_TAG}"
           fi
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
