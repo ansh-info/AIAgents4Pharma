@@ -28,21 +28,18 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
   python${PYTHON_VERSION}-dev \
   python${PYTHON_VERSION}-venv \
   python3-pip \
-  && rm -rf /var/lib/apt/lists/*
-
-# Set python3 to point to our specific Python version
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1 \
+  && rm -rf /var/lib/apt/lists/* \
+  && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1 \
   && update-alternatives --install /usr/bin/python python /usr/bin/python${PYTHON_VERSION} 1
 
 FROM python-install AS uv-install
 WORKDIR /app
 
-# Install UV package manager and dependencies in correct order
+# Install UV package manager and dependencies
 COPY pyproject.toml uv.lock* ./
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
   export PATH="/root/.local/bin:$PATH" && \
   export UV_PROJECT_ENVIRONMENT="/opt/venv" && \
-  uv --version && \
   uv sync --frozen --extra dev --no-install-project --python python${PYTHON_VERSION} && \
   . /opt/venv/bin/activate && \
   uv pip install \
@@ -57,19 +54,16 @@ LABEL maintainer="talk2aiagents4pharma"
 LABEL version="1.0.0"
 LABEL description="AI Agents for Pharma - Streamlit Application"
 
-# Install only runtime dependencies (no build tools)
+# Install runtime dependencies
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
   ca-certificates \
+  curl \
+  libmagic1 \
   libopenblas0 \
   libomp5 \
-  curl \
   python${PYTHON_VERSION} \
-  libmagic1 \
   && rm -rf /var/lib/apt/lists/* \
-  && apt-get clean
-
-# Set python3 to point to our specific Python version
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1 \
+  && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1 \
   && update-alternatives --install /usr/bin/python python /usr/bin/python${PYTHON_VERSION} 1
 
 # Copy UV virtual environment from build stage
