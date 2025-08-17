@@ -1,13 +1,5 @@
 repos:
-  # Black - Code formatting
-  - repo: https://github.com/psf/black
-    rev: 25.1.0
-    hooks:
-      - id: black
-        language_version: python3.12
-        exclude: ^(docs/notebooks/|app/)
-
-  # Ruff - Fast Python linter
+  # Ruff - Fast Python linter and formatter (replaces black + flake8)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.8
     hooks:
