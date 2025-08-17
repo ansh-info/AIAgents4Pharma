@@ -37,7 +37,7 @@ jobs:
           cache: "npm"
 
       - name: Install semantic-release
-        run: npm ci
+        run: npm install
 
       - name: Install dependencies
         run: uv sync --frozen --extra dev
