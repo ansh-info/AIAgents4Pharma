@@ -102,8 +102,9 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["aiagents4pharma"]
 exclude = [
-  "aiagents4pharma/*/tests/files/",
-  "aiagents4pharma/*/tests/files/**",
+  "aiagents4pharma/talk2knowledgegraphs/tests/files",
+  "aiagents4pharma/talk2knowledgegraphs/tests/files/**/*",
+  "aiagents4pharma/**/tests/files/**/*",
   "dist/*",
   ".venv/*",
   "node_modules/*",
@@ -117,8 +118,9 @@ exclude = [
 
 [tool.hatch.build.targets.sdist]
 exclude = [
-  "aiagents4pharma/*/tests/files/",
-  "aiagents4pharma/*/tests/files/**",
+  "aiagents4pharma/talk2knowledgegraphs/tests/files",
+  "aiagents4pharma/talk2knowledgegraphs/tests/files/**/*",
+  "aiagents4pharma/**/tests/files/**/*",
   "dist/*",
   ".venv/*",
   "node_modules/*",
