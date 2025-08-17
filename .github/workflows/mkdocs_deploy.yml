@@ -40,4 +40,7 @@ jobs:
             mkdocs-material-${{ runner.os }}-
 
       - name: Deploy documentation
-        run: uv run mkdocs gh-deploy --clean --force
+        run: |
+          echo "Deploying to GitHub Pages..."
+          uv run mkdocs gh-deploy --clean --force --verbose
+          echo "Deployment completed!"
