@@ -186,14 +186,13 @@ git checkout -b feat/your-feature-name
 4. Set up your development environment:
 
 ```sh
-uv sync  # Install dependencies
+uv sync --frozen --extra dev  # Install development dependencies
 uv run pre-commit install  # Set up code quality hooks
 ```
 
 5. Make your changes and run quality checks:
 
 ```sh
-uv run pytest  # Run tests
 uv run ruff check --fix .  # Lint and fix code
 uv run ruff format .  # Format code
 uv run pre-commit run --all-files  # Run all checks (linting, formatting, security)

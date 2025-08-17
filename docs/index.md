@@ -82,7 +82,7 @@ We use `uv` for fast and reliable dependency management. Install uv first follow
 
 > **For developers**: See [developer/README.md](developer/README.md) for detailed setup instructions including system prerequisites.
 
-```python
+```sh
 uv sync
 ```
 
@@ -102,11 +102,13 @@ export LANGCHAIN_API_KEY=...        # Optional for all agents
 4. **Launch the app:**
 
 **Option A: Using UV (recommended)**
+
 ```sh
 uv run streamlit run app/frontend/streamlit_app_<agent>.py
 ```
 
 **Option B: Traditional approach**
+
 ```sh
 # Activate virtual environment
 source .venv/bin/activate  # Linux/macOS
@@ -184,14 +186,13 @@ git checkout -b feat/your-feature-name
 4. Set up your development environment:
 
 ```sh
-uv sync  # Install dependencies
+uv sync --frozen --extra dev  # Install development dependencies
 uv run pre-commit install  # Set up code quality hooks
 ```
 
 5. Make your changes and run quality checks:
 
 ```sh
-uv run pytest  # Run tests
 uv run ruff check --fix .  # Lint and fix code
 uv run ruff format .  # Format code
 uv run pre-commit run --all-files  # Run all checks (linting, formatting, security)
