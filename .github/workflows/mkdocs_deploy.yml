@@ -31,5 +31,13 @@ jobs:
       - name: Install project dependencies (including MkDocs)
         run: uv sync --frozen
 
+      - name: Cache MkDocs materials
+        uses: actions/cache@v4
+        with:
+          key: mkdocs-material-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          path: .cache
+          restore-keys: |
+            mkdocs-material-${{ runner.os }}-
+
       - name: Deploy documentation
         run: uv run mkdocs gh-deploy --clean --force
