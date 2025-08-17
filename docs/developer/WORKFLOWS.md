@@ -22,11 +22,10 @@ Our CI/CD pipeline uses **UV** for fast, reliable dependency management across a
 ### 🐳 Build & Deploy
 - [`docker_build.yml`](#docker-build)
 - [`docker_compose_release.yml`](#docker-compose-release)
-- [`package_build.yml`](#package-build)
 - [`release.yml`](#release)
 
 ### 📚 Documentation
-- [`mkdocs-deploy.yml`](#mkdocs-deploy)
+- [`mkdocs_deploy.yml`](#mkdocs-deploy)
 
 ---
 
