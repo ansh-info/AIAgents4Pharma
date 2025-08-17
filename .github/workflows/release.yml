@@ -80,8 +80,9 @@ jobs:
 
       - name: Test package installation
         run: |
-          # Test that the built package can be installed
-          uv pip install --system dist/*.whl --dry-run
+          # Test that the built package can be installed in a virtual environment
+          uv venv test-env
+          uv pip install --python test-env dist/*.whl --dry-run
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
