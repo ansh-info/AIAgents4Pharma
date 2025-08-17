@@ -195,7 +195,12 @@ uv run pre-commit install  # Set up code quality hooks
 ```sh
 uv run pytest  # Run tests
 uv run ruff check --fix .  # Lint and fix code
-uv run pre-commit run --all-files  # Run all checks
+uv run ruff format .  # Format code
+uv run pre-commit run --all-files  # Run all checks (linting, formatting, security)
+
+# Run submodule-specific checks
+uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2scholars/
+uv run coverage run --include="aiagents4pharma/talk2scholars/*" -m pytest --cache-clear aiagents4pharma/talk2scholars/tests/ && uv run coverage report
 ```
 
 6. Commit and push your changes:
