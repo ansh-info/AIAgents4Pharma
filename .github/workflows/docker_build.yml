@@ -34,9 +34,8 @@ jobs:
         uses: dorny/paths-filter@v2
         id: filter
         with:
-          # For workflow_run, we need to compare against the base of the merged PR
-          base: ${{ github.event.workflow_run.head_sha }}~1
-          head: ${{ github.event.workflow_run.head_sha }}
+          # For workflow_run, we need to compare against the previous commit
+          base: HEAD~1
           filters: |
             talk2biomodels:
               - 'aiagents4pharma/talk2biomodels/**'
