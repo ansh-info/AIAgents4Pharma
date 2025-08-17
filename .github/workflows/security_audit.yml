@@ -80,9 +80,14 @@ jobs:
           pattern: "*-report*"
           merge-multiple: true
 
-      - name: Install uv and process security reports
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Process security reports
         run: |
-          uv tool install sarif-om
           # Convert pip-audit JSON to SARIF if exists
           if [ -f audit-report.json ]; then
             echo "Processing dependency vulnerability report..."
