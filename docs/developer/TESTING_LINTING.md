@@ -17,18 +17,24 @@ uv run coverage report
 
 # Run linting
 uv run ruff check .
+uv run ruff check --fix .  # Auto-fix issues
 uv run pylint aiagents4pharma/
 
 # Run security scanning
 uv run bandit -r aiagents4pharma/
 uv run pip-audit
 
-# Format code
-uv run black .
+# Format code (using ruff-format - faster than black)
 uv run ruff format .
 
-# Pre-commit hooks
+# Pre-commit hooks (runs all checks at once)
 uv run pre-commit run --all-files
+
+# Run individual pre-commit checks
+uv run pre-commit run ruff --all-files         # Linting only
+uv run pre-commit run ruff-format --all-files  # Formatting only
+uv run pre-commit run bandit --all-files       # Security only
+uv run pre-commit run pip-audit --all-files    # Vulnerabilities only
 ```
 
 ---
@@ -202,6 +208,40 @@ uv run pytest aiagents4pharma/talk2biomodels/tests/
 uv run pytest aiagents4pharma/talk2knowledgegraphs/tests/
 uv run pytest aiagents4pharma/talk2aiagents4pharma/tests/
 uv run pytest aiagents4pharma/talk2cells/tests/
+```
+
+### Submodule-Specific Quality Checks
+
+#### Pylint for Individual Submodules
+```bash
+# Run pylint on specific submodules with standard disable flags
+uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2scholars/
+uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2biomodels/
+uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2knowledgegraphs/
+uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2aiagents4pharma/
+uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2cells/
+```
+
+#### Coverage for Individual Submodules
+```bash
+# Run coverage on specific submodules
+uv run coverage run --include="aiagents4pharma/talk2scholars/*" -m pytest --cache-clear aiagents4pharma/talk2scholars/tests/ && uv run coverage report
+uv run coverage run --include="aiagents4pharma/talk2biomodels/*" -m pytest --cache-clear aiagents4pharma/talk2biomodels/tests/ && uv run coverage report
+uv run coverage run --include="aiagents4pharma/talk2knowledgegraphs/*" -m pytest --cache-clear aiagents4pharma/talk2knowledgegraphs/tests/ && uv run coverage report
+uv run coverage run --include="aiagents4pharma/talk2aiagents4pharma/*" -m pytest --cache-clear aiagents4pharma/talk2aiagents4pharma/tests/ && uv run coverage report
+uv run coverage run --include="aiagents4pharma/talk2cells/*" -m pytest --cache-clear aiagents4pharma/talk2cells/tests/ && uv run coverage report
+```
+
+#### Pre-commit Hooks for Specific Files/Directories
+```bash
+# Run pre-commit on specific submodule
+uv run pre-commit run --files aiagents4pharma/talk2scholars/*.py
+uv run pre-commit run --files aiagents4pharma/talk2biomodels/*.py
+uv run pre-commit run --files aiagents4pharma/talk2knowledgegraphs/*.py
+
+# Run specific hook on specific submodule
+uv run pre-commit run ruff --files aiagents4pharma/talk2scholars/*.py
+uv run pre-commit run bandit --files aiagents4pharma/talk2knowledgegraphs/*.py
 ```
 
 #### Test Configuration
@@ -571,11 +611,32 @@ uv run pre-commit autoupdate
 ### Pre-commit Configuration (`.pre-commit-config.yaml`)
 The repository includes comprehensive pre-commit hooks:
 
-- **Black**: Code formatting
-- **Ruff**: Linting and formatting
-- **Bandit**: Security scanning
-- **General hooks**: Trailing whitespace, YAML validation, etc.
-- **pip-audit**: Vulnerability scanning
+- **Ruff**: Fast linting and code formatting (replaces black + flake8)
+- **Bandit**: Security vulnerability scanning
+- **General hooks**: Trailing whitespace, YAML validation, large file checks, etc.
+- **pip-audit**: Dependency vulnerability scanning
+
+### Individual Pre-commit Commands
+```bash
+# Run all hooks
+uv run pre-commit run --all-files
+
+# Run specific hooks
+uv run pre-commit run ruff --all-files         # Linting with auto-fix
+uv run pre-commit run ruff-format --all-files  # Code formatting
+uv run pre-commit run bandit --all-files       # Security scanning
+uv run pre-commit run pip-audit --all-files    # Dependency vulnerabilities
+
+# General quality checks
+uv run pre-commit run trailing-whitespace --all-files
+uv run pre-commit run end-of-file-fixer --all-files
+uv run pre-commit run check-yaml --all-files
+uv run pre-commit run check-added-large-files --all-files
+
+# Run on specific files
+uv run pre-commit run ruff --files aiagents4pharma/talk2scholars/main.py
+uv run pre-commit run bandit --files aiagents4pharma/talk2knowledgegraphs/tools/*.py
+```
 
 ### Bypassing Hooks (Emergency Use)
 ```bash
