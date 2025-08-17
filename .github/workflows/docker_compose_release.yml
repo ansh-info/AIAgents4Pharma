@@ -336,25 +336,54 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ needs.detect-changes.outputs.version }}
-          name: "Docker Compose Release ${{ needs.detect-changes.outputs.version }}"
+          name: "🐳 AIAgents4Pharma ${{ needs.detect-changes.outputs.version }}"
           body: |
-            ## Docker Compose Configuration Release
+            ## 🚀 Ready-to-Deploy Docker Configurations
 
-            This release contains Docker Compose files and configurations for AIAgents4Pharma.
+            **One-click deployment** for all AIAgents4Pharma applications with the latest updates from ${{ needs.detect-changes.outputs.version }}.
 
-            ### What's Included
-              - All Docker Compose configurations
-              - Environment file template (`.env.example`)
-              - Setup documentation
-              - Both development and production configurations
+            ### 📦 What's New in This Release
+            - **Updated Docker images** with latest application code
+            - **Production-ready** compose configurations for CPU & GPU
+            - **Complete setup** with Milvus, Minio, and all dependencies
+            - **Environment templates** for easy configuration
+            - **Python package** also available on PyPI and as wheel/source archives below
 
-            ### Quick Start
-            1. Download and extract the archive
-            2. Copy `.env.example` to `.env` and customize
-            3. Run: `docker compose up -d`
+            ### 🐍 Python Package Installation
+            This release also includes the Python package for direct installation:
+            ```bash
+            # Install from PyPI
+            pip install aiagents4pharma==${{ needs.detect-changes.outputs.version }}
 
-            ### Changes in this release
-            ${{ github.event.head_commit.message }}
+            # Or download wheel/source from this release
+            # See assets below: aiagents4pharma-${{ needs.detect-changes.outputs.version }}-py3-none-any.whl
+            ```
+
+            ### ⚡ Quick Deploy
+            ```bash
+            # Download and extract
+            wget https://github.com/${{ github.repository }}/releases/download/${{ needs.detect-changes.outputs.version }}/aiagents4pharma-compose-${{ needs.detect-changes.outputs.version }}.tar.gz
+            tar -xzf aiagents4pharma-compose-${{ needs.detect-changes.outputs.version }}.tar.gz
+
+            # Configure and run
+            cd talk2aiagents4pharma/cpu  # or gpu for GPU version
+            cp .env.example .env && nano .env  # Add your API keys
+            docker compose up -d
+            ```
+
+            ### 🏗️ Available Applications
+            | Application | CPU Port | GPU Port | Description |
+            |-------------|----------|----------|-------------|
+            | 🧪 **talk2aiagents4pharma** | 8501 | 8501 | Main pharmaceutical AI platform |
+            | 📚 **talk2scholars** | 8502 | 8502 | Academic paper research system |
+            | 🕸️ **talk2knowledgegraphs** | 8503 | 8503 | Knowledge graph analysis |
+
+            ### 📋 System Requirements
+            - **CPU**: 8GB+ RAM, Docker & Docker Compose
+            - **GPU**: 16GB+ RAM, NVIDIA Docker runtime, CUDA GPU
+
+            ---
+            *Synchronized with application release ${{ needs.detect-changes.outputs.version }} • Built with ❤️ by VirtualPatientEngine*
 
           files: |
             aiagents4pharma-compose-${{ needs.detect-changes.outputs.version }}.tar.gz
