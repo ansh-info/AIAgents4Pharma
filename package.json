@@ -2,7 +2,8 @@
 	"name": "aiagents4pharma",
 	"private": true,
 	"devDependencies": {
-		"@semantic-release/github": "^11.0.1"
+		"@semantic-release/github": "^11.0.1",
+		"@semantic-release/exec": "^6.0.3"
 	},
 	"release": {
 		"plugins": [
@@ -15,6 +16,12 @@
 				}
 			],
 			"@semantic-release/npm",
+			[
+				"@semantic-release/exec",
+				{
+					"prepareCmd": "sed -i 's/version = \".*\"/version = \"${nextRelease.version}\"/' pyproject.toml"
+				}
+			],
 			[
 				"@semantic-release/github",
 				{
