@@ -42,17 +42,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for compose changes
-        uses: dorny/paths-filter@v2
+      - name: Check for compose changes (simplified for workflow_run)
         id: changes
-        with:
-          # For workflow_run, we need to compare against the previous commit
-          base: HEAD~1
-          filters: |
-            compose_changed:
-              - 'aiagents4pharma/talk2aiagents4pharma/docker-compose/**'
-              - 'aiagents4pharma/talk2scholars/docker-compose/**'
-              - 'aiagents4pharma/talk2knowledgegraphs/docker-compose/**'
+        run: |
+          # For workflow_run, assume compose files may need updating after app changes
+          echo "compose_changed=true" >> $GITHUB_OUTPUT
+          echo "Compose files will be released after app changes"
 
       - name: Get version info
         id: version
