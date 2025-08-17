@@ -18,9 +18,9 @@
 			[
 				"@semantic-release/github",
 				{
-					"successComment": "🎉 This PR is included in version ${nextRelease.version}",
+					"successComment": false,
 					"failComment": false,
-					"releasedLabels": ["released"]
+					"releasedLabels": false
 				}
 			]
 		]
