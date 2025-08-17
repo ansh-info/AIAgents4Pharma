@@ -91,6 +91,7 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
           verify-metadata: true
           verbose: true
+          skip-existing: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
