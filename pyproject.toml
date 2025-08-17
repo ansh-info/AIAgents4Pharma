@@ -101,12 +101,34 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["aiagents4pharma"]
+exclude = [
+  "aiagents4pharma/*/tests/files/*.pkl",
+  "aiagents4pharma/*/tests/files/*.h5",
+  "aiagents4pharma/*/tests/files/*.pt",
+  "aiagents4pharma/*/tests/files/*.pth",
+  "aiagents4pharma/*/tests/files/*.bin",
+  "dist/*",
+  ".venv/*",
+  "node_modules/*",
+]
 
 [tool.hatch.build.targets.wheel.force-include]
 "aiagents4pharma/talk2aiagents4pharma/configs" = "aiagents4pharma/talk2aiagents4pharma/configs"
 "aiagents4pharma/talk2biomodels/configs" = "aiagents4pharma/talk2biomodels/configs"
 "aiagents4pharma/talk2knowledgegraphs/configs" = "aiagents4pharma/talk2knowledgegraphs/configs"
 "aiagents4pharma/talk2scholars/configs" = "aiagents4pharma/talk2scholars/configs"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "aiagents4pharma/*/tests/files/*.pkl",
+  "aiagents4pharma/*/tests/files/*.h5",
+  "aiagents4pharma/*/tests/files/*.pt",
+  "aiagents4pharma/*/tests/files/*.pth",
+  "aiagents4pharma/*/tests/files/*.bin",
+  "dist/*",
+  ".venv/*",
+  "node_modules/*",
+]
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
