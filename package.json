@@ -25,9 +25,9 @@
 			[
 				"@semantic-release/github",
 				{
-					"successComment": false,
+					"successComment": "🎉 This PR is included in version ${nextRelease.version} 🎉\n\nThe release is available on [GitHub release](${nextRelease.githubUrl})\n\nYour semantic-release bot 📦🚀",
 					"failComment": false,
-					"releasedLabels": false
+					"releasedLabels": ["released"]
 				}
 			]
 		]
