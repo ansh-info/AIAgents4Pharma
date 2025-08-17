@@ -27,6 +27,7 @@ wheels = [
 
 [[package]]
 name = "aiagents4pharma"
+version = "0.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "anndata" },

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
@@ -83,7 +83,7 @@ dependencies = [
   "pyarrow>=14.0.0",
   "datasets>=4.0.0",
 ]
-dynamic = ["version"]
+version = "0.0.0"  # This will be updated by semantic-release
 
 [project.optional-dependencies]
 dev = [
@@ -97,11 +97,6 @@ dev = [
   "twine>=4.0.0",
 ]
 
-[tool.hatch.version]
-source = "vcs"
-
-[tool.hatch.build.hooks.vcs]
-version-file = "_version.py"
 
 
 [tool.hatch.build.targets.wheel]
