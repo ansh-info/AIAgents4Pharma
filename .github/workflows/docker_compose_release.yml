@@ -46,6 +46,9 @@ jobs:
         uses: dorny/paths-filter@v2
         id: changes
         with:
+          # For workflow_run, we need to compare against the base of the merged PR
+          base: ${{ github.event.workflow_run.head_sha }}~1
+          head: ${{ github.event.workflow_run.head_sha }}
           filters: |
             compose_changed:
               - 'aiagents4pharma/talk2aiagents4pharma/docker-compose/**'
