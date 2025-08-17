@@ -5,8 +5,11 @@ This guide covers how to run tests, perform linting, and generate code coverage 
 ## Quick Reference
 
 ```bash
-# Install dependencies
-uv sync
+# Install dependencies (production)
+uv sync --frozen
+
+# Install with development tools
+uv sync --extra dev --frozen
 
 # Run all tests
 uv run pytest
@@ -62,10 +65,10 @@ git clone https://github.com/VirtualPatientEngine/AIAgents4Pharma
 cd AIAgents4Pharma
 
 # Sync dependencies (creates .venv and installs everything)
-uv sync
+uv sync --frozen
 
-# Install with development dependencies
-uv sync --extra dev
+# Install with development dependencies (recommended)
+uv sync --extra dev --frozen
 ```
 
 ### 3. System Prerequisites
@@ -737,7 +740,7 @@ uv add "datasets>=4.0.0"
 
 # Clear and reinstall if needed
 rm -rf .venv
-uv sync
+uv sync --extra dev --frozen
 ```
 
 #### Import Errors

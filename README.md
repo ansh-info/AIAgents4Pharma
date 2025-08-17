@@ -82,11 +82,23 @@ We use `uv` for fast and reliable dependency management. Install uv first follow
 
 > **For developers**: See [docs/developer/README.md](docs/developer/README.md) for detailed setup instructions including system prerequisites.
 
+**For Production/Basic Usage:**
 ```sh
-uv sync
+uv sync --frozen
 ```
 
-This will create a virtual environment and install all dependencies defined in `pyproject.toml`.
+**For Development (includes dev tools like ruff, black, mypy):**
+```sh
+uv sync --extra dev --frozen
+```
+
+**Alternative basic installation (without lock file):**
+```sh
+uv sync                    # Basic installation
+uv sync --extra dev        # With development tools
+```
+
+> 💡 **Recommended**: Use `--frozen` flag to ensure exact reproducible builds using the pinned versions from `uv.lock`.
 
 3. **Initialize API Keys**
 
@@ -186,8 +198,8 @@ git checkout -b feat/your-feature-name
 4. Set up your development environment:
 
 ```sh
-uv sync --frozen --extra dev  # Install development dependencies
-uv run pre-commit install  # Set up code quality hooks
+uv sync --extra dev --frozen  # Install development dependencies
+uv run pre-commit install    # Set up code quality hooks
 ```
 
 5. Make your changes and run quality checks:

@@ -39,7 +39,7 @@ git clone https://github.com/VirtualPatientEngine/AIAgents4Pharma
 cd AIAgents4Pharma
 
 # 2. Install dependencies (creates virtual environment automatically)
-uv sync --extra dev
+uv sync --extra dev --frozen
 
 # 3. Set up pre-commit hooks (optional but recommended)
 uv run pre-commit install
@@ -423,7 +423,7 @@ echo "OPENAI_API_KEY=sk-..." >> .env
 
 ```bash
 # 1. Activate environment and install dependencies
-uv sync --extra dev
+uv sync --extra dev --frozen
 
 # 2. Run pre-commit setup
 uv run pre-commit install
@@ -539,7 +539,7 @@ uv lock --verbose
 
 1. **Fork** the repository
 2. **Create** feature branch: `git checkout -b feature/amazing-feature`
-3. **Setup** development environment: `uv sync --extra dev`
+3. **Setup** development environment: `uv sync --extra dev --frozen`
 4. **Install** pre-commit: `uv run pre-commit install`
 5. **Make** changes and ensure all checks pass
 6. **Commit** with descriptive message
