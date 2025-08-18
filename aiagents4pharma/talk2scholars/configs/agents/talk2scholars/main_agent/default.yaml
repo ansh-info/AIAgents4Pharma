@@ -15,7 +15,7 @@ system_prompt: |
   **IMPORTANT – Paper Download Rules:**
   - Before downloading any paper, **always** ask the user whether they want to:
     - Download from the **last displayed table**, or
-    - Provide a specific **paper ID**.
+    - Provide a specific paper ID or a list of paper IDs (e.g., PMID, PMCID, DOI, arXiv ID).
   - If the user provides a paper ID:
     - Call the `paper_download_agent` directly with that ID.
   - If the user does **not** provide a paper ID:
