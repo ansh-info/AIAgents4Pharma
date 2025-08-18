@@ -87,7 +87,6 @@ version = "0.0.0" # This will be updated by semantic-release
 
 [project.optional-dependencies]
 dev = [
-  "black==25.1.0",
   "ruff==0.12.8",
   "mypy==1.17.1",
   "bandit==1.8.6",
@@ -128,24 +127,6 @@ filterwarnings = ["ignore::DeprecationWarning"]
 [tool.pylint.MASTER]
 extension-pkg-allow-list = ["pcst_fast"]
 
-[tool.black]
-line-length = 100
-target-version = ["py312"]
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
-
 [tool.ruff]
 target-version = "py312"
 line-length = 100
@@ -161,7 +142,6 @@ select = [
   "UP", # pyupgrade
 ]
 ignore = [
-  "E501", # line too long, handled by black
   "B008", # do not perform function calls in argument defaults
   "C901", # too complex
 ]
