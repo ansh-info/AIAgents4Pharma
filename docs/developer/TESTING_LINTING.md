@@ -27,7 +27,7 @@ uv run pylint aiagents4pharma/
 uv run bandit -r aiagents4pharma/
 uv run pip-audit
 
-# Format code (using ruff-format - faster than black)
+# Format code
 uv run ruff format .
 
 # Pre-commit hooks (runs all checks at once)
@@ -45,6 +45,7 @@ uv run pre-commit run pip-audit --all-files    # Vulnerabilities only
 ## Setup & Installation
 
 ### 1. Install UV
+
 Follow the [official UV installation guide](https://docs.astral.sh/uv/getting-started/installation/):
 
 ```bash
@@ -59,6 +60,7 @@ pip install uv
 ```
 
 ### 2. Install Dependencies
+
 ```bash
 # Clone repository
 git clone https://github.com/VirtualPatientEngine/AIAgents4Pharma
@@ -74,6 +76,7 @@ uv sync --extra dev --frozen
 ### 3. System Prerequisites
 
 **macOS/Linux users:**
+
 ```bash
 # macOS
 brew install libmagic
@@ -94,6 +97,7 @@ sudo yum install file-libs
 ### Adding New Dependencies
 
 #### Add Runtime Dependencies
+
 ```bash
 # Add a new package to main dependencies
 uv add "package-name"
@@ -109,15 +113,17 @@ uv add "package-name" --index-url https://pypi.org/simple/
 ```
 
 #### Add Development Dependencies
+
 ```bash
 # Add to development dependencies
 uv add --dev "pytest-mock"
 
 # Add to specific extra group
-uv add --extra dev "black>=23.0.0"
+uv add --extra dev "pip-audit==2.9.0"
 ```
 
 #### Add from Git Repository
+
 ```bash
 # Install from Git repository
 uv add "git+https://github.com/user/repo.git"
@@ -128,6 +134,7 @@ uv add "git+https://github.com/user/repo.git@v1.0.0"
 ```
 
 ### Removing Dependencies
+
 ```bash
 # Remove a package
 uv remove "package-name"
@@ -137,6 +144,7 @@ uv remove --dev "package-name"
 ```
 
 ### Updating Dependencies
+
 ```bash
 # Update all dependencies
 uv lock --upgrade
@@ -149,6 +157,7 @@ uv sync --upgrade
 ```
 
 ### Managing Virtual Environments
+
 ```bash
 # Create virtual environment (automatic with uv sync)
 uv venv
@@ -168,6 +177,7 @@ uv pip show "package-name"
 ```
 
 ### Lock File Management
+
 ```bash
 # Generate/update uv.lock
 uv lock
@@ -186,6 +196,7 @@ uv pip check
 ### Running Tests
 
 #### Basic Test Execution
+
 ```bash
 # Run all tests
 uv run pytest
@@ -204,6 +215,7 @@ uv run pytest -k "test_pdf"
 ```
 
 #### Component-Specific Testing
+
 ```bash
 # Test individual agents
 uv run pytest aiagents4pharma/talk2scholars/tests/
@@ -216,6 +228,7 @@ uv run pytest aiagents4pharma/talk2cells/tests/
 ### Submodule-Specific Quality Checks
 
 #### Pylint for Individual Submodules
+
 ```bash
 # Run pylint on specific submodules with standard disable flags
 uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2scholars/
@@ -226,6 +239,7 @@ uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2cells/
 ```
 
 #### Coverage for Individual Submodules
+
 ```bash
 # Run coverage on specific submodules
 uv run coverage run --include="aiagents4pharma/talk2scholars/*" -m pytest --cache-clear aiagents4pharma/talk2scholars/tests/ && uv run coverage report
@@ -236,6 +250,7 @@ uv run coverage run --include="aiagents4pharma/talk2cells/*" -m pytest --cache-c
 ```
 
 #### Pre-commit Hooks for Specific Files/Directories
+
 ```bash
 # Run pre-commit on specific submodule
 uv run pre-commit run --files aiagents4pharma/talk2scholars/*.py
@@ -250,6 +265,7 @@ uv run pre-commit run bandit --files aiagents4pharma/talk2knowledgegraphs/*.py
 #### Test Configuration
 
 Tests are configured in `pyproject.toml`:
+
 ```toml
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
@@ -258,6 +274,7 @@ filterwarnings = ["ignore::DeprecationWarning"]
 ```
 
 #### Environment Variables for Testing
+
 ```bash
 # Required for certain tests
 export OPENAI_API_KEY="your-openai-key"
@@ -276,6 +293,7 @@ export LANGCHAIN_API_KEY="your-langsmith-key"
 ### Basic Coverage Commands
 
 #### Generate Coverage Reports
+
 ```bash
 # Run tests with coverage
 uv run coverage run -m pytest
@@ -293,6 +311,7 @@ uv run coverage xml
 #### Advanced Coverage Usage
 
 **Component-Specific Coverage:**
+
 ```bash
 # Coverage for specific component (standard configuration)
 # Note: Use quotes on macOS/zsh shell, GitHub Actions CI doesn't require them
@@ -319,6 +338,7 @@ uv run coverage report --show-missing
 ```
 
 **Coverage Configuration** (`pyproject.toml`):
+
 ```toml
 [tool.coverage.run]
 source = ["aiagents4pharma"]
@@ -350,6 +370,7 @@ output = "coverage.xml"
 #### Coverage Thresholds
 
 **Check Coverage Threshold:**
+
 ```bash
 # Check if coverage meets minimum threshold
 COVERAGE=$(uv run coverage report -m | awk 'END {print int($NF)}')
@@ -368,6 +389,7 @@ fi
 ### Ruff (Fast Python Linter)
 
 #### Basic Ruff Commands
+
 ```bash
 # Check all files
 uv run ruff check .
@@ -381,11 +403,12 @@ uv run ruff check --fix .
 # Check with specific rules
 uv run ruff check --select E,W,F .
 
-# Format code (like Black)
+# Format code
 uv run ruff format .
 ```
 
 #### Ruff Configuration (`pyproject.toml`)
+
 ```toml
 [tool.ruff]
 target-version = "py312"
@@ -402,7 +425,6 @@ select = [
     "UP", # pyupgrade
 ]
 ignore = [
-    "E501",  # line too long, handled by black
     "B008",  # do not perform function calls in argument defaults
     "C901",  # too complex
 ]
@@ -414,6 +436,7 @@ ignore = [
 ### Pylint (Comprehensive Static Analysis)
 
 #### Basic Pylint Commands
+
 ```bash
 # Run pylint on entire codebase
 uv run pylint aiagents4pharma/
@@ -438,6 +461,7 @@ uv run pylint aiagents4pharma/ --errors-only
 ```
 
 #### Pylint Configuration (`pyproject.toml`)
+
 ```toml
 [tool.pylint.MASTER]
 extension-pkg-allow-list = ["pcst_fast"]
@@ -451,44 +475,6 @@ disable = [
 ]
 ```
 
-### Black (Code Formatting)
-
-#### Basic Black Commands
-```bash
-# Format all files
-uv run black .
-
-# Check formatting without changing files
-uv run black --check .
-
-# Show diff of what would be changed
-uv run black --diff .
-
-# Format specific files
-uv run black aiagents4pharma/talk2scholars/
-```
-
-#### Black Configuration (`pyproject.toml`)
-```toml
-[tool.black]
-line-length = 100
-target-version = ["py312"]
-include = '\\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \\.eggs
-  | \\.git
-  | \\.hg
-  | \\.mypy_cache
-  | \\.tox
-  | \\.venv
-  | build
-  | dist
-)/
-'''
-```
-
 ---
 
 ## Security Scanning
@@ -496,6 +482,7 @@ extend-exclude = '''
 ### Bandit (Security Linter)
 
 #### Basic Bandit Commands
+
 ```bash
 # Scan entire codebase
 uv run bandit -r aiagents4pharma/
@@ -511,6 +498,7 @@ uv run bandit -r aiagents4pharma/ -ll
 ```
 
 #### Bandit Configuration (`pyproject.toml`)
+
 ```toml
 [tool.bandit]
 exclude_dirs = ["tests", "test_*"]
@@ -523,6 +511,7 @@ skips = ["*_test.py", "*/test_*.py"]
 ### Vulnerability Scanning
 
 #### pip-audit (Dependency Vulnerability Scanner)
+
 ```bash
 # Basic vulnerability scan
 uv run pip-audit
@@ -536,6 +525,7 @@ uv run pip-audit --desc --format=table
 ```
 
 #### safety (Alternative Vulnerability Scanner)
+
 ```bash
 # Basic safety check
 uv run safety check
@@ -552,9 +542,11 @@ uv run safety check --file=uv.lock
 ## Type Checking (MyPy)
 
 ### Current Status
+
 MyPy is currently **disabled** in pre-commit due to 1,121 type annotation errors that require dedicated cleanup effort.
 
 #### Manual MyPy Execution
+
 ```bash
 # Run mypy (will show many errors)
 uv run mypy aiagents4pharma/
@@ -567,6 +559,7 @@ uv run mypy aiagents4pharma/talk2scholars/ --ignore-missing-imports
 ```
 
 #### MyPy Configuration (`pyproject.toml`)
+
 ```toml
 [tool.mypy]
 python_version = "3.12"
@@ -596,6 +589,7 @@ ignore_missing_imports = true
 ## Pre-commit Hooks
 
 ### Installation & Setup
+
 ```bash
 # Install pre-commit hooks
 uv run pre-commit install
@@ -604,7 +598,6 @@ uv run pre-commit install
 uv run pre-commit run --all-files
 
 # Run specific hook
-uv run pre-commit run black
 uv run pre-commit run ruff
 
 # Update hooks to latest versions
@@ -612,14 +605,16 @@ uv run pre-commit autoupdate
 ```
 
 ### Pre-commit Configuration (`.pre-commit-config.yaml`)
+
 The repository includes comprehensive pre-commit hooks:
 
-- **Ruff**: Fast linting and code formatting (replaces black + flake8)
+- **Ruff**: Fast linting and code formatting
 - **Bandit**: Security vulnerability scanning
 - **General hooks**: Trailing whitespace, YAML validation, large file checks, etc.
 - **pip-audit**: Dependency vulnerability scanning
 
 ### Individual Pre-commit Commands
+
 ```bash
 # Run all hooks
 uv run pre-commit run --all-files
@@ -642,12 +637,13 @@ uv run pre-commit run bandit --files aiagents4pharma/talk2knowledgegraphs/tools/
 ```
 
 ### Bypassing Hooks (Emergency Use)
+
 ```bash
 # Skip all hooks for urgent commits
 git commit -m "urgent fix" --no-verify
 
 # Skip specific hooks
-SKIP=black,ruff git commit -m "work in progress"
+SKIP=ruff git commit -m "work in progress"
 ```
 
 ---
@@ -655,6 +651,7 @@ SKIP=black,ruff git commit -m "work in progress"
 ## Automation & CI Integration
 
 ### GitHub Actions Integration
+
 All these tools are integrated into our CI/CD pipeline:
 
 ```bash
@@ -668,6 +665,7 @@ uv run pip-audit                                 # Vulnerabilities
 ```
 
 ### Local Development Workflow
+
 ```bash
 # 1. Make changes to code
 git checkout -b feature/my-feature
@@ -676,7 +674,6 @@ git checkout -b feature/my-feature
 uv run pytest
 uv run coverage run -m pytest && uv run coverage report
 uv run ruff check --fix .
-uv run black .
 
 # 3. Run pre-commit hooks
 uv run pre-commit run --all-files
@@ -694,6 +691,7 @@ git push origin feature/my-feature
 ## Performance & Optimization
 
 ### UV Advantages
+
 - **Speed**: UV is 10-100x faster than pip
 - **Reliability**: Deterministic dependency resolution
 - **Caching**: Smart caching reduces repeat installations
@@ -702,6 +700,7 @@ git push origin feature/my-feature
 ### Development Tips
 
 #### Faster Test Iteration
+
 ```bash
 # Run tests with pytest-xdist for parallel execution
 uv add --dev pytest-xdist
@@ -713,6 +712,7 @@ uv run pytest               # Reuse cache for speed
 ```
 
 #### Efficient Coverage
+
 ```bash
 # Run coverage only on changed files
 git diff --name-only | grep "\.py$" | xargs uv run coverage run -m pytest
@@ -729,6 +729,7 @@ uv run coverage combine
 ### Common Issues
 
 #### Dependency Conflicts
+
 ```bash
 # Fix dependency conflicts using uv
 uv add "package>=new-version"
@@ -744,6 +745,7 @@ uv sync --extra dev --frozen
 ```
 
 #### Import Errors
+
 ```bash
 # Ensure you're in the right environment
 uv run python -c "import sys; print(sys.executable)"
@@ -753,6 +755,7 @@ uv pip list
 ```
 
 #### Permission Issues (Linux/macOS)
+
 ```bash
 # Fix ownership if needed
 sudo chown -R $USER:$USER .venv
@@ -762,6 +765,7 @@ uv sync --user
 ```
 
 #### Windows-Specific Issues
+
 ```powershell
 # Use PowerShell execution policy
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser

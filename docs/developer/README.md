@@ -103,16 +103,8 @@ AIAgents4Pharma/
 
 All tools are configured in `pyproject.toml` and run automatically via pre-commit:
 
-#### 🎨 **Black** - Code Formatting
-```bash
-# Format all code
-uv run black .
-
-# Check formatting without applying
-uv run black --check .
-```
-
 #### ⚡ **Ruff** - Fast Linting & Import Sorting
+
 ```bash
 # Lint and auto-fix issues
 uv run ruff check --fix .
@@ -125,6 +117,7 @@ uv run ruff format .
 ```
 
 #### 🔍 **MyPy** - Static Type Checking
+
 ```bash
 # Type check the main package
 uv run mypy aiagents4pharma/
@@ -136,6 +129,7 @@ uv run mypy .
 ### Security Tools
 
 #### 🛡️ **Bandit** - Security Vulnerability Scanner
+
 ```bash
 # Scan for security issues
 uv run bandit -r aiagents4pharma/
@@ -145,6 +139,7 @@ uv run bandit -r aiagents4pharma/ -f json -o security-report.json
 ```
 
 #### 🔒 **Dependency Vulnerability Scanning**
+
 ```bash
 # Scan dependencies for known vulnerabilities
 uv run pip-audit
@@ -172,20 +167,20 @@ uv run pre-commit install
 uv run pre-commit run --all-files
 
 # Run specific hook
-uv run pre-commit run black
 uv run pre-commit run ruff
 uv run pre-commit run mypy
 ```
 
 ### What runs on each commit:
-1. **Black** - Formats code
-2. **Ruff** - Lints and fixes imports
-3. **MyPy** - Type checking (configured but currently disabled in pre-commit)
-4. **Bandit** - Security scanning
-5. **pip-audit** - Dependency vulnerability check
-6. **General checks** - Trailing whitespace, YAML validation, etc.
+
+1. **Ruff** - Lints and fixes imports
+2. **MyPy** - Type checking (configured but currently disabled in pre-commit)
+3. **Bandit** - Security scanning
+4. **pip-audit** - Dependency vulnerability check
+5. **General checks** - Trailing whitespace, YAML validation, etc.
 
 ### Bypassing Pre-commit (Emergency Only)
+
 ```bash
 # Skip pre-commit hooks (not recommended)
 git commit --no-verify -m "emergency fix"
@@ -237,7 +232,7 @@ uv sync --extra dev --frozen
 ### Dependency Groups
 
 - **Main**: Core runtime dependencies
-- **Dev**: Development tools (black, ruff, mypy, etc.)
+- **Dev**: Development tools (ruff, mypy, etc.)
 - **Optional**: Feature-specific dependencies
 
 ---
@@ -389,6 +384,7 @@ data_files = secure_file_upload(
 ```
 
 #### Security Features:
+
 - **File type validation** - Only allowed extensions (prevents malware.exe → report.pdf)
 - **MIME type checking** - Detects file masquerading attacks
 - **File size limits** - Prevents DoS attacks (configurable 25-50MB)
@@ -436,7 +432,6 @@ uv run pre-commit install
 ```bash
 # 1. Run quality checks
 uv run ruff check --fix .
-uv run black .
 uv run mypy aiagents4pharma/
 
 # 2. Run tests
@@ -465,6 +460,7 @@ git commit -m "your message"
 ### Common Issues
 
 #### Dependency Conflicts
+
 ```bash
 # Clear cache and reinstall
 rm -rf .venv uv.lock
@@ -472,6 +468,7 @@ uv sync --extra dev
 ```
 
 #### Pre-commit Issues
+
 ```bash
 # Reinstall hooks
 uv run pre-commit uninstall
@@ -482,6 +479,7 @@ uv run pre-commit autoupdate
 ```
 
 #### Import Errors
+
 ```bash
 # Verify installation
 uv run python -c "import aiagents4pharma; print('OK')"
@@ -491,6 +489,7 @@ uv run python -c "import sys; print(sys.path)"
 ```
 
 #### Type Checking Errors
+
 ```bash
 # Install missing type stubs
 uv add --group dev types-requests types-PyYAML
@@ -514,14 +513,15 @@ uv lock --verbose
 ## 📚 Additional Resources
 
 ### Core Tools
+
 - [uv Documentation](https://docs.astral.sh/uv/) - Modern Python package manager
 - [Hatchling](https://hatch.pypa.io/latest/) - Modern build backend
-- [Black Code Style](https://black.readthedocs.io/) - Code formatting
 - [Ruff Rules](https://docs.astral.sh/ruff/rules/) - Fast Python linter
 - [MyPy Configuration](https://mypy.readthedocs.io/en/stable/config_file.html) - Static type checking
 - [Pre-commit Hooks](https://pre-commit.com/) - Git hook framework
 
 ### Security Tools
+
 - [Bandit](https://bandit.readthedocs.io/) - Security linter for Python
 - [pip-audit](https://pypi.org/project/pip-audit/) - Dependency vulnerability scanner
 - [Safety](https://pyup.io/safety/) - Dependency vulnerability checker
@@ -529,6 +529,7 @@ uv lock --verbose
 - [Streamlit Security Guide](STREAMLIT_SECURITY.md) - File upload security implementation
 
 ### CI/CD & Quality
+
 - [SonarCloud](https://sonarcloud.io/) - Code quality and security analysis
 - [GitHub Actions](https://docs.github.com/en/actions) - CI/CD workflows
 - [Dependabot](https://docs.github.com/en/code-security/dependabot) - Automated dependency updates
@@ -546,7 +547,8 @@ uv lock --verbose
 7. **Push** to your fork and create Pull Request
 
 All contributions are automatically scanned for:
-- **Code formatting and style** (Black + Ruff)
+
+- **Code formatting and style** (Ruff)
 - **Type safety** (MyPy - configured, ready to enable)
 - **Security vulnerabilities** (Bandit + pip-audit + Safety)
 - **Test coverage** (pytest with coverage reporting)
