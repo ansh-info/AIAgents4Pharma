@@ -80,22 +80,10 @@ git clone https://github.com/VirtualPatientEngine/AIAgents4Pharma && cd AIAgents
 
 We use `uv` for fast and reliable dependency management. Install uv first following the [official installation guide](https://docs.astral.sh/uv/getting-started/installation/).
 
-> **For developers**: See [developer/README.md](developer/README.md) for detailed setup instructions including system prerequisites.
+> **For developers**: See [docs/developer/README.md](docs/developer/README.md) for detailed setup instructions including system prerequisites.
 
-**For Production/Basic Usage:**
 ```sh
 uv sync --frozen
-```
-
-**For Development (includes dev tools like ruff, black, mypy):**
-```sh
-uv sync --extra dev --frozen
-```
-
-**Alternative basic installation (without lock file):**
-```sh
-uv sync                    # Basic installation
-uv sync --extra dev        # With development tools
 ```
 
 > 💡 **Recommended**: Use `--frozen` flag to ensure exact reproducible builds using the pinned versions from `uv.lock`.
