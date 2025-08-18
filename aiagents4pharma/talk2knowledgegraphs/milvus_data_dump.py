@@ -199,13 +199,15 @@ class DynamicDataLoader:
                 logger.info("Successfully imported GPU libraries (cudf, cupy)")
             except ImportError as e:
                 logger.error(
-                    "[DATA LOADER] cudf or cupy not found. Please ensure they are installed correctly."
+                    "[DATA LOADER] cudf or cupy not found. "
+                    "Please ensure they are installed correctly."
                 )
                 logger.error("Import error: %s", str(e))
                 # Match original script's exit behavior for critical GPU import failure
                 if not os.getenv("FORCE_CPU", "false").lower() == "true":
                     logger.error(
-                        "GPU libraries required but not available. Set FORCE_CPU=true to use CPU mode."
+                        "GPU libraries required but not available. "
+                        "Set FORCE_CPU=true to use CPU mode."
                     )
                     sys.exit(1)
                 else:
@@ -349,7 +351,8 @@ class DynamicDataLoader:
         """Get embedding dimension using original script's exact logic."""
         first_emb = df.iloc[0][column_name]
         if self.use_gpu:
-            # cuDF format - matches original: len(nodes_df.iloc[0]['desc_emb'].to_arrow().to_pylist()[0])
+            # cuDF format - matches original:
+            # len(nodes_df.iloc[0]['desc_emb'].to_arrow().to_pylist()[0])
             return len(first_emb.to_arrow().to_pylist()[0])
         else:
             # pandas format
