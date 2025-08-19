@@ -317,13 +317,12 @@ def initialize_zotero_and_build_store():
         )
 
         # Initialize vector store
-        pdf_config = load_hydra_config()
         embedding_model = get_text_embedding_model(
             st.session_state.text_embedding_model
         )
         logger.info("Initializing Milvus vector store...")
         vector_store = get_vectorstore(
-            embedding_model=embedding_model, config=pdf_config
+            embedding_model=embedding_model, config=load_hydra_config()
         )
         st.session_state.vector_store = vector_store
 
@@ -368,7 +367,7 @@ def initialize_zotero_and_build_store():
                 vector_store=vector_store,
                 articles=article_data,
                 call_id="streamlit_startup",
-                config=pdf_config,
+                config=load_hydra_config(),
                 has_gpu=vector_store.has_gpu,
             )
 

@@ -25,7 +25,6 @@ max_parallel_pdfs: 10 # Maximum number of PDFs to process in parallel
 # Traditional RAG Pipeline Settings
 # Step 1: Initial retrieval (cast wide net)
 initial_retrieval_k: 100 # Number of chunks to retrieve before reranking
-mmr_diversity: 0.8 # MMR diversity parameter (0=max diversity, 1=max relevance)
 
 # Step 2: Reranking settings
 top_k_chunks: 25 # Final number of chunks after reranking

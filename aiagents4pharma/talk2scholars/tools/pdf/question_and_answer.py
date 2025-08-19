@@ -54,83 +54,57 @@ def load_hydra_config() -> Any:
         return config
 
 
-class QAToolHelper:
-    """
-    Encapsulates helper routines for the PDF Question & Answer tool.
-    Enhanced with automatic GPU/CPU detection and optimization.
-    """
+def _get_state_models_and_data(
+    state: dict, call_id: str
+) -> tuple[Any, Any, dict[str, Any]]:
+    """Retrieve embedding model, LLM, and article data from agent state."""
+    text_emb = state.get("text_embedding_model")
+    if not text_emb:
+        msg = "No text embedding model found in state."
+        logger.error("%s: %s", call_id, msg)
+        raise ValueError(msg)
+    llm = state.get("llm_model")
+    if not llm:
+        msg = "No LLM model found in state."
+        logger.error("%s: %s", call_id, msg)
+        raise ValueError(msg)
+    articles = state.get("article_data", {})
+    if not articles:
+        msg = "No article_data found in state."
+        logger.error("%s: %s", call_id, msg)
+        raise ValueError(msg)
+    return text_emb, llm, articles
 
-    def __init__(self) -> None:
-        self.config: Any = None
-        self.call_id: str = ""
-        self.has_gpu: bool = False  # Track GPU availability
-        logger.debug("Initialized QAToolHelper")
 
-    def start_call(self, config: Any, call_id: str) -> None:
-        """Initialize helper with current config and call identifier."""
-        self.config = config
-        self.call_id = call_id
-        logger.debug("QAToolHelper started call %s", call_id)
+def _init_vector_store(emb_model: Any, call_id: str) -> Any:
+    """Get the singleton Milvus vector store instance with GPU/CPU optimization."""
+    logger.info(
+        "%s: Getting singleton vector store instance with hardware optimization",
+        call_id,
+    )
+    vs = get_vectorstore(embedding_model=emb_model, config=load_hydra_config())
 
-    def get_state_models_and_data(self, state: dict) -> tuple[Any, Any, dict[str, Any]]:
-        """Retrieve embedding model, LLM, and article data from agent state."""
-        text_emb = state.get("text_embedding_model")
-        if not text_emb:
-            msg = "No text embedding model found in state."
-            logger.error("%s: %s", self.call_id, msg)
-            raise ValueError(msg)
-        llm = state.get("llm_model")
-        if not llm:
-            msg = "No LLM model found in state."
-            logger.error("%s: %s", self.call_id, msg)
-            raise ValueError(msg)
-        articles = state.get("article_data", {})
-        if not articles:
-            msg = "No article_data found in state."
-            logger.error("%s: %s", self.call_id, msg)
-            raise ValueError(msg)
-        return text_emb, llm, articles
+    # Get GPU availability from vector store
+    has_gpu = getattr(vs, "has_gpu", False)
+    hardware_type = "GPU-accelerated" if has_gpu else "CPU-only"
 
-    def init_vector_store(self, emb_model: Any) -> Any:
-        """Get the singleton Milvus vector store instance with GPU/CPU optimization."""
+    logger.info(
+        "%s: Vector store initialized (%s mode)",
+        call_id,
+        hardware_type,
+    )
+
+    # Log hardware-specific configuration
+    if hasattr(vs, "index_params"):
+        index_type = vs.index_params.get("index_type", "Unknown")
         logger.info(
-            "%s: Getting singleton vector store instance with hardware optimization",
-            self.call_id,
-        )
-        vs = get_vectorstore(embedding_model=emb_model, config=self.config)
-
-        # Track GPU availability from vector store
-        self.has_gpu = getattr(vs, "has_gpu", False)
-        hardware_type = "GPU-accelerated" if self.has_gpu else "CPU-only"
-
-        logger.info(
-            "%s: Vector store initialized (%s mode)",
-            self.call_id,
+            "%s: Using %s index type for %s processing",
+            call_id,
+            index_type,
             hardware_type,
         )
 
-        # Log hardware-specific configuration
-        if hasattr(vs, "index_params"):
-            index_type = vs.index_params.get("index_type", "Unknown")
-            logger.info(
-                "%s: Using %s index type for %s processing",
-                self.call_id,
-                index_type,
-                hardware_type,
-            )
-
-        return vs
-
-    def get_hardware_stats(self) -> dict[str, Any]:
-        """Get current hardware configuration stats for monitoring."""
-        return {
-            "gpu_available": self.has_gpu,
-            "hardware_mode": "GPU-accelerated" if self.has_gpu else "CPU-only",
-            "call_id": self.call_id,
-        }
-
-
-# Helper will be initialized in the tool function
+    return vs
 
 
 class QuestionAndAnswerInput(BaseModel):
@@ -193,17 +167,12 @@ def question_and_answer(
     )
     logger.info("%s: Question: '%s'", call_id, question)
 
-    # Initialize configuration and helper locally
-    config = load_hydra_config()
-    helper = QAToolHelper()
-    helper.start_call(config, call_id)
+    # Extract models and article metadata directly
+    text_emb, llm_model, article_data = _get_state_models_and_data(state, call_id)
 
-    # Extract models and article metadata
-    text_emb, llm_model, article_data = helper.get_state_models_and_data(state)
-
-    # Initialize or reuse Milvus vector store
+    # Initialize or reuse Milvus vector store directly
     logger.info("%s: Initializing vector store", call_id)
-    vs = helper.init_vector_store(text_emb)
+    vs = _init_vector_store(text_emb, call_id)
 
     # Load ALL papers (traditional RAG approach)
     logger.info(
@@ -211,12 +180,15 @@ def question_and_answer(
         call_id,
         len(article_data),
     )
+    # Get GPU status from vector store
+    has_gpu = getattr(vs, "has_gpu", False)
+
     load_all_papers(
         vector_store=vs,
         articles=article_data,
         call_id=call_id,
-        config=config,
-        has_gpu=helper.has_gpu,
+        config=load_hydra_config(),
+        has_gpu=has_gpu,
     )
 
     # Traditional RAG Pipeline: Retrieve from ALL papers, then rerank
@@ -227,7 +199,7 @@ def question_and_answer(
 
     # Retrieve and rerank chunks in one step
     reranked_chunks = retrieve_and_rerank_chunks(
-        vs, question, config, call_id, helper.has_gpu
+        vs, question, load_hydra_config(), call_id, has_gpu
     )
 
     if not reranked_chunks:
@@ -245,9 +217,9 @@ def question_and_answer(
         reranked_chunks,
         llm_model,
         article_data,
-        config,
+        load_hydra_config(),
         call_id=call_id,
-        has_gpu=helper.has_gpu,
+        has_gpu=has_gpu,
     )
 
     logger.info(
