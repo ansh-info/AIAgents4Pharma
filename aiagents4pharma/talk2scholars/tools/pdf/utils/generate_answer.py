@@ -6,7 +6,6 @@ import logging
 import os
 from typing import Any, Dict, List
 
-import hydra
 from langchain_core.documents import Document
 from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -16,19 +15,6 @@ logging.basicConfig(level=getattr(logging, log_level))
 logger = logging.getLogger(__name__)
 logger.setLevel(getattr(logging, log_level))
 
-
-def load_hydra_config() -> Any:
-    """
-    Load the configuration using Hydra and return the configuration for the Q&A tool.
-    """
-    with hydra.initialize(version_base=None, config_path="../../../configs"):
-        cfg = hydra.compose(
-            config_name="config",
-            overrides=["tools/question_and_answer=default"],
-        )
-        config = cfg.tools.question_and_answer
-        logger.debug("Loaded Question and Answer tool configuration.")
-        return config
 
 
 def _build_context_and_sources(

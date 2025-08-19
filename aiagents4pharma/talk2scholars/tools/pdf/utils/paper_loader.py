@@ -104,7 +104,7 @@ def load_all_papers(
     # This should process ALL papers at once with hardware optimization
     add_papers_batch(
         papers_to_add=papers_to_load,
-        vector_store=vector_store.vector_store,  # Pass the LangChain vector store
+        vector_store=vector_store,  # Pass the PyMilvus vector store directly
         loaded_papers=vector_store.loaded_papers,
         paper_metadata=vector_store.paper_metadata,
         documents=vector_store.documents,

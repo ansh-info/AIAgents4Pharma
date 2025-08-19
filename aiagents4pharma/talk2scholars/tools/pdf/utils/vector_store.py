@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional
 
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-from langchain_milvus import Milvus
 
 from .collection_manager import ensure_collection_exists
 from .gpu_detection import (
@@ -125,8 +124,7 @@ class Vectorstore:
             self.collection_name, self.config, self.index_params, self.has_gpu
         )
 
-        # Initialize the LangChain Milvus vector store
-        self.vector_store = self._initialize_vector_store()
+        # Collection is now the primary interface (no LangChain wrapper needed)
 
         # Load existing papers AFTER vector store is ready
         self._load_existing_paper_ids()
@@ -162,41 +160,22 @@ class Vectorstore:
             self.connection_args["host"], self.connection_args["port"], self.db_name
         )
 
-    def _initialize_vector_store(self) -> Milvus:
-        """Initialize or load the Milvus vector store with proper embedding model."""
-        # Use the wrapped embedding model (with normalization if needed)
-        vector_store = self._singleton.get_vector_store(
-            self.collection_name, self.embedding_model, self.connection_args
-        )
-
-        return vector_store
+    # Removed _initialize_vector_store - no longer needed with pure PyMilvus
 
     def _load_existing_paper_ids(self):
-        """Load already embedded paper IDs using LangChain's collection access."""
-        logger.info("Checking for existing papers via LangChain collection...")
-
-        # Access the collection through LangChain's wrapper
-        langchain_collection = getattr(self.vector_store, "col", None)
-
-        if langchain_collection is None:
-            langchain_collection = getattr(self.vector_store, "collection", None)
-
-        if langchain_collection is None:
-            logger.warning(
-                "No LangChain collection found, proceeding with empty loaded_papers"
-            )
-            return
+        """Load already embedded paper IDs using pure PyMilvus collection."""
+        logger.info("Checking for existing papers in PyMilvus collection...")
 
         # Force flush and check entity count
-        langchain_collection.flush()
-        num_entities = langchain_collection.num_entities
+        self.collection.flush()
+        num_entities = self.collection.num_entities
 
-        logger.info("LangChain collection entity count: %d", num_entities)
+        logger.info("PyMilvus collection entity count: %d", num_entities)
 
         if num_entities > 0:
-            logger.info("Loading existing paper IDs from LangChain collection...")
+            logger.info("Loading existing paper IDs from PyMilvus collection...")
 
-            results = langchain_collection.query(
+            results = self.collection.query(
                 expr="",  # No filter - get all
                 output_fields=["paper_id"],
                 limit=16384,  # Max limit
@@ -211,95 +190,14 @@ class Vectorstore:
         else:
             logger.info("Collection is empty - no existing papers")
 
-    def similarity_search(self, query: str, **kwargs: Any) -> List[Document]:
-        """
-        Perform similarity search on the vector store.
-        Query embedding will be automatically normalized if using GPU with COSINE.
-        Keyword args:
-            k: int = 4
-            filter: Optional[Dict[str, Any]] = None
-            plus any other kwargs to pass through to the underlying vector_store.
-        """
-        # Extract our parameters
-        k: int = kwargs.pop("k", 4)
-        filter_: Optional[Dict[str, Any]] = kwargs.pop("filter", None)
-
-        # Build Milvus expr from filter_, if present
-        expr = None
-        if filter_:
-            conditions = []
-            for key, value in filter_.items():
-                if isinstance(value, str):
-                    conditions.append(f'{key} == "{value}"')
-                elif isinstance(value, list):
-                    vals = ", ".join(
-                        f'"{v}"' if isinstance(v, str) else str(v) for v in value
-                    )
-                    conditions.append(f"{key} in [{vals}]")
-                else:
-                    conditions.append(f"{key} == {value}")
-            expr = " and ".join(conditions)
-
-        # Delegate to the wrapped store
-        return self.vector_store.similarity_search(
-            query=query, k=k, expr=expr, **kwargs
-        )
-
-    def max_marginal_relevance_search(
-        self, query: str, **kwargs: Any
-    ) -> List[Document]:
-        """
-        Perform MMR search on the vector store.
-        Query embedding will be automatically normalized if using GPU with COSINE.
-        Keyword args:
-            k: int = 4
-            fetch_k: int = 20
-            lambda_mult: float = 0.5
-            filter: Optional[Dict[str, Any]] = None
-            plus any other kwargs to pass through.
-        """
-        # Extract our parameters
-        k: int = kwargs.pop("k", 4)
-        fetch_k: int = kwargs.pop("fetch_k", 20)
-        lambda_mult: float = kwargs.pop("lambda_mult", 0.5)
-        filter_: Optional[Dict[str, Any]] = kwargs.pop("filter", None)
-
-        # Build Milvus expr from filter_, if present
-        expr = None
-        if filter_:
-            conditions = []
-            for key, value in filter_.items():
-                if isinstance(value, str):
-                    conditions.append(f'{key} == "{value}"')
-                elif isinstance(value, list):
-                    vals = ", ".join(
-                        f'"{v}"' if isinstance(v, str) else str(v) for v in value
-                    )
-                    conditions.append(f"{key} in [{vals}]")
-                else:
-                    conditions.append(f"{key} == {value}")
-            expr = " and ".join(conditions)
-
-        # Delegate to the wrapped store
-        return self.vector_store.max_marginal_relevance_search(
-            query=query,
-            k=k,
-            fetch_k=fetch_k,
-            lambda_mult=lambda_mult,
-            expr=expr,
-            **kwargs,
-        )
+    # Removed custom similarity_search, similarity_search_with_score, and max_marginal_relevance_search methods
+    # These were causing type checking issues with PyMilvus SearchFuture/SearchResult objects
+    # The system now uses direct PyMilvus collection.search() calls where needed
 
     def _ensure_collection_loaded(self):
         """Ensure collection is loaded into memory/GPU after data insertion."""
-        # Get the collection
-        collection = getattr(self.vector_store, "col", None)
-        if collection is None:
-            collection = getattr(self.vector_store, "collection", None)
-
-        if collection is None:
-            logger.warning("Cannot access collection for loading")
-            return
+        # Use direct PyMilvus collection reference
+        collection = self.collection
 
         # Force flush to ensure we see all data
         logger.info("Flushing collection to ensure data visibility...")
@@ -329,6 +227,41 @@ class Vectorstore:
             )
         else:
             logger.info("Collection is empty, skipping load operation")
+
+    def add_documents(self, documents: List[Document], ids: List[str]) -> None:
+        """
+        Add documents to the collection using pure PyMilvus.
+        Handles embedding generation and insertion.
+        """
+        if not documents or not ids:
+            logger.warning("No documents or IDs provided for insertion")
+            return
+
+        if len(documents) != len(ids):
+            raise ValueError("Number of documents must match number of IDs")
+
+        # Extract texts and generate embeddings
+        texts = [doc.page_content for doc in documents]
+        embeddings = self.embedding_model.embed_documents(texts)
+
+        # Prepare data for insertion
+        entities = []
+        for i, (doc, doc_id) in enumerate(zip(documents, ids)):
+            entity = {
+                "id": doc_id,
+                "text": doc.page_content,
+                "embedding": embeddings[i],
+                "paper_id": doc.metadata.get("paper_id", ""),
+                "title": doc.metadata.get("title", ""),
+                "chunk_id": doc.metadata.get("chunk_id", 0),
+                "page": doc.metadata.get("page", 0),
+                "source": doc.metadata.get("source", ""),
+            }
+            entities.append(entity)
+
+        # Insert into collection
+        self.collection.insert(entities)
+        logger.info("Inserted %d documents into collection", len(documents))
 
     def get_embedding_info(self) -> Dict[str, Any]:
         """Get information about the embedding configuration."""

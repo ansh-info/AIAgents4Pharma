@@ -58,6 +58,6 @@ def get_vectorstore(
             if existing.embedding_model != embedding_model:
                 logger.warning("Embedding model changed, updating existing instance")
                 existing.embedding_model = embedding_model
-                existing.vector_store.embedding_function = embedding_model
+                # No need to update vector_store.embedding_function - using direct PyMilvus now
 
         return _vectorstore_cache[collection_name]

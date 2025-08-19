@@ -6,10 +6,8 @@ Handles connection reuse, event loops, and GPU detection caching.
 import asyncio
 import logging
 import threading
-from typing import Any, Dict
 
-from langchain_core.embeddings import Embeddings
-from langchain_milvus import Milvus
+# Removed LangChain imports - now using pure PyMilvus
 from pymilvus import connections, db, utility
 from pymilvus.exceptions import MilvusException
 
@@ -24,7 +22,6 @@ class VectorstoreSingleton:
     _instance = None
     _lock = threading.Lock()
     _connections = {}  # Store connections by connection string
-    _vector_stores = {}  # Store vector stores by collection name
     _event_loops = {}  # Store event loops by thread ID
     _gpu_detected = None  # Cache GPU detection result
 
@@ -101,40 +98,4 @@ class VectorstoreSingleton:
 
         return self._connections[conn_key]
 
-    def get_vector_store(
-        self,
-        collection_name: str,
-        embedding_model: Embeddings,
-        connection_args: Dict[str, Any],
-    ) -> Milvus:
-        """Get or create a vector store for a collection."""
-        if collection_name not in self._vector_stores:
-            # Ensure event loop exists for this thread
-            self.get_event_loop()
-
-            # Create LangChain Milvus instance with explicit URI format
-            # This ensures LangChain uses the correct host
-            milvus_uri = f"http://{connection_args['host']}:{connection_args['port']}"
-
-            vector_store = Milvus(
-                embedding_function=embedding_model,
-                collection_name=collection_name,
-                connection_args={
-                    "uri": milvus_uri,  # Use URI format instead of host/port
-                    "host": connection_args["host"],
-                    "port": connection_args["port"],
-                },
-                text_field="text",
-                auto_id=False,
-                drop_old=False,
-                consistency_level="Strong",
-            )
-
-            self._vector_stores[collection_name] = vector_store
-            logger.info(
-                "Created new vector store for collection: %s with URI: %s",
-                collection_name,
-                milvus_uri,
-            )
-
-        return self._vector_stores[collection_name]
+    # Removed get_vector_store method - no longer needed with pure PyMilvus approach

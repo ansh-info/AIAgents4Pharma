@@ -27,7 +27,7 @@ def add_papers_batch(
 
     Args:
         papers_to_add: List of tuples (paper_id, pdf_url, paper_metadata).
-        vector_store: The LangChain Milvus vector store instance.
+        vector_store: The PyMilvus vector store instance.
         loaded_papers: Set to track which papers are already loaded.
         paper_metadata: Dict to store paper metadata after load.
         documents: Dict to store document chunks.
@@ -171,10 +171,10 @@ def _batch_embed(
             ids=ids[start_idx:end_idx],
         )
 
-        # Post-insert verification
-        col = store.col
-        col.flush()
-        count = col.num_entities
+        # Post-insert verification using direct collection access
+        collection = store.collection
+        collection.flush()
+        count = collection.num_entities
         logger.info(
             "Post-insert batch %d: collection has %d entities",
             batch_num,
@@ -185,7 +185,7 @@ def _batch_embed(
                 "Sample paper IDs: %s",
                 [
                     r.get("paper_id", "unknown")
-                    for r in col.query(expr="", output_fields=["paper_id"], limit=3)
+                    for r in collection.query(expr="", output_fields=["paper_id"], limit=3)
                 ],
             )
 

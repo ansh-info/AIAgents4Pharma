@@ -28,7 +28,7 @@ sys.path.append("./")
 
 
 from aiagents4pharma.talk2scholars.agents.main_agent import get_app
-from aiagents4pharma.talk2scholars.tools.pdf.utils.generate_answer import (
+from aiagents4pharma.talk2scholars.tools.pdf.question_and_answer import (
     load_hydra_config,
 )
 from aiagents4pharma.talk2scholars.tools.pdf.utils.get_vectorstore import (
@@ -244,11 +244,9 @@ def force_collection_reload_after_loading(vector_store, call_id: str = "streamli
     logger = logging.getLogger(__name__)
 
     try:
-        # Get the collection from the vector store
-        collection = getattr(vector_store.vector_store, "col", None)
-        if collection is None:
-            collection = getattr(vector_store.vector_store, "collection", None)
-
+        # Get the collection directly from the pure PyMilvus vector store
+        collection = vector_store.collection
+        
         if collection is None:
             logger.warning(f"{call_id}: Cannot access collection for reloading")
             return False
@@ -403,7 +401,7 @@ def initialize_zotero_and_build_store():
 
         # Log final statistics
         try:
-            collection = getattr(vector_store.vector_store, "col", None)
+            collection = vector_store.collection
             if collection is not None:
                 final_entities = collection.num_entities
                 hardware_type = "GPU" if vector_store.has_gpu else "CPU"

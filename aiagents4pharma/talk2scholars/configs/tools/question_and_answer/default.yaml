@@ -12,7 +12,7 @@ milvus:
 
   # Ensure collection persists across restarts
   consistency_level: "Strong"
-  embedding_dim: 768
+  embedding_dim: 1536
 
 # Document processing settings
 chunk_size: 1200 # Number of characters per text chunk

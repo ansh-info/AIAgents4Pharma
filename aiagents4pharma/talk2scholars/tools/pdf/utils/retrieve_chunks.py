@@ -94,15 +94,56 @@ def retrieve_relevant_chunks(
     else:
         logger.debug("Using default search parameters (no hardware optimization)")
 
-    # Perform MMR search - let the vector store handle search_params internally
-    # Don't pass search_params explicitly to avoid conflicts
-    results = vector_store.max_marginal_relevance_search(
-        query=query,
-        k=top_k,
-        fetch_k=fetch_k,
-        lambda_mult=mmr_diversity,
-        filter=filter_dict,
+    # Use direct PyMilvus search (simplified approach without MMR)
+    # Generate query embedding using the vector store's embedding model
+    query_embedding = vector_store.embedding_model.embed_query(query)
+    
+    # Build filter expression if provided
+    expr = ""
+    if filter_dict:
+        conditions = []
+        for key, value in filter_dict.items():
+            if isinstance(value, str):
+                conditions.append(f'{key} == "{value}"')
+            elif isinstance(value, list):
+                vals = ", ".join(f'"{v}"' if isinstance(v, str) else str(v) for v in value)
+                conditions.append(f"{key} in [{vals}]")
+            else:
+                conditions.append(f"{key} == {value}")
+        expr = " and ".join(conditions)
+    
+    # Perform direct PyMilvus search
+    search_results = vector_store.collection.search(
+        data=[query_embedding],
+        anns_field="embedding",
+        param=vector_store.search_params["params"],
+        limit=fetch_k,  # Get more candidates first
+        expr=expr if expr else None,
+        output_fields=["text", "paper_id", "title", "page", "chunk_id", "source"],
+        consistency_level="Strong",
     )
+    
+    # Convert results to Document format (simplified, no complex MMR)
+    results = []
+    try:
+        # Extract hits from search results
+        if search_results and len(search_results) > 0:
+            hits = search_results[0]  # Get first result set
+            for hit in hits[:top_k]:  # Take top_k results
+                doc = Document(
+                    page_content=hit.entity.get("text", ""),
+                    metadata={
+                        "paper_id": hit.entity.get("paper_id", ""),
+                        "title": hit.entity.get("title", ""),
+                        "page": hit.entity.get("page", 0),
+                        "chunk_id": hit.entity.get("chunk_id", 0),
+                        "source": hit.entity.get("source", ""),
+                        "score": hit.score,
+                    }
+                )
+                results.append(doc)
+    except Exception as e:
+        logger.warning("Error processing search results: %s", e)
 
     logger.info(
         "Retrieved %d chunks using %s MMR from Milvus", len(results), search_mode
@@ -177,29 +218,68 @@ def retrieve_relevant_chunks_with_scores(
     else:
         logger.debug("Standard CPU similarity search")
 
-    if hasattr(vector_store, "similarity_search_with_score"):
-        # Don't pass search_params to avoid conflicts
-        results = vector_store.similarity_search_with_score(
-            query=query,
-            k=top_k,
-            filter=filter_dict,
-        )
-
-        # Filter by score threshold
-        filtered_results = [
-            (doc, score) for doc, score in results if score >= score_threshold
-        ]
-
-        logger.info(
-            "%s search with scores retrieved %d/%d chunks above threshold %.3f",
-            search_mode,
-            len(filtered_results),
-            len(results),
-            score_threshold,
-        )
-
-        return filtered_results
-
-    raise NotImplementedError(
-        "Vector store does not support similarity_search_with_score"
+    # Use direct PyMilvus search since we removed the wrapper methods
+    # Generate query embedding using the vector store's embedding model
+    query_embedding = vector_store.embedding_model.embed_query(query)
+    
+    # Build filter expression if provided
+    expr = ""
+    if filter_dict:
+        conditions = []
+        for key, value in filter_dict.items():
+            if isinstance(value, str):
+                conditions.append(f'{key} == "{value}"')
+            elif isinstance(value, list):
+                vals = ", ".join(f'"{v}"' if isinstance(v, str) else str(v) for v in value)
+                conditions.append(f"{key} in [{vals}]")
+            else:
+                conditions.append(f"{key} == {value}")
+        expr = " and ".join(conditions)
+    
+    # Perform direct PyMilvus search
+    search_results = vector_store.collection.search(
+        data=[query_embedding],
+        anns_field="embedding",
+        param=vector_store.search_params["params"],
+        limit=top_k,
+        expr=expr if expr else None,
+        output_fields=["text", "paper_id", "title", "page", "chunk_id", "source"],
+        consistency_level="Strong",
     )
+    
+    # Convert results to (Document, score) tuples
+    results = []
+    try:
+        # Extract hits from search results
+        if search_results and len(search_results) > 0:
+            hits = search_results[0]  # Get first result set
+            for hit in hits:
+                doc = Document(
+                    page_content=hit.entity.get("text", ""),
+                    metadata={
+                        "paper_id": hit.entity.get("paper_id", ""),
+                        "title": hit.entity.get("title", ""),
+                        "page": hit.entity.get("page", 0),
+                        "chunk_id": hit.entity.get("chunk_id", 0),
+                        "source": hit.entity.get("source", ""),
+                    }
+                )
+                results.append((doc, hit.score))
+    except Exception as e:
+        logger.warning("Error processing search results: %s", e)
+        return []
+
+    # Filter by score threshold
+    filtered_results = [
+        (doc, score) for doc, score in results if score >= score_threshold
+    ]
+
+    logger.info(
+        "%s search with scores retrieved %d/%d chunks above threshold %.3f",
+        search_mode,
+        len(filtered_results),
+        len(results),
+        score_threshold,
+    )
+
+    return filtered_results
