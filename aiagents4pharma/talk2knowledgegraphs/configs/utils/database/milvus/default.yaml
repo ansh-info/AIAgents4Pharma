@@ -18,8 +18,8 @@ milvus_db:
   token: "${oc.env:MILVUS_USER,root}:${oc.env:MILVUS_PASSWORD,Milvus}"
   user: ${oc.env:MILVUS_USER,root}
   password: ${oc.env:MILVUS_PASSWORD,Milvus}
-  
-  # Database and collection names  
+
+  # Database and collection names
   database_name: ${oc.env:MILVUS_DATABASE,t2kg_primekg}
   collection_edges: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_edges"
   collection_nodes: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_nodes"
@@ -29,7 +29,7 @@ milvus_db:
   collection_nodes_biological_process: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_nodes_biological_process"
   collection_nodes_drug: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_nodes_drug"
   collection_nodes_disease: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_nodes_disease"
-  
+
   # Query performance settings
   query_batch_size: 10000
 
