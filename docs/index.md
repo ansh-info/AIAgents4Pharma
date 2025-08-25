@@ -85,7 +85,7 @@ We use `uv` for fast and reliable dependency management. Install uv first follow
 > **For developers**: See [docs/developer/README.md](docs/developer/README.md) for detailed setup instructions including system prerequisites.
 
 ```sh
-uv sync --frozen
+uv sync --extra dev --frozen
 ```
 
 > 💡 **Recommended**: Use `--frozen` flag to ensure exact reproducible builds using the pinned versions from `uv.lock`.
