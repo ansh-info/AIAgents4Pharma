@@ -82,6 +82,8 @@ dependencies = [
   "python-magic==0.4.27",
   "pyarrow==21.0.0",
   "datasets==4.0.0",
+  "beautifulsoup4==4.13.4",
+  "cloudscraper==1.2.71",
 ]
 version = "0.0.0" # This will be updated by semantic-release
 
