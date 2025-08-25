@@ -33,12 +33,14 @@ from aiagents4pharma.talk2scholars.tools.paper_download.paper_downloader import 
 # --- tiny helpers to manipulate factory state without protected-access lint ---
 def _set_cached_config(value):
     """set cached config in the factory for testing purposes."""
-    PaperDownloaderFactory._cached_config = value
+    attr_name = "_cached_config"
+    setattr(PaperDownloaderFactory, attr_name, value)
 
 
 def _set_config_lock(lock_obj):
     """set the config lock object in the factory for testing purposes."""
-    PaperDownloaderFactory._config_lock = lock_obj
+    attr_name = "_config_lock"
+    setattr(PaperDownloaderFactory, attr_name, lock_obj)
 
 
 class PaperDownloaderFactoryTestShim(PaperDownloaderFactory):

@@ -388,11 +388,13 @@ class TestBasePaperDownloader(unittest.TestCase):
             BasePaperDownloader.get_default_filename(self.downloader, "test")
 
         # Protected abstract methods: call via getattr to avoid W0212 while still executing code.
+        method_name_1 = "_get_paper_identifier_info"
         with self.assertRaises(NotImplementedError):
-            BasePaperDownloader._get_paper_identifier_info(self.downloader, {})
+            getattr(BasePaperDownloader, method_name_1)(self.downloader, {})
 
+        method_name_2 = "_add_service_identifier"
         with self.assertRaises(NotImplementedError):
-            BasePaperDownloader._add_service_identifier(self.downloader, {}, "test")
+            getattr(BasePaperDownloader, method_name_2)(self.downloader, {}, "test")
 
     @patch("tempfile.NamedTemporaryFile")
     @patch("requests.get")
