@@ -30,6 +30,7 @@ from langsmith import Client
 import glob
 import re
 
+
 def submit_feedback(user_response):
     """
     Function to submit feedback to the developers.
@@ -240,7 +241,7 @@ def sample_questions_t2kg():
     Function to get the sample questions for Talk2KnowledgeGraphs.
     """
     questions = [
-        'What genes are associated with Crohn\'s disease?',
+        "What genes are associated with Crohn's disease?",
         "List the drugs that target Interleukin-6 and show their molecular structures",
         "Extract a subgraph for JAK1 and JAK2 genes and visualize their interactions",
         "Find the pathway connections between TNF-alpha and inflammatory bowel disease",
@@ -771,15 +772,16 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
         key: The key for the graph
         save_graph: Whether to save the graph in the chat history
     """
+
     def extract_inner_html(html):
         match = re.search(r"<body[^>]*>(.*?)</body>", html, re.DOTALL)
         return match.group(1) if match else html
 
     figures_inner_html = ""
 
-    for name, subgraph_nodes, subgraph_edges in zip(graph_dict["name"],
-                                                    graph_dict["nodes"],
-                                                    graph_dict["edges"]):
+    for name, subgraph_nodes, subgraph_edges in zip(
+        graph_dict["name"], graph_dict["nodes"], graph_dict["edges"]
+    ):
         # Create a directed graph
         graph = nx.DiGraph()
 
@@ -809,18 +811,18 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
         )
         # components.html(fig.to_html(), height=475)
         inner_html = extract_inner_html(fig.to_html())
-        wrapped_html = f'''
+        wrapped_html = f"""
         <div class="graph-content">
             {inner_html}
         </div>
-        '''
+        """
 
-        figures_inner_html += f'''
+        figures_inner_html += f"""
         <div class="graph-box">
             <h3 class="graph-title">{name}</h3>
             {wrapped_html}
         </div>
-        '''
+        """
 
     if save_graph:
         # Add data to the chat history
@@ -895,6 +897,7 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
     """
     components.html(full_html, height=550, scrolling=False)
 
+
 # def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
 #     """
 #     Function to render the graph in the chat.
@@ -942,6 +945,7 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
 #                 "key": key,
 #             }
 #         )
+
 
 def get_text_embedding_model(model_name) -> Embeddings:
     """
@@ -1129,9 +1133,7 @@ def get_file_type_icon(file_type: str) -> str:
     Returns:
         str: The icon for the file type.
     """
-    return {"article": "📜",
-            "drug_data": "💊",
-            "multimodal": "📦"}.get(file_type)
+    return {"article": "📜", "drug_data": "💊", "multimodal": "📦"}.get(file_type)
 
 
 @st.fragment
@@ -1155,7 +1157,7 @@ def get_t2b_uploaded_files(app):
         type=["pdf"],
         key=f"article_{st.session_state.t2b_article_key}",
     )
-    
+
     # Update the agent state with the uploaded article
     if article:
         # print (article.name)
@@ -1202,25 +1204,25 @@ def get_t2b_uploaded_files(app):
     return uploaded_sbml_file
 
 
-@st.fragment
-def initialize_selections() -> None:
-    """
-    Initialize the selections.
-
-    Args:
-        cfg: The configuration object.
-    """
-    # with open(st.session_state.config["kg_pyg_path"], "rb") as f:
-        # pyg_graph = pickle.load(f)
-    # graph_nodes = pd.read_parquet(st.session_state.config["kg_nodes_path"])
-    node_types = st.session_state.config["kg_node_types"]
-
-    # Populate the selections based on the node type from the graph
-    selections = {}
-    for i in node_types:
-        selections[i] = []
-
-    return selections
+# @st.fragment
+# def initialize_selections() -> None:
+#     """
+#     Initialize the selections.
+#
+#     Args:
+#         cfg: The configuration object.
+#     """
+#     # with open(st.session_state.config["kg_pyg_path"], "rb") as f:
+#         # pyg_graph = pickle.load(f)
+#     # graph_nodes = pd.read_parquet(st.session_state.config["kg_nodes_path"])
+#     node_types = st.session_state.config["kg_node_types"]
+#
+#     # Populate the selections based on the node type from the graph
+#     selections = {}
+#     for i in node_types:
+#         selections[i] = []
+#
+#     return selections
 
 
 @st.fragment
@@ -1235,7 +1237,7 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
         "💊 Upload pre-clinical drug data",
         help="Free-form text. Must contain atleast drug targets and kinetic parameters",
         accept_multiple_files=True,
-        type=cfg.data_package_allowed_file_types,
+        type=cfg.app.frontend.data_package_allowed_file_types,
         key=f"uploader_{st.session_state.data_package_key}",
     )
 
@@ -1243,7 +1245,7 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
         "📦 Upload multimodal endotype/phenotype data package",
         help="A spread sheet containing multimodal endotype/phenotype data package (e.g., genes, drugs, etc.)",
         accept_multiple_files=True,
-        type=cfg.multimodal_allowed_file_types,
+        type=cfg.app.frontend.multimodal_allowed_file_types,
         key=f"uploader_multimodal_{st.session_state.multimodal_key}",
     )
 
@@ -1263,7 +1265,7 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
                 )
                 uploaded_file.file_name = uploaded_file.name
                 uploaded_file.file_path = (
-                    f"{cfg.upload_data_dir}/{uploaded_file.file_name}"
+                    f"{cfg.app.frontend.upload_data_dir}/{uploaded_file.file_name}"
                 )
                 uploaded_file.current_user = st.session_state.current_user
                 uploaded_file.timestamp = current_timestamp
@@ -1281,7 +1283,10 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
                     }
                 )
                 with open(
-                    os.path.join(cfg.upload_data_dir, uploaded_file.file_name), "wb"
+                    os.path.join(
+                        cfg.app.frontend.upload_data_dir, uploaded_file.file_name
+                    ),
+                    "wb",
                 ) as f:
                     f.write(uploaded_file.getbuffer())
                 uploaded_file = None
@@ -1298,12 +1303,13 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
             if st.button("🗑️", key=uploaded_file["file_name"]):
                 with st.spinner("Removing uploaded file ..."):
                     if os.path.isfile(
-                        f"{cfg.upload_data_dir}/{uploaded_file['file_name']}"
+                        f"{cfg.app.frontend.upload_data_dir}/{uploaded_file['file_name']}"
                     ):
-                        os.remove(f"{cfg.upload_data_dir}/{uploaded_file['file_name']}")
+                        os.remove(
+                            f"{cfg.app.frontend.upload_data_dir}/{uploaded_file['file_name']}"
+                        )
                     st.session_state.uploaded_files.remove(uploaded_file)
                     st.cache_data.clear()
                     st.session_state.data_package_key += 1
                     st.session_state.multimodal_key += 1
                     st.rerun(scope="fragment")
-

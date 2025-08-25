@@ -21,6 +21,7 @@ from utils import streamlit_utils
 
 sys.path.append("./")
 from aiagents4pharma.talk2knowledgegraphs.agents.t2kg_agent import get_app
+
 # from talk2knowledgegraphs.agents.t2kg_agent import get_app
 
 st.set_page_config(
@@ -38,8 +39,10 @@ if "config" not in st.session_state:
         version_base=None,
         config_path="../../aiagents4pharma/talk2knowledgegraphs/configs",
     ):
-        cfg = hydra.compose(config_name="config", overrides=["app/frontend=default"])
-        cfg = cfg.app.frontend
+        cfg = hydra.compose(
+            config_name="config",
+            overrides=["app/frontend=default", "utils/database/milvus=default"],
+        )
         st.session_state.config = cfg
 else:
     cfg = st.session_state.config
@@ -47,9 +50,9 @@ else:
 
 # Set the logo, detect if we're in container or local development
 def get_logo_path():
-    container_path = '/app/docs/assets/VPE.png'
-    local_path = 'docs/assets/VPE.png'
-    
+    container_path = "/app/docs/assets/VPE.png"
+    local_path = "docs/assets/VPE.png"
+
     if os.path.exists(container_path):
         return container_path
     elif os.path.exists(local_path):
@@ -57,18 +60,17 @@ def get_logo_path():
     else:
         # Fallback: try to find it relative to script location
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        relative_path = os.path.join(script_dir, '../../docs/assets/VPE.png')
+        relative_path = os.path.join(script_dir, "../../docs/assets/VPE.png")
         if os.path.exists(relative_path):
             return relative_path
-    
+
     return None  # File not found
+
 
 logo_path = get_logo_path()
 if logo_path:
     st.logo(
-        image=logo_path,
-        size='large',
-        link='https://github.com/VirtualPatientEngine'
+        image=logo_path, size="large", link="https://github.com/VirtualPatientEngine"
     )
 
 # Check if env variable OPENAI_API_KEY exists
@@ -81,7 +83,7 @@ if "OPENAI_API_KEY" not in os.environ:
 
 # Initialize current user
 if "current_user" not in st.session_state:
-    st.session_state.current_user = cfg.default_user
+    st.session_state.current_user = cfg.app.frontend.default_user
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -91,9 +93,9 @@ if "messages" not in st.session_state:
 # if "sbml_key" not in st.session_state:
 #     st.session_state.sbml_key = 0
 
-# Initialize session state for selections
-if "selections" not in st.session_state:
-    st.session_state.selections = streamlit_utils.initialize_selections()
+# # Initialize session state for selections
+# if "selections" not in st.session_state:
+#     st.session_state.selections = streamlit_utils.initialize_selections()
 
 # Initialize session state for pre-clinical data package uploader
 if "data_package_key" not in st.session_state:
@@ -108,7 +110,7 @@ if "uploaded_files" not in st.session_state:
     st.session_state.uploaded_files = []
 
     # Make directories if not exists
-    os.makedirs(cfg.upload_data_dir, exist_ok=True)
+    os.makedirs(cfg.app.frontend.upload_data_dir, exist_ok=True)
 
 # Initialize project_name for Langsmith
 if "project_name" not in st.session_state:
@@ -125,17 +127,20 @@ if "unique_id" not in st.session_state:
 
 # Initialize the LLM model
 if "llm_model" not in st.session_state:
-    st.session_state.llm_model = tuple(cfg.openai_llms + cfg.ollama_llms)[0]
+    st.session_state.llm_model = tuple(
+        cfg.app.frontend.openai_llms + cfg.app.frontend.ollama_llms
+    )[0]
 
 # Initialize the app with default LLM model for the first time
 if "app" not in st.session_state:
     # Initialize the app
-    if st.session_state.llm_model in cfg.openai_llms:
+    if st.session_state.llm_model in cfg.app.frontend.openai_llms:
         print("Using OpenAI LLM model")
         st.session_state.app = get_app(
             st.session_state.unique_id,
             llm_model=ChatOpenAI(
-                model=st.session_state.llm_model, temperature=cfg.temperature
+                model=st.session_state.llm_model,
+                temperature=cfg.app.frontend.temperature,
             ),
         )
     else:
@@ -143,14 +148,15 @@ if "app" not in st.session_state:
         st.session_state.app = get_app(
             st.session_state.unique_id,
             llm_model=ChatOllama(
-                model=st.session_state.llm_model, temperature=cfg.temperature
+                model=st.session_state.llm_model,
+                temperature=cfg.app.frontend.temperature,
             ),
         )
 
 if "topk_nodes" not in st.session_state:
     # Subgraph extraction settings
-    st.session_state.topk_nodes = cfg.reasoning_subgraph_topk_nodes
-    st.session_state.topk_edges = cfg.reasoning_subgraph_topk_edges
+    st.session_state.topk_nodes = cfg.app.frontend.reasoning_subgraph_topk_nodes
+    st.session_state.topk_edges = cfg.app.frontend.reasoning_subgraph_topk_edges
 
 # Milvus connection is now handled by backend tools automatically
 # No frontend connection management needed
@@ -168,16 +174,16 @@ with st.sidebar:
     # Top-K nodes and edges sliders
     topk_nodes = st.slider(
         "Top-K (Nodes)",
-        cfg.reasoning_subgraph_topk_nodes_min,
-        cfg.reasoning_subgraph_topk_nodes_max,
+        cfg.app.frontend.reasoning_subgraph_topk_nodes_min,
+        cfg.app.frontend.reasoning_subgraph_topk_nodes_max,
         st.session_state.topk_nodes,
         key="st_slider_topk_nodes",
     )
     st.session_state.topk_nodes = topk_nodes
     topk_edges = st.slider(
         "Top-K (Edges)",
-        cfg.reasoning_subgraph_topk_nodes_min,
-        cfg.reasoning_subgraph_topk_nodes_max,
+        cfg.app.frontend.reasoning_subgraph_topk_nodes_min,
+        cfg.app.frontend.reasoning_subgraph_topk_nodes_max,
         st.session_state.topk_edges,
         key="st_slider_topk_edges",
     )
@@ -200,7 +206,7 @@ with main_col1:
 
         # LLM panel (Only at the front-end for now)
         # llms = ["gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"]
-        llms = tuple(cfg.openai_llms + cfg.ollama_llms)
+        llms = tuple(cfg.app.frontend.openai_llms + cfg.app.frontend.ollama_llms)
         st.selectbox(
             "Pick an LLM to power the agent",
             llms,
@@ -237,8 +243,7 @@ with main_col2:
                     st.markdown(message["content"].content)
                     st.empty()
             elif message["type"] == "button":
-                if st.button(message["content"],
-                             key=message["key"]):
+                if st.button(message["content"], key=message["key"]):
                     # Trigger the question
                     prompt = message["question"]
                     st.empty()
@@ -279,23 +284,27 @@ with main_col2:
             with st.chat_message("assistant", avatar="🤖"):
                 with st.spinner("Initializing the agent ..."):
                     config = {"configurable": {"thread_id": st.session_state.unique_id}}
-                    
+
                     # Prepare LLM and embedding model for updating the agent
-                    if st.session_state.llm_model in cfg.openai_llms:
+                    if st.session_state.llm_model in cfg.app.frontend.openai_llms:
                         llm_model = ChatOpenAI(
                             model=st.session_state.llm_model,
-                            temperature=cfg.temperature,
+                            temperature=cfg.app.frontend.temperature,
                         )
                     else:
                         llm_model = ChatOllama(
                             model=st.session_state.llm_model,
-                            temperature=cfg.temperature,
+                            temperature=cfg.app.frontend.temperature,
                         )
 
-                    if cfg.default_embedding_model == "ollama":
-                        emb_model = OllamaEmbeddings(model=cfg.ollama_embeddings[0])
+                    if cfg.app.frontend.default_embedding_model == "ollama":
+                        emb_model = OllamaEmbeddings(
+                            model=cfg.app.frontend.ollama_embeddings[0]
+                        )
                     else:
-                        emb_model = OpenAIEmbeddings(model=cfg.openai_embeddings[0])
+                        emb_model = OpenAIEmbeddings(
+                            model=cfg.app.frontend.openai_embeddings[0]
+                        )
 
                     # Update the agent state with initial configuration
                     app.update_state(
@@ -303,56 +312,57 @@ with main_col2:
                         {
                             "llm_model": llm_model,
                             "embedding_model": emb_model,
-                            "selections": st.session_state.selections,
+                            # "selections": st.session_state.selections,
                             "uploaded_files": st.session_state.uploaded_files,
                             "topk_nodes": st.session_state.topk_nodes,
                             "topk_edges": st.session_state.topk_edges,
                             "dic_source_graph": [
                                 {
-                                    "name": cfg.milvus_db.database_name,
+                                    "name": cfg.utils.database.milvus.milvus_db.database_name,
                                 }
                             ],
                         },
                     )
-                    
+
                     intro_prompt = "Tell your name and about yourself. Always start with a greeting."
                     intro_prompt += " and tell about the tools you can run to perform analysis with short description."
                     intro_prompt += " We have provided starter questions (separately) outside your response."
                     intro_prompt += " Do not provide any questions by yourself. Let the users know that they can"
                     intro_prompt += " simply click on the questions to execute them."
-                    
+
                     response = app.stream(
                         {"messages": [HumanMessage(content=intro_prompt)]},
                         config=config,
-                        stream_mode="messages"
+                        stream_mode="messages",
                     )
                     st.write_stream(streamlit_utils.stream_response(response))
                     current_state = app.get_state(config)
                     # Add response to chat history
                     assistant_msg = ChatMessage(
-                        current_state.values["messages"][-1].content,
-                        role="assistant"
+                        current_state.values["messages"][-1].content, role="assistant"
                     )
-                    st.session_state.messages.append({
-                        "type": "message",
-                        "content": assistant_msg
-                    })
+                    st.session_state.messages.append(
+                        {"type": "message", "content": assistant_msg}
+                    )
                     st.empty()
 
         # Display sample questions when there are few messages
         if len(st.session_state.messages) <= 1:
             for count, question in enumerate(streamlit_utils.sample_questions_t2kg()):
-                if st.button(f'Q{count+1}. {question}',
-                             key=f'sample_question_{count+1}'):
+                if st.button(
+                    f"Q{count+1}. {question}", key=f"sample_question_{count+1}"
+                ):
                     # Trigger the question
                     prompt = question
                 # Add button click to chat history
-                st.session_state.messages.append({
-                    "type": "button",
-                    "question": question,
-                    "content": f'Q{count+1}. {question}',
-                    "key": f'sample_question_{count+1}'
-                })
+                st.session_state.messages.append(
+                    {
+                        "type": "button",
+                        "question": question,
+                        "content": f"Q{count+1}. {question}",
+                        "key": f"sample_question_{count+1}",
+                    }
+                )
 
         # When the user asks a question
         if prompt:
@@ -376,31 +386,39 @@ with main_col2:
                     ]
                     # Convert chat history to ChatMessage objects
                     chat_history = [
-                        SystemMessage(content=m[1])
-                        if m[0] == "system"
-                        else HumanMessage(content=m[1])
-                        if m[0] == "human"
-                        else AIMessage(content=m[1])
+                        (
+                            SystemMessage(content=m[1])
+                            if m[0] == "system"
+                            else (
+                                HumanMessage(content=m[1])
+                                if m[0] == "human"
+                                else AIMessage(content=m[1])
+                            )
+                        )
                         for m in history
                     ]
 
                     # Prepare LLM and embedding model for updating the agent
-                    if st.session_state.llm_model in cfg.openai_llms:
+                    if st.session_state.llm_model in cfg.app.frontend.openai_llms:
                         llm_model = ChatOpenAI(
                             model=st.session_state.llm_model,
-                            temperature=cfg.temperature,
+                            temperature=cfg.app.frontend.temperature,
                         )
                     else:
                         llm_model = ChatOllama(
                             model=st.session_state.llm_model,
-                            temperature=cfg.temperature,
+                            temperature=cfg.app.frontend.temperature,
                         )
 
-                    if cfg.default_embedding_model == "ollama":
+                    if cfg.app.frontend.default_embedding_model == "ollama":
                         # For IBD BioBridge data, we still use Ollama embeddings
-                        emb_model = OllamaEmbeddings(model=cfg.ollama_embeddings[0])
+                        emb_model = OllamaEmbeddings(
+                            model=cfg.app.frontend.ollama_embeddings[0]
+                        )
                     else:
-                        emb_model = OpenAIEmbeddings(model=cfg.openai_embeddings[0])
+                        emb_model = OpenAIEmbeddings(
+                            model=cfg.app.frontend.openai_embeddings[0]
+                        )
 
                     # Create config for the agent
                     config = {"configurable": {"thread_id": st.session_state.unique_id}}
@@ -409,13 +427,13 @@ with main_col2:
                         {
                             "llm_model": llm_model,
                             "embedding_model": emb_model,
-                            "selections": st.session_state.selections,
+                            # "selections": st.session_state.selections,
                             "uploaded_files": st.session_state.uploaded_files,
                             "topk_nodes": st.session_state.topk_nodes,
                             "topk_edges": st.session_state.topk_edges,
                             "dic_source_graph": [
                                 {
-                                    "name": cfg.milvus_db.database_name,
+                                    "name": cfg.utils.database.milvus.milvus_db.database_name,
                                     # "edge_index": st.session_state.edge_index,
                                     # "kg_pyg_path": st.session_state.config["kg_pyg_path"],
                                     # "kg_text_path": st.session_state.config["kg_text_path"],
@@ -434,11 +452,11 @@ with main_col2:
                         response = app.stream(
                             {"messages": [HumanMessage(content=prompt)]},
                             config=config | {"callbacks": [tracer]},
-                            stream_mode="messages"
+                            stream_mode="messages",
                         )
                         st.write_stream(streamlit_utils.stream_response(response))
                         st.session_state.run_id = cb.traced_runs[-1].id
-                    
+
                     # Get final state and add response to chat history
                     current_state = app.get_state(config)
                     assistant_msg = ChatMessage(
@@ -496,19 +514,21 @@ with main_col2:
                                 "subgraph_extraction",
                             )
                             # Add the graph to be rendered
-                            latest_graph = current_state.values["dic_extracted_graph"][-1]
-                            graphs_visuals.append({
-                                "content": latest_graph["graph_dict"],
-                                "key": "subgraph_" + uniq_msg_id,
-                            })
+                            latest_graph = current_state.values["dic_extracted_graph"][
+                                -1
+                            ]
+                            graphs_visuals.append(
+                                {
+                                    "content": latest_graph["graph_dict"],
+                                    "key": "subgraph_" + uniq_msg_id,
+                                }
+                            )
 
             # Visualize the graphs
             if len(graphs_visuals) > 0:
                 for count, graph in enumerate(graphs_visuals):
                     streamlit_utils.render_graph(
-                        graph_dict=graph["content"], 
-                        key=graph["key"], 
-                        save_graph=True
+                        graph_dict=graph["content"], key=graph["key"], save_graph=True
                     )
                     st.empty()
 
