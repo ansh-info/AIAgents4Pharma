@@ -6,7 +6,6 @@ Utils for Streamlit.
 
 import datetime
 import os
-import pickle
 import tempfile
 
 import gravis
@@ -30,7 +29,6 @@ from langsmith import Client
 
 import glob
 import re
-from pymilvus import db, connections, Collection
 
 def submit_feedback(user_response):
     """
@@ -1309,63 +1307,3 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
                     st.session_state.multimodal_key += 1
                     st.rerun(scope="fragment")
 
-def setup_milvus(cfg: dict):
-    """
-    Function to connect to the Milvus database.
-
-    Args:
-        cfg: The configuration dictionary containing Milvus connection details.
-    """
-    # Check if the connection already exists
-    if not connections.has_connection(cfg.milvus_db.alias):
-        # Create a new connection to Milvus
-        # Connect to Milvus
-        connections.connect(
-            alias=cfg.milvus_db.alias,
-            host=cfg.milvus_db.host,
-            port=cfg.milvus_db.port,
-            user=cfg.milvus_db.user,
-            password=cfg.milvus_db.password
-        )
-        print("Connected to Milvus database.")
-    else:
-        print("Already connected to Milvus database.")
-
-    # Use a predefined Milvus database
-    db.using_database(cfg.milvus_db.database_name)
-
-    return connections.get_connection_addr(cfg.milvus_db.alias)
-
-def get_cache_edge_index(cfg: dict):
-    """
-    Function to get the edge index of the knowledge graph in the Milvus collection.
-    Due to massive records that we should query to get edge index from the Milvus database,
-    we pre-loaded this information when the app is started and stored it in a state.
-
-    Args:
-        cfg: The configuration dictionary containing the path to the edge index file.
-
-    Returns:
-        The edge index.
-    """
-    # Load collection
-    coll = Collection(f"{cfg.milvus_db.database_name}_edges")
-    coll.load()
-
-    batch_size = cfg.milvus_db.query_batch_size
-    head_list = []
-    tail_list = []
-    for start in range(0, coll.num_entities, batch_size):
-        end = min(start + batch_size, coll.num_entities)
-        print(f"Processing triplet_index range: {start} to {end}")
-        batch = coll.query(
-            expr=f"triplet_index >= {start} and triplet_index < {end}",
-            output_fields=["head_index", "tail_index"],
-        )
-        head_list.extend([r["head_index"] for r in batch])
-        tail_list.extend([r["tail_index"] for r in batch])
-    edge_index = [head_list, tail_list]
-
-    # Save the edge index to a file
-    with open(cfg.milvus_db.cache_edge_index_path, "wb") as f:
-        pickle.dump(edge_index, f)

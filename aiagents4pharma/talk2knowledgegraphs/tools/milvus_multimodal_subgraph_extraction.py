@@ -20,6 +20,7 @@ from ..utils.extractions.milvus_multimodal_pcst import (
     MultimodalPCSTPruning,
     SystemDetector,
 )
+from ..utils.database import MilvusConnectionManager
 from .load_arguments import ArgumentData
 
 # Initialize logger
@@ -298,7 +299,6 @@ class MultimodalSubgraphExtractionTool(BaseTool):
     def _prepare_final_subgraph(self,
                                 state:Annotated[dict, InjectedState],
                                 subgraph: dict,
-                                cfg: dict,
                                 cfg_db) -> dict:
         """
         Prepare the subgraph based on the extracted subgraph.
@@ -306,15 +306,13 @@ class MultimodalSubgraphExtractionTool(BaseTool):
         Args:
             state: The injected state for the tool.
             subgraph: The extracted subgraph.
-            graph: The graph dictionary.
-            cfg: The configuration dictionary for the tool.
             cfg_db: The configuration dictionary for Milvus database.
 
         Returns:
             A dictionary containing the PyG graph, NetworkX graph, and textualized graph.
         """
         # Convert the dict to a DataFrame
-        node_colors = {n: cfg.node_colors_dict[k]
+        node_colors = {n: cfg_db.node_colors_dict[k]
                         for k, v in state["selections"].items() for n in v}
         color_df = self.loader.df.DataFrame(list(node_colors.items()), columns=["node_id", "color"])
         # print(color_df)
@@ -450,19 +448,27 @@ class MultimodalSubgraphExtractionTool(BaseTool):
             cfg = hydra.compose(
                 config_name="config", overrides=["tools/multimodal_subgraph_extraction=default"]
             )
-            cfg_db = cfg.app.frontend
             cfg = cfg.tools.multimodal_subgraph_extraction
 
-        # Check if the Milvus connection exists
-        # logger.log(logging.INFO, "Checking Milvus connection")
-        # logger.log(logging.INFO, "Milvus connection name: %s", cfg_db.milvus_db.alias)
-        # logger.log(logging.INFO, "Milvus connection DB: %s", cfg_db.milvus_db.database_name)
-        # logger.log(logging.INFO, "Is connection established? %s",
-        #            connections.has_connection(cfg_db.milvus_db.alias))
-        # if connections.has_connection(cfg_db.milvus_db.alias):
-        #     logger.log(logging.INFO, "Milvus connection is established.")
-        #     for collection_name in utility.list_collections():
-        #         logger.log(logging.INFO, "Collection: %s", collection_name)
+        # Load database configuration separately  
+        with hydra.initialize(version_base=None, config_path="../configs"):
+            cfg_all = hydra.compose(config_name="config")
+            cfg_db = cfg_all.database.milvus
+
+        # Establish Milvus connection using connection manager with dedicated database config
+        logger.log(logging.INFO, "Establishing Milvus connection")
+        connection_manager = MilvusConnectionManager(cfg_db)
+        try:
+            connection_manager.ensure_connection()
+            logger.log(logging.INFO, "Milvus connection established successfully")
+            
+            # Log connection info
+            conn_info = connection_manager.get_connection_info()
+            logger.log(logging.INFO, "Connected to database: %s", conn_info.get('database'))
+            logger.log(logging.INFO, "Connection healthy: %s", connection_manager.test_connection())
+        except Exception as e:
+            logger.error("Failed to establish Milvus connection: %s", str(e))
+            raise RuntimeError(f"Cannot connect to Milvus database: {str(e)}")
 
         # Prepare the query embeddings and modalities
         logger.log(logging.INFO, "_prepare_query_modalities")
@@ -497,7 +503,6 @@ class MultimodalSubgraphExtractionTool(BaseTool):
         # start = datetime.datetime.now()
         final_subgraph = self._prepare_final_subgraph(state,
                                                       subgraphs,
-                                                      cfg,
                                                       cfg_db)
         # end = datetime.datetime.now()
         # logger.log(logging.INFO, "_prepare_final_subgraph time: %s seconds",

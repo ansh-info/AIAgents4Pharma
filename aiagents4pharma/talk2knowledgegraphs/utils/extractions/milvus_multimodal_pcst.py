@@ -3,7 +3,6 @@ Exctraction of multimodal subgraph using Prize-Collecting Steiner Tree (PCST) al
 """
 
 import logging
-import pickle
 import platform
 import subprocess
 from typing import NamedTuple
@@ -217,6 +216,51 @@ class MultimodalPCSTPruning(NamedTuple):
             coll.load()
 
         return colls
+
+    def _load_edge_index_from_milvus(self, cfg: dict) -> np.ndarray:
+        """
+        Load edge index directly from Milvus collection (replaces pickle cache).
+        
+        This method queries the edges collection to get head_index and tail_index,
+        eliminating the need for pickle caching and reducing memory usage.
+        
+        Args:
+            cfg: The configuration dictionary containing the Milvus setup.
+            
+        Returns:
+            numpy.ndarray: Edge index array with shape [2, num_edges]
+        """
+        logger.log(logging.INFO, "Loading edge index from Milvus collection")
+        
+        # Load the edges collection
+        edges_collection = Collection(name=f"{cfg.milvus_db.database_name}_edges")
+        edges_collection.load()
+        
+        # Query all edges in batches to get head_index and tail_index
+        batch_size = getattr(cfg.milvus_db, 'query_batch_size', 10000)
+        head_list = []
+        tail_list = []
+        
+        total_entities = edges_collection.num_entities
+        logger.log(logging.INFO, "Total edges to process: %d", total_entities)
+        
+        for start in range(0, total_entities, batch_size):
+            end = min(start + batch_size, total_entities)
+            logger.debug("Processing edge batch: %d to %d", start, end)
+            
+            batch = edges_collection.query(
+                expr=f"triplet_index >= {start} and triplet_index < {end}",
+                output_fields=["head_index", "tail_index"],
+            )
+            
+            head_list.extend([r["head_index"] for r in batch])
+            tail_list.extend([r["tail_index"] for r in batch])
+        
+        # Convert to numpy array format expected by PCST
+        edge_index = self.loader.py.array([head_list, tail_list])
+        logger.log(logging.INFO, "Edge index loaded: shape %s", str(edge_index.shape))
+        
+        return edge_index
 
     def _compute_node_prizes(self, query_emb: list, colls: dict) -> dict:
         """
@@ -501,11 +545,9 @@ class MultimodalPCSTPruning(NamedTuple):
         logger.log(logging.INFO, "Preparing collections")
         colls = self.prepare_collections(cfg, modality)
 
-        # Load cache edge index
-        logger.log(logging.INFO, "Loading cache edge index")
-        with open(cfg.milvus_db.cache_edge_index_path, "rb") as f:
-            edge_index = pickle.load(f)
-            edge_index = self.loader.py.array(edge_index)
+        # Load edge index directly from Milvus (replaces pickle cache)
+        logger.log(logging.INFO, "Loading edge index from Milvus")
+        edge_index = self._load_edge_index_from_milvus(cfg)
 
         # Assert the topk and topk_e values for subgraph retrieval
         assert self.topk > 0, "topk must be greater than or equal to 0"

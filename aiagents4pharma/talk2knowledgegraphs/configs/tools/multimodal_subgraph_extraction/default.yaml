@@ -19,34 +19,5 @@ vector_processing:
   # Enable dynamic metric type selection based on hardware
   dynamic_metrics: true
 
-# Milvus Database Configuration
-milvus_db:
-  # Database and collection names
-  database_name: "t2kg_primekg"
-
-  # Cache settings for edge index
-  cache_edge_index_path: "${oc.env:CACHE_EDGE_INDEX_PATH,aiagents4pharma/talk2knowledgegraphs/tests/files/t2kg_primekg_edge_index.pkl}"
-
-node_id_column: "node_id"
-node_attr_column: "node_attr"
-edge_src_column: "edge_src"
-edge_attr_column: "edge_attr"
-edge_dst_column: "edge_dst"
-node_colors_dict:
-  "gene/protein": "#6a79f7"
-  "molecular_function": "#82cafc"
-  "cellular_component": "#3f9b0b"
-  "biological_process": "#c5c9c7"
-  "drug": "#c4a661"
-  "disease": "#80013f"
-
-biobridge:
-  # source: "aiagents4pharma/talk2knowledgegraphs/tests/files/ibd_biobridge_multimodal/"
-  source: "/mnt/blockstorage/biobridge_multimodal/"
-  node_type:
-    - "gene/protein"
-    - "molecular_function"
-    - "cellular_component"
-    - "biological_process"
-    - "drug"
-    - "disease"
+# Tool-specific configuration only
+# Database configuration moved to configs/database/milvus/default.yaml

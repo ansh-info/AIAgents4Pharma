@@ -152,14 +152,8 @@ if "topk_nodes" not in st.session_state:
     st.session_state.topk_nodes = cfg.reasoning_subgraph_topk_nodes
     st.session_state.topk_edges = cfg.reasoning_subgraph_topk_edges
 
-if "milvus_connection" not in st.session_state:
-    st.session_state.milvus_connection = streamlit_utils.setup_milvus(cfg)
-    print("Milvus connection established:", st.session_state.milvus_connection)
-    # Cache edge index if it does not exist
-    if not os.path.exists(cfg.milvus_db.cache_edge_index_path):
-        print("Cache edge index does not exist. Creating it now...")
-        # Create the cache edge index
-        streamlit_utils.get_cache_edge_index(cfg)
+# Milvus connection is now handled by backend tools automatically
+# No frontend connection management needed
 
 # Get the app
 app = st.session_state.app
