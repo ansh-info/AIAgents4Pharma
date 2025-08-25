@@ -41,5 +41,5 @@ reasoning_subgraph_topk_nodes_max: 50
 reasoning_subgraph_topk_edges: 15
 reasoning_subgraph_topk_edges_min: 1
 reasoning_subgraph_topk_edges_max: 50
-# Database configuration moved to configs/database/milvus/default.yaml
+# Database configuration moved to configs/utils/database/milvus/default.yaml
 # This frontend config now only contains frontend-specific settings

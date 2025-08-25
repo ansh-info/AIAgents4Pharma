@@ -453,7 +453,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
         # Load database configuration separately  
         with hydra.initialize(version_base=None, config_path="../configs"):
             cfg_all = hydra.compose(config_name="config")
-            cfg_db = cfg_all.database.milvus
+            cfg_db = cfg_all.utils.database.milvus
 
         # Establish Milvus connection using connection manager with dedicated database config
         logger.log(logging.INFO, "Establishing Milvus connection")

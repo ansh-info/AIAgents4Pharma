@@ -227,16 +227,16 @@ class MilvusConnectionManager:
             
             # Load with specific overrides
             conn_manager = MilvusConnectionManager.from_hydra_config(
-                overrides=["database/milvus=default"]
+                overrides=["utils/database/milvus=default"]
             )
         """
         if overrides is None:
-            overrides = ["database/milvus=default"]
+            overrides = ["utils/database/milvus=default"]
             
         try:
             with hydra.initialize(version_base=None, config_path=config_path):
                 cfg_all = hydra.compose(config_name=config_name, overrides=overrides)
-                cfg = cfg_all.database.milvus  # Extract database.milvus section
+                cfg = cfg_all.utils.database.milvus  # Extract utils.database.milvus section
                 logger.info("Loaded Milvus config from Hydra with overrides: %s", overrides)
                 return cls(cfg)
         except Exception as e:

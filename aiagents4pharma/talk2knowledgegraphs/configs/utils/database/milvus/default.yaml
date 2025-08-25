@@ -7,7 +7,7 @@
 #   MILVUS_PORT - Milvus server port (default: 19530)
 #   MILVUS_USER - Milvus username (default: root)
 #   MILVUS_PASSWORD - Milvus password (default: Milvus)
-#   MILVUS_DATABASE_NAME - Database name (default: t2kg_primekg)
+#   MILVUS_DATABASE - Database name (default: t2kg_primekg)
 
 milvus_db:
   # Connection settings
@@ -20,15 +20,15 @@ milvus_db:
   password: ${oc.env:MILVUS_PASSWORD,Milvus}
   
   # Database and collection names  
-  database_name: ${oc.env:MILVUS_DATABASE_NAME,t2kg_primekg}
-  collection_edges: "${oc.env:MILVUS_DATABASE_NAME,t2kg_primekg}_edges"
-  collection_nodes: "${oc.env:MILVUS_DATABASE_NAME,t2kg_primekg}_nodes"
-  collection_nodes_gene_protein: "${oc.env:MILVUS_DATABASE_NAME,t2kg_primekg}_nodes_gene_protein"
-  collection_nodes_molecular_function: "${oc.env:MILVUS_DATABASE_NAME,t2kg_primekg}_nodes_molecular_function"
-  collection_nodes_cellular_component: "${oc.env:MILVUS_DATABASE_NAME,t2kg_primekg}_nodes_cellular_component"
-  collection_nodes_biological_process: "${oc.env:MILVUS_DATABASE_NAME,t2kg_primekg}_nodes_biological_process"
-  collection_nodes_drug: "${oc.env:MILVUS_DATABASE_NAME,t2kg_primekg}_nodes_drug"
-  collection_nodes_disease: "${oc.env:MILVUS_DATABASE_NAME,t2kg_primekg}_nodes_disease"
+  database_name: ${oc.env:MILVUS_DATABASE,t2kg_primekg}
+  collection_edges: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_edges"
+  collection_nodes: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_nodes"
+  collection_nodes_gene_protein: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_nodes_gene_protein"
+  collection_nodes_molecular_function: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_nodes_molecular_function"
+  collection_nodes_cellular_component: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_nodes_cellular_component"
+  collection_nodes_biological_process: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_nodes_biological_process"
+  collection_nodes_drug: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_nodes_drug"
+  collection_nodes_disease: "${oc.env:MILVUS_DATABASE,t2kg_primekg}_nodes_disease"
   
   # Query performance settings
   query_batch_size: 10000
