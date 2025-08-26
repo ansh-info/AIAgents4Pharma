@@ -52,19 +52,49 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get release version from latest tag
+      - name: Get release version and checkout tag
         run: |
           RELEASE_VERSION=$(git describe --tags --abbrev=0)
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
           echo "Release version: $RELEASE_VERSION"
 
-      - name: Checkout exact tag for clean build
-        run: |
+          # Fetch the tag and checkout exactly on it
+          git fetch origin tag $RELEASE_VERSION --no-tags
           git checkout $RELEASE_VERSION
+
+          # Verify we're on the exact tag
+          echo "Current commit: $(git rev-parse HEAD)"
+          echo "Tag commit: $(git rev-list -n 1 $RELEASE_VERSION)"
+          git describe --exact-match --tags HEAD || echo "Warning: Not on exact tag"
 
       - name: Build package with uv
         run: |
+          # Clean any previous builds
+          rm -rf dist/ build/ *.egg-info/
+
+          # Show git status for debugging
+          echo "=== Git Status ==="
+          git status
+          echo "=== Current Tag ==="
+          git describe --exact-match --tags HEAD 2>/dev/null || echo "Not on exact tag"
+          echo "=== Building ==="
+
+          # Try building - if version is still wrong, we'll override it
           uv build
+
+          # Check if we got a clean version
+          BUILT_VERSION=$(find dist -name "*.whl" | head -1 | sed -n 's/.*-\([0-9][^-]*\)-.*/\1/p')
+          echo "Built version: $BUILT_VERSION"
+
+          if [[ "$BUILT_VERSION" == *"dev"* ]] || [[ "$BUILT_VERSION" == *"+"* ]]; then
+            echo "WARNING: Built version contains dev/local identifiers. Rebuilding with explicit version."
+            rm -rf dist/ build/ *.egg-info/
+
+            # Set explicit version and rebuild
+            CLEAN_VERSION=${RELEASE_VERSION#v}  # Remove 'v' prefix
+            echo "Building with explicit version: $CLEAN_VERSION"
+            HATCH_VERSION=$CLEAN_VERSION uv build
+          fi
 
       - name: Verify package integrity
         run: |
