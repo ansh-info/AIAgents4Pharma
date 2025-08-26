@@ -2,34 +2,6 @@
 	"name": "aiagents4pharma",
 	"private": true,
 	"devDependencies": {
-		"@semantic-release/github": "^11.0.1",
-		"@semantic-release/exec": "^6.0.3"
-	},
-	"release": {
-		"plugins": [
-			"@semantic-release/commit-analyzer",
-			[
-				"@semantic-release/release-notes-generator",
-				{
-					"linkReferences": true,
-					"linkCompare": false
-				}
-			],
-			"@semantic-release/npm",
-			[
-				"@semantic-release/exec",
-				{
-					"prepareCmd": "sed -i 's/version = \".*\"/version = \"${nextRelease.version}\"/' pyproject.toml"
-				}
-			],
-			[
-				"@semantic-release/github",
-				{
-					"successComment": "🎉 This PR is included in version ${nextRelease.version} 🎉\n\nThe release is available on [GitHub release](${nextRelease.githubUrl})\n\nYour semantic-release bot 📦🚀",
-					"failComment": false,
-					"releasedLabels": ["released"]
-				}
-			]
-		]
+		"@semantic-release/github": "^11.0.1"
 	}
 }
