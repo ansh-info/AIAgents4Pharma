@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -85,7 +85,13 @@ dependencies = [
   "beautifulsoup4==4.13.4",
   "cloudscraper==1.2.71",
 ]
-version = "0.0.0" # This will be updated by semantic-release
+dynamic = ["version"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "_version.py"
 
 [project.optional-dependencies]
 dev = [
