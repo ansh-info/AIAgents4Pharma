@@ -3,7 +3,7 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "aiagents4pharma-anshh"
+name = "aiagents4pharma-anshhh"
 description = "AI Agents for drug discovery, drug development, and other pharmaceutical R&D.."
 readme = "README.md"
 requires-python = ">=3.12"
