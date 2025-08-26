@@ -58,6 +58,10 @@ jobs:
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
           echo "Release version: $RELEASE_VERSION"
 
+      - name: Checkout exact tag for clean build
+        run: |
+          git checkout $RELEASE_VERSION
+
       - name: Build package with uv
         run: |
           uv build
