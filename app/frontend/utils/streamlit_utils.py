@@ -6,7 +6,6 @@ Utils for Streamlit.
 
 import datetime
 import os
-import pickle
 import tempfile
 
 import gravis
@@ -30,7 +29,7 @@ from langsmith import Client
 
 import glob
 import re
-from pymilvus import db, connections, Collection
+
 
 def submit_feedback(user_response):
     """
@@ -242,7 +241,7 @@ def sample_questions_t2kg():
     Function to get the sample questions for Talk2KnowledgeGraphs.
     """
     questions = [
-        'What genes are associated with Crohn\'s disease?',
+        "What genes are associated with Crohn's disease?",
         "List the drugs that target Interleukin-6 and show their molecular structures",
         "Extract a subgraph for JAK1 and JAK2 genes and visualize their interactions",
         "Find the pathway connections between TNF-alpha and inflammatory bowel disease",
@@ -773,15 +772,16 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
         key: The key for the graph
         save_graph: Whether to save the graph in the chat history
     """
+
     def extract_inner_html(html):
         match = re.search(r"<body[^>]*>(.*?)</body>", html, re.DOTALL)
         return match.group(1) if match else html
 
     figures_inner_html = ""
 
-    for name, subgraph_nodes, subgraph_edges in zip(graph_dict["name"],
-                                                    graph_dict["nodes"],
-                                                    graph_dict["edges"]):
+    for name, subgraph_nodes, subgraph_edges in zip(
+        graph_dict["name"], graph_dict["nodes"], graph_dict["edges"]
+    ):
         # Create a directed graph
         graph = nx.DiGraph()
 
@@ -811,18 +811,18 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
         )
         # components.html(fig.to_html(), height=475)
         inner_html = extract_inner_html(fig.to_html())
-        wrapped_html = f'''
+        wrapped_html = f"""
         <div class="graph-content">
             {inner_html}
         </div>
-        '''
+        """
 
-        figures_inner_html += f'''
+        figures_inner_html += f"""
         <div class="graph-box">
             <h3 class="graph-title">{name}</h3>
             {wrapped_html}
         </div>
-        '''
+        """
 
     if save_graph:
         # Add data to the chat history
@@ -897,6 +897,7 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
     """
     components.html(full_html, height=550, scrolling=False)
 
+
 # def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
 #     """
 #     Function to render the graph in the chat.
@@ -944,6 +945,7 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
 #                 "key": key,
 #             }
 #         )
+
 
 def get_text_embedding_model(model_name) -> Embeddings:
     """
@@ -1131,9 +1133,7 @@ def get_file_type_icon(file_type: str) -> str:
     Returns:
         str: The icon for the file type.
     """
-    return {"article": "📜",
-            "drug_data": "💊",
-            "multimodal": "📦"}.get(file_type)
+    return {"article": "📜", "drug_data": "💊", "multimodal": "📦"}.get(file_type)
 
 
 @st.fragment
@@ -1157,7 +1157,7 @@ def get_t2b_uploaded_files(app):
         type=["pdf"],
         key=f"article_{st.session_state.t2b_article_key}",
     )
-    
+
     # Update the agent state with the uploaded article
     if article:
         # print (article.name)
@@ -1205,24 +1205,47 @@ def get_t2b_uploaded_files(app):
 
 
 @st.fragment
-def initialize_selections() -> None:
+def initialize_selections() -> dict:
     """
-    Initialize the selections.
+    Initialize the selections based on configured node types.
 
-    Args:
-        cfg: The configuration object.
+    Returns:
+        dict: Dictionary of node types with empty lists for selections
     """
-    # with open(st.session_state.config["kg_pyg_path"], "rb") as f:
-        # pyg_graph = pickle.load(f)
-    # graph_nodes = pd.read_parquet(st.session_state.config["kg_nodes_path"])
-    node_types = st.session_state.config["kg_node_types"]
+    try:
+        # Load configuration from the session state
+        cfg = st.session_state.config
 
-    # Populate the selections based on the node type from the graph
-    selections = {}
-    for i in node_types:
-        selections[i] = []
+        # Initialize selections based on configured node types
+        if hasattr(cfg.utils.database.milvus, "kg_node_types"):
+            node_types = cfg.utils.database.milvus.kg_node_types
+        else:
+            # Fallback to default node types from PrimeKG
+            node_types = [
+                "anatomy",
+                "biological_process",
+                "cellular_component",
+                "compound",
+                "disease",
+                "drug",
+                "effect_phenotype",
+                "gene_protein",
+                "molecular_function",
+                "pathway",
+                "side_effect",
+            ]
 
-    return selections
+        # Populate the selections based on the node type from the configuration
+        selections = {}
+        for node_type in node_types:
+            selections[node_type] = []
+
+        return selections
+
+    except Exception as e:
+        st.error(f"Failed to initialize selections: {str(e)}")
+        # Return empty selections as fallback
+        return {}
 
 
 @st.fragment
@@ -1237,7 +1260,7 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
         "💊 Upload pre-clinical drug data",
         help="Free-form text. Must contain atleast drug targets and kinetic parameters",
         accept_multiple_files=True,
-        type=cfg.data_package_allowed_file_types,
+        type=cfg.app.frontend.data_package_allowed_file_types,
         key=f"uploader_{st.session_state.data_package_key}",
     )
 
@@ -1245,7 +1268,7 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
         "📦 Upload multimodal endotype/phenotype data package",
         help="A spread sheet containing multimodal endotype/phenotype data package (e.g., genes, drugs, etc.)",
         accept_multiple_files=True,
-        type=cfg.multimodal_allowed_file_types,
+        type=cfg.app.frontend.multimodal_allowed_file_types,
         key=f"uploader_multimodal_{st.session_state.multimodal_key}",
     )
 
@@ -1265,7 +1288,7 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
                 )
                 uploaded_file.file_name = uploaded_file.name
                 uploaded_file.file_path = (
-                    f"{cfg.upload_data_dir}/{uploaded_file.file_name}"
+                    f"{cfg.app.frontend.upload_data_dir}/{uploaded_file.file_name}"
                 )
                 uploaded_file.current_user = st.session_state.current_user
                 uploaded_file.timestamp = current_timestamp
@@ -1283,7 +1306,10 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
                     }
                 )
                 with open(
-                    os.path.join(cfg.upload_data_dir, uploaded_file.file_name), "wb"
+                    os.path.join(
+                        cfg.app.frontend.upload_data_dir, uploaded_file.file_name
+                    ),
+                    "wb",
                 ) as f:
                     f.write(uploaded_file.getbuffer())
                 uploaded_file = None
@@ -1300,72 +1326,13 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
             if st.button("🗑️", key=uploaded_file["file_name"]):
                 with st.spinner("Removing uploaded file ..."):
                     if os.path.isfile(
-                        f"{cfg.upload_data_dir}/{uploaded_file['file_name']}"
+                        f"{cfg.app.frontend.upload_data_dir}/{uploaded_file['file_name']}"
                     ):
-                        os.remove(f"{cfg.upload_data_dir}/{uploaded_file['file_name']}")
+                        os.remove(
+                            f"{cfg.app.frontend.upload_data_dir}/{uploaded_file['file_name']}"
+                        )
                     st.session_state.uploaded_files.remove(uploaded_file)
                     st.cache_data.clear()
                     st.session_state.data_package_key += 1
                     st.session_state.multimodal_key += 1
                     st.rerun(scope="fragment")
-
-def setup_milvus(cfg: dict):
-    """
-    Function to connect to the Milvus database.
-
-    Args:
-        cfg: The configuration dictionary containing Milvus connection details.
-    """
-    # Check if the connection already exists
-    if not connections.has_connection(cfg.milvus_db.alias):
-        # Create a new connection to Milvus
-        # Connect to Milvus
-        connections.connect(
-            alias=cfg.milvus_db.alias,
-            host=cfg.milvus_db.host,
-            port=cfg.milvus_db.port,
-            user=cfg.milvus_db.user,
-            password=cfg.milvus_db.password
-        )
-        print("Connected to Milvus database.")
-    else:
-        print("Already connected to Milvus database.")
-
-    # Use a predefined Milvus database
-    db.using_database(cfg.milvus_db.database_name)
-
-    return connections.get_connection_addr(cfg.milvus_db.alias)
-
-def get_cache_edge_index(cfg: dict):
-    """
-    Function to get the edge index of the knowledge graph in the Milvus collection.
-    Due to massive records that we should query to get edge index from the Milvus database,
-    we pre-loaded this information when the app is started and stored it in a state.
-
-    Args:
-        cfg: The configuration dictionary containing the path to the edge index file.
-
-    Returns:
-        The edge index.
-    """
-    # Load collection
-    coll = Collection(f"{cfg.milvus_db.database_name}_edges")
-    coll.load()
-
-    batch_size = cfg.milvus_db.query_batch_size
-    head_list = []
-    tail_list = []
-    for start in range(0, coll.num_entities, batch_size):
-        end = min(start + batch_size, coll.num_entities)
-        print(f"Processing triplet_index range: {start} to {end}")
-        batch = coll.query(
-            expr=f"triplet_index >= {start} and triplet_index < {end}",
-            output_fields=["head_index", "tail_index"],
-        )
-        head_list.extend([r["head_index"] for r in batch])
-        tail_list.extend([r["tail_index"] for r in batch])
-    edge_index = [head_list, tail_list]
-
-    # Save the edge index to a file
-    with open(cfg.milvus_db.cache_edge_index_path, "wb") as f:
-        pickle.dump(edge_index, f)
