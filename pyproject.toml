@@ -85,7 +85,7 @@ dependencies = [
   "beautifulsoup4==4.13.4",
   "cloudscraper==1.2.71",
 ]
-version = "0.0.0" # This will be updated by semantic-release
+version = "0.0.0"
 
 [project.optional-dependencies]
 dev = [
@@ -97,6 +97,7 @@ dev = [
   "pre-commit==4.3.0",
   "twine==6.1.0",
 ]
+
 
 
 [tool.hatch.build.targets.wheel]
