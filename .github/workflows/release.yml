@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Needed for VCS versioning
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -46,18 +46,6 @@ jobs:
         run: |
           uv run ruff check aiagents4pharma/
           uv run bandit -c pyproject.toml -r aiagents4pharma/
-
-      - name: Clean up existing tags if needed
-        run: |
-          # Get the next version that semantic-release would create
-          NEXT_VERSION=$(npx semantic-release --dry-run | grep "The next release version is" | sed 's/.*The next release version is //' || echo "")
-          if [ ! -z "$NEXT_VERSION" ] && git tag | grep -q "v$NEXT_VERSION"; then
-            echo "Tag v$NEXT_VERSION already exists, deleting it"
-            git tag -d "v$NEXT_VERSION" || true
-            git push origin ":refs/tags/v$NEXT_VERSION" || true
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run semantic-release (creates tag automatically)
         run: npx semantic-release

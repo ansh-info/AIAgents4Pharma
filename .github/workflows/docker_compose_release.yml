@@ -336,7 +336,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ needs.detect-changes.outputs.version }}
-          name: "🐳 AIAgents4Pharma ${{ needs.detect-changes.outputs.version }}"
+          name: "AIAgents4Pharma ${{ needs.detect-changes.outputs.version }}"
           body: |
             ## 🚀 Ready-to-Deploy Docker Configurations
 
