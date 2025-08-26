@@ -93,9 +93,9 @@ if "messages" not in st.session_state:
 # if "sbml_key" not in st.session_state:
 #     st.session_state.sbml_key = 0
 
-# # Initialize session state for selections
-# if "selections" not in st.session_state:
-#     st.session_state.selections = streamlit_utils.initialize_selections()
+# Initialize session state for selections
+if "selections" not in st.session_state:
+    st.session_state.selections = streamlit_utils.initialize_selections()
 
 # Initialize session state for pre-clinical data package uploader
 if "data_package_key" not in st.session_state:
@@ -312,7 +312,7 @@ with main_col2:
                         {
                             "llm_model": llm_model,
                             "embedding_model": emb_model,
-                            # "selections": st.session_state.selections,
+                            "selections": st.session_state.selections,
                             "uploaded_files": st.session_state.uploaded_files,
                             "topk_nodes": st.session_state.topk_nodes,
                             "topk_edges": st.session_state.topk_edges,
@@ -427,16 +427,13 @@ with main_col2:
                         {
                             "llm_model": llm_model,
                             "embedding_model": emb_model,
-                            # "selections": st.session_state.selections,
+                            "selections": st.session_state.selections,
                             "uploaded_files": st.session_state.uploaded_files,
                             "topk_nodes": st.session_state.topk_nodes,
                             "topk_edges": st.session_state.topk_edges,
                             "dic_source_graph": [
                                 {
                                     "name": cfg.utils.database.milvus.milvus_db.database_name,
-                                    # "edge_index": st.session_state.edge_index,
-                                    # "kg_pyg_path": st.session_state.config["kg_pyg_path"],
-                                    # "kg_text_path": st.session_state.config["kg_text_path"],
                                 }
                             ],
                         },
@@ -513,16 +510,50 @@ with main_col2:
                                 len(current_state.values["dic_extracted_graph"]),
                                 "subgraph_extraction",
                             )
-                            # Add the graph to be rendered
-                            latest_graph = current_state.values["dic_extracted_graph"][
-                                -1
-                            ]
-                            graphs_visuals.append(
-                                {
-                                    "content": latest_graph["graph_dict"],
-                                    "key": "subgraph_" + uniq_msg_id,
-                                }
+                            # Debug logging
+                            print(
+                                f"DEBUG: dic_extracted_graph keys: {current_state.values.keys()}"
                             )
+                            if "dic_extracted_graph" in current_state.values:
+                                print(
+                                    f"DEBUG: dic_extracted_graph length: {len(current_state.values['dic_extracted_graph'])}"
+                                )
+                                for i, graph in enumerate(
+                                    current_state.values["dic_extracted_graph"]
+                                ):
+                                    print(
+                                        f"DEBUG: Graph {i} keys: {graph.keys() if isinstance(graph, dict) else 'not dict'}"
+                                    )
+
+                            # Add the graph to be rendered
+                            if current_state.values.get("dic_extracted_graph"):
+                                latest_graph = current_state.values[
+                                    "dic_extracted_graph"
+                                ][-1]
+                                print(
+                                    f"DEBUG: Latest graph structure: {type(latest_graph)}"
+                                )
+                                if (
+                                    isinstance(latest_graph, dict)
+                                    and "graph_dict" in latest_graph
+                                ):
+                                    print(
+                                        f"DEBUG: graph_dict keys: {latest_graph['graph_dict'].keys()}"
+                                    )
+                                    graphs_visuals.append(
+                                        {
+                                            "content": latest_graph["graph_dict"],
+                                            "key": "subgraph_" + uniq_msg_id,
+                                        }
+                                    )
+                                else:
+                                    print(
+                                        f"ERROR: graph_dict not found in latest_graph: {latest_graph}"
+                                    )
+                            else:
+                                print(
+                                    "ERROR: No dic_extracted_graph found in current_state.values"
+                                )
 
             # Visualize the graphs
             if len(graphs_visuals) > 0:

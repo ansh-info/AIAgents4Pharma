@@ -1204,25 +1204,48 @@ def get_t2b_uploaded_files(app):
     return uploaded_sbml_file
 
 
-# @st.fragment
-# def initialize_selections() -> None:
-#     """
-#     Initialize the selections.
-#
-#     Args:
-#         cfg: The configuration object.
-#     """
-#     # with open(st.session_state.config["kg_pyg_path"], "rb") as f:
-#         # pyg_graph = pickle.load(f)
-#     # graph_nodes = pd.read_parquet(st.session_state.config["kg_nodes_path"])
-#     node_types = st.session_state.config["kg_node_types"]
-#
-#     # Populate the selections based on the node type from the graph
-#     selections = {}
-#     for i in node_types:
-#         selections[i] = []
-#
-#     return selections
+@st.fragment
+def initialize_selections() -> dict:
+    """
+    Initialize the selections based on configured node types.
+
+    Returns:
+        dict: Dictionary of node types with empty lists for selections
+    """
+    try:
+        # Load configuration from the session state
+        cfg = st.session_state.config
+
+        # Initialize selections based on configured node types
+        if hasattr(cfg.utils.database.milvus, "kg_node_types"):
+            node_types = cfg.utils.database.milvus.kg_node_types
+        else:
+            # Fallback to default node types from PrimeKG
+            node_types = [
+                "anatomy",
+                "biological_process",
+                "cellular_component",
+                "compound",
+                "disease",
+                "drug",
+                "effect_phenotype",
+                "gene_protein",
+                "molecular_function",
+                "pathway",
+                "side_effect",
+            ]
+
+        # Populate the selections based on the node type from the configuration
+        selections = {}
+        for node_type in node_types:
+            selections[node_type] = []
+
+        return selections
+
+    except Exception as e:
+        st.error(f"Failed to initialize selections: {str(e)}")
+        # Return empty selections as fallback
+        return {}
 
 
 @st.fragment
