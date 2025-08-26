@@ -347,17 +347,6 @@ jobs:
             - **Production-ready** compose configurations for CPU & GPU
             - **Complete setup** with Milvus, Minio, and all dependencies
             - **Environment templates** for easy configuration
-            - **Python package** also available on PyPI and as wheel/source archives below
-
-            ### 🐍 Python Package Installation
-            This release also includes the Python package for direct installation:
-            ```bash
-            # Install from PyPI
-            pip install aiagents4pharma==${{ needs.detect-changes.outputs.version }}
-
-            # Or download wheel/source from this release
-            # See assets below: aiagents4pharma-${{ needs.detect-changes.outputs.version }}-py3-none-any.whl
-            ```
 
             ### ⚡ Quick Deploy
             ```bash
