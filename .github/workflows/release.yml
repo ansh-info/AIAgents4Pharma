@@ -108,20 +108,20 @@ jobs:
             const previousRelease = releases.find(r => r.tag_name !== version);
             const previousDate = previousRelease ? previousRelease.published_at : '1970-01-01T00:00:00Z';
 
+            // Get only the latest commit (the merge commit)
             const { data: commits } = await github.rest.repos.listCommits({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              since: previousDate,
-              per_page: 100
+              per_page: 1
             });
 
             const prNumbers = new Set();
-            for (const commit of commits) {
+            if (commits.length > 0) {
               try {
                 const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  commit_sha: commit.sha
+                  commit_sha: commits[0].sha
                 });
                 prs.forEach(pr => {
                   if (pr.state === 'closed' && pr.merged_at) {
@@ -129,7 +129,7 @@ jobs:
                   }
                 });
               } catch (error) {
-                console.log('Could not get PRs for commit ' + commit.sha + ': ' + error.message);
+                console.log('Could not get PRs for latest commit: ' + error.message);
               }
             }
 
