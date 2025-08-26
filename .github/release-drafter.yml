@@ -1,0 +1,77 @@
+name-template: 'AIAgents4Pharma v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+categories:
+  - title: '🚀 Features'
+    labels:
+      - 'feature'
+      - 'enhancement'
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'bug'
+      - 'fix'
+  - title: '🧰 Maintenance'
+    labels:
+      - 'chore'
+      - 'dependencies'
+  - title: '📚 Documentation'
+    labels:
+      - 'documentation'
+  - title: '🔒 Security'
+    labels:
+      - 'security'
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - 'major'
+      - 'breaking'
+  minor:
+    labels:
+      - 'minor'
+      - 'feature'
+      - 'enhancement'
+  patch:
+    labels:
+      - 'patch'
+      - 'bug'
+      - 'fix'
+      - 'chore'
+  default: patch
+
+template: |
+  ## 🚀 Ready-to-Deploy Docker Configurations
+
+  **One-click deployment** for all AIAgents4Pharma applications with the latest updates.
+
+  ## Changes
+
+  $CHANGES
+
+  ## 📦 Installation Options
+
+  ### 🐍 Python Package
+  ```bash
+  pip install aiagents4pharma==$RESOLVED_VERSION
+  ```
+
+  ### 🐳 Docker Images
+  ```bash
+  docker pull vpatientengine/talk2aiagents4pharma:$RESOLVED_VERSION
+  docker pull vpatientengine/talk2scholars:$RESOLVED_VERSION
+  docker pull vpatientengine/talk2knowledgegraphs:$RESOLVED_VERSION
+  ```
+
+  ### 📦 Docker Compose
+  Download the compose files from this release and run:
+  ```bash
+  cd talk2aiagents4pharma/cpu  # or gpu
+  cp .env.example .env && nano .env
+  docker compose up -d
+  ```
+
+  ---
+  *Built with ❤️ by VirtualPatientEngine*
