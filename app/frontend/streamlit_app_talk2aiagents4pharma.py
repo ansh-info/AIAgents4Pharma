@@ -26,41 +26,9 @@ st.set_page_config(
 )
 
 
-# Set the logo, detect if we're in container or local development
-def get_logo_path():
-    container_path = "/app/docs/assets/VPE.png"
-    local_path = "docs/assets/VPE.png"
+# Logo will be configured after Hydra config is loaded
 
-    if os.path.exists(container_path):
-        return container_path
-    elif os.path.exists(local_path):
-        return local_path
-    else:
-        # Fallback: try to find it relative to script location
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        relative_path = os.path.join(script_dir, "../../docs/assets/VPE.png")
-        if os.path.exists(relative_path):
-            return relative_path
-
-    return None  # File not found
-
-
-logo_path = get_logo_path()
-if logo_path:
-    st.logo(
-        image=logo_path, size="large", link="https://github.com/VirtualPatientEngine"
-    )
-
-# Check if env variables OPENAI_API_KEY and/or
-# NVIDIA_API_KEY exist
-if "OPENAI_API_KEY" not in os.environ or "NVIDIA_API_KEY" not in os.environ:
-    st.error(
-        "Please set the OPENAI_API_KEY and NVIDIA_API_KEY "
-        "environment variables in the terminal where you run "
-        "the app. For more information, please refer to our "
-        "[documentation](https://virtualpatientengine.github.io/AIAgents4Pharma/#option-2-git)."
-    )
-    st.stop()
+# Environment variables will be checked after config is loaded
 
 # Import the agent
 sys.path.append("./")
@@ -69,21 +37,76 @@ from aiagents4pharma.talk2aiagents4pharma.agents.main_agent import get_app
 # Initialize configuration
 hydra.core.global_hydra.GlobalHydra.instance().clear()
 if "config" not in st.session_state:
-    # Load Hydra configuration
+    # Load T2AA4P's main configuration
     with hydra.initialize(
         version_base=None,
-        config_path="../../aiagents4pharma/talk2knowledgegraphs/configs",
+        config_path="../../aiagents4pharma/talk2aiagents4pharma/configs",
     ):
         cfg = hydra.compose(
             config_name="config",
-            overrides=["app/frontend=default", "utils/database/milvus=default"],
+            overrides=["app/frontend=default"],
         )
         st.session_state.config = cfg
 else:
     cfg = st.session_state.config
 
+# Load T2KG database config for knowledge graph access
+if "t2kg_config" not in st.session_state:
+    with hydra.initialize(
+        version_base=None,
+        config_path="../../aiagents4pharma/talk2knowledgegraphs/configs",
+    ):
+        t2kg_cfg = hydra.compose(
+            config_name="config",
+            overrides=["utils/database/milvus=default"],
+        )
+        st.session_state.t2kg_config = t2kg_cfg
+else:
+    t2kg_cfg = st.session_state.t2kg_config
+
 # Extract frontend config for backward compatibility
 cfg_t2kg = cfg.app.frontend
+
+# Set the logo using config
+def get_logo_path():
+    container_path = cfg.app.frontend.logo_paths.container
+    local_path = cfg.app.frontend.logo_paths.local
+
+    if os.path.exists(container_path):
+        return container_path
+    elif os.path.exists(local_path):
+        return local_path
+    else:
+        # Fallback: try to find it relative to script location
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        relative_path = os.path.join(script_dir, cfg.app.frontend.logo_paths.relative)
+        if os.path.exists(relative_path):
+            return relative_path
+
+    return None  # File not found
+
+logo_path = get_logo_path()
+if logo_path:
+    st.logo(
+        image=logo_path, size="large", link=cfg.app.frontend.logo_link
+    )
+
+# Check required environment variables based on config
+required_env_vars = ["OPENAI_API_KEY"]
+missing_vars = [var for var in required_env_vars if var not in os.environ]
+
+# Check for optional NVIDIA API key if NVIDIA models are configured
+if cfg.app.frontend.nvidia_llms and "NVIDIA_API_KEY" not in os.environ:
+    missing_vars.append("NVIDIA_API_KEY")
+
+if missing_vars:
+    st.error(
+        f"Please set the {', '.join(missing_vars)} "
+        "environment variable(s) in the terminal where you run "
+        "the app. For more information, please refer to our "
+        "[documentation](https://virtualpatientengine.github.io/AIAgents4Pharma/#option-2-git)."
+    )
+    st.stop()
 
 ########################################################################################
 # Streamlit app
@@ -98,72 +121,8 @@ prompt = ChatPromptTemplate.from_messages(
     ]
 )
 
-# Initialize current user
-if "current_user" not in st.session_state:
-    st.session_state.current_user = cfg.app.frontend.default_user
-
-# Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-## T2B
-
-# Initialize sbml_file_path
-if "sbml_file_path" not in st.session_state:
-    st.session_state.sbml_file_path = None
-
-## T2KG
-
-# Initialize session state for selections
-if "selections" not in st.session_state:
-    st.session_state.selections = streamlit_utils.initialize_selections()
-
-# Initialize session state for T2B article
-if "t2b_article_key" not in st.session_state:
-    st.session_state.t2b_article_key = 0
-
-# Initialize session state for pre-clinical data package uploader
-if "data_package_key" not in st.session_state:
-    st.session_state.data_package_key = 0
-
-# Initialize session state for patient gene expression data uploader
-if "endotype_key" not in st.session_state:
-    st.session_state.endotype_key = 0
-
-# Initialize session state for multimodal data package uploader
-if "multimodal_key" not in st.session_state:
-    st.session_state.multimodal_key = 0
-
-# Initialize session state for uploaded files
-if "t2b_uploaded_files" not in st.session_state:
-    st.session_state.t2b_uploaded_files = []
-
-# Initialize session state for uploaded files
-if "uploaded_files" not in st.session_state:
-    st.session_state.uploaded_files = []
-
-    # Make directories if not exists
-    os.makedirs(cfg.app.frontend.upload_data_dir, exist_ok=True)
-
-# Initialize project_name for Langsmith
-if "project_name" not in st.session_state:
-    # st.session_state.project_name = str(st.session_state.user_name) + '@' + str(uuid.uuid4())
-    st.session_state.project_name = "T2AA4P-" + str(random.randint(1000, 9999))
-
-# Initialize run_id for Langsmith
-if "run_id" not in st.session_state:
-    st.session_state.run_id = None
-
-# Initialize the LLM model
-if "llm_model" not in st.session_state:
-    azure_llms = cfg.app.frontend.get("azure_openai_llms", [])
-    st.session_state.llm_model = tuple(
-        cfg.app.frontend.openai_llms + azure_llms + cfg.app.frontend.ollama_llms
-    )[0]
-
-# Initialize graph
-if "unique_id" not in st.session_state:
-    st.session_state.unique_id = random.randint(1, 1000)
+# Initialize unified session state
+streamlit_utils.initialize_session_state(cfg, agent_type="T2AA4P")
 
 # Initialize the app with default LLM model for the first time
 if "app" not in st.session_state:
@@ -172,25 +131,6 @@ if "app" not in st.session_state:
         st.session_state.unique_id,
         llm_model=streamlit_utils.get_base_chat_model(st.session_state.llm_model),
     )
-
-if "t2kg_emb_model" not in st.session_state:
-    # Set the default embedding model
-    if cfg.app.frontend.default_embedding_model == "ollama":
-        print("Using Ollama embeddings as default.")
-        # For IBD BioBridge data, we still use Ollama embeddings
-        st.session_state.t2kg_emb_model = OllamaEmbeddings(
-            model=cfg.app.frontend.ollama_embeddings[0]
-        )
-    else:
-        print("Using OpenAI embeddings as default.")
-        st.session_state.t2kg_emb_model = OpenAIEmbeddings(
-            model=cfg.app.frontend.openai_embeddings[0]
-        )
-
-if "topk_nodes" not in st.session_state:
-    # Subgraph extraction settings
-    st.session_state.topk_nodes = cfg.app.frontend.reasoning_subgraph_topk_nodes
-    st.session_state.topk_edges = cfg.app.frontend.reasoning_subgraph_topk_edges
 
 # Milvus connection is now handled by backend tools automatically
 # No frontend connection management needed
@@ -238,10 +178,7 @@ with main_col1:
         )
 
         # LLM panel (Only at the front-end for now)
-        azure_llms = cfg.app.frontend.get("azure_openai_llms", [])
-        llms = tuple(
-            cfg.app.frontend.openai_llms + azure_llms + cfg.app.frontend.ollama_llms
-        )
+        llms = tuple(streamlit_utils.get_all_available_llms(cfg))
         st.selectbox(
             "Pick an LLM to power the agent",
             llms,
@@ -251,10 +188,7 @@ with main_col1:
         )
 
         # Text embedding model panel
-        text_models = [
-            "NVIDIA/llama-3.2-nv-embedqa-1b-v2",
-            "OpenAI/text-embedding-ada-002",
-        ]
+        text_models = tuple(streamlit_utils.get_all_available_embeddings(cfg))
         st.selectbox(
             "Pick a text embedding model",
             text_models,

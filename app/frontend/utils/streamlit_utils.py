@@ -1562,5 +1562,49 @@ def initialize_session_state(cfg, agent_type="T2B"):
         pass
         
     elif agent_type == "T2AA4P":
-        # Combined agent specific session state (placeholder for future)
-        pass
+        # Combined agent specific session state (hybrid of T2B + T2KG)
+        
+        # T2B specific session state
+        if "sbml_file_path" not in st.session_state:
+            st.session_state.sbml_file_path = None
+            
+        # T2B article upload key
+        if "t2b_article_key" not in st.session_state:
+            st.session_state.t2b_article_key = 0
+            
+        # T2B uploaded files (separate from T2KG files)
+        if "t2b_uploaded_files" not in st.session_state:
+            st.session_state.t2b_uploaded_files = []
+            
+        # T2KG specific session state
+        if "selections" not in st.session_state:
+            st.session_state.selections = initialize_selections()
+            
+        if "data_package_key" not in st.session_state:
+            st.session_state.data_package_key = 0
+            
+        if "multimodal_key" not in st.session_state:
+            st.session_state.multimodal_key = 0
+            
+        # Special for T2AA4P: patient gene expression data
+        if "endotype_key" not in st.session_state:
+            st.session_state.endotype_key = 0
+            
+        if "topk_nodes" not in st.session_state:
+            st.session_state.topk_nodes = cfg.app.frontend.get("reasoning_subgraph_topk_nodes", 15)
+            
+        if "topk_edges" not in st.session_state:
+            st.session_state.topk_edges = cfg.app.frontend.get("reasoning_subgraph_topk_edges", 15)
+            
+        # T2KG embedding model (special handling for T2AA4P)
+        if "t2kg_emb_model" not in st.session_state:
+            if cfg.app.frontend.get("default_embedding_model", "openai") == "ollama":
+                from langchain_ollama import OllamaEmbeddings
+                st.session_state.t2kg_emb_model = OllamaEmbeddings(
+                    model=cfg.app.frontend.get("ollama_embeddings", ["nomic-embed-text"])[0]
+                )
+            else:
+                from langchain_openai import OpenAIEmbeddings
+                st.session_state.t2kg_emb_model = OpenAIEmbeddings(
+                    model=cfg.app.frontend.get("openai_embeddings", ["text-embedding-ada-002"])[0]
+                )
