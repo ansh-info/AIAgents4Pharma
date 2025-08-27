@@ -322,6 +322,17 @@ def update_state_t2b(st):
 def update_state_t2kg(st):
     # Get the config from session state
     cfg = st.session_state.config
+
+    # For T2AA4P, database config is stored separately in t2kg_config
+    # For T2KG, it's in the main config
+    if hasattr(st.session_state, "t2kg_config"):
+        # T2AA4P case - use the separate T2KG config for database info
+        db_config = st.session_state.t2kg_config
+        database_name = db_config.utils.database.milvus.milvus_db.database_name
+    else:
+        # T2KG case - use main config
+        database_name = cfg.utils.database.milvus.milvus_db.database_name
+
     dic = {
         "embedding_model": st.session_state.t2kg_emb_model,
         "uploaded_files": st.session_state.uploaded_files,
@@ -329,7 +340,7 @@ def update_state_t2kg(st):
         "topk_edges": st.session_state.topk_edges,
         "dic_source_graph": [
             {
-                "name": cfg.utils.database.milvus.milvus_db.database_name,
+                "name": database_name,
             }
         ],
         "selections": st.session_state.selections,
@@ -978,39 +989,54 @@ def get_text_embedding_model(model_name) -> Embeddings:
         "Azure/text-embedding-ada-002": "text-embedding-ada-002",
         "nomic-embed-text": "nomic-embed-text",
     }
-    
+
     if model_name.startswith("NVIDIA"):
         return NVIDIAEmbeddings(model=dic_text_embedding_models[model_name])
     elif model_name.startswith("Azure/"):
         # Azure OpenAI Embeddings configuration
         azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
-        azure_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT")  
+        azure_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT")
         api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01")
-        
+
         if not azure_endpoint or not azure_deployment:
-            st.error("Azure OpenAI requires AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT environment variables")
-            return OpenAIEmbeddings(model=dic_text_embedding_models[model_name])  # Fallback to regular OpenAI
-        
-        # Get Azure token provider  
+            st.error(
+                "Azure OpenAI requires AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT environment variables"
+            )
+            return OpenAIEmbeddings(
+                model=dic_text_embedding_models[model_name]
+            )  # Fallback to regular OpenAI
+
+        # Get Azure token provider
         token_provider = get_azure_token_provider()
         if not token_provider:
             st.error("Failed to get Azure token provider")
-            return OpenAIEmbeddings(model=dic_text_embedding_models[model_name])  # Fallback to regular OpenAI
-        
+            return OpenAIEmbeddings(
+                model=dic_text_embedding_models[model_name]
+            )  # Fallback to regular OpenAI
+
         from langchain_openai.embeddings import AzureOpenAIEmbeddings
+
         return AzureOpenAIEmbeddings(
             azure_endpoint=azure_endpoint,
             azure_deployment=azure_deployment,
             api_version=api_version,
             azure_ad_token_provider=token_provider,
         )
-    elif model_name in dic_text_embedding_models and not model_name.startswith(("OpenAI/", "NVIDIA/", "Azure/")):
+    elif model_name in dic_text_embedding_models and not model_name.startswith(
+        ("OpenAI/", "NVIDIA/", "Azure/")
+    ):
         # Ollama embeddings (models without provider prefix)
         return OllamaEmbeddings(model=dic_text_embedding_models[model_name])
     else:
         # Default to OpenAI
-        model_key = model_name if model_name.startswith("OpenAI/") else f"OpenAI/{model_name}"
-        return OpenAIEmbeddings(model=dic_text_embedding_models.get(model_key, model_name.replace("OpenAI/", "")))
+        model_key = (
+            model_name if model_name.startswith("OpenAI/") else f"OpenAI/{model_name}"
+        )
+        return OpenAIEmbeddings(
+            model=dic_text_embedding_models.get(
+                model_key, model_name.replace("OpenAI/", "")
+            )
+        )
 
 
 def get_base_chat_model(model_name) -> BaseChatModel:
@@ -1313,10 +1339,26 @@ def initialize_selections() -> dict:
         # Load configuration from the session state
         cfg = st.session_state.config
 
-        # Initialize selections based on configured node types
-        if hasattr(cfg.utils.database.milvus, "kg_node_types"):
-            node_types = cfg.utils.database.milvus.kg_node_types
+        # For T2AA4P, database config is stored separately in t2kg_config
+        # For T2KG, it's in the main config
+        if hasattr(st.session_state, "t2kg_config"):
+            # T2AA4P case - use the separate T2KG config for database info
+            db_config = st.session_state.t2kg_config
+            if hasattr(db_config.utils.database.milvus, "kg_node_types"):
+                node_types = db_config.utils.database.milvus.kg_node_types
+            else:
+                node_types = None
         else:
+            # T2KG case - use main config
+            if hasattr(cfg, "utils") and hasattr(
+                cfg.utils.database.milvus, "kg_node_types"
+            ):
+                node_types = cfg.utils.database.milvus.kg_node_types
+            else:
+                node_types = None
+
+        # If no node types found in config, use fallback
+        if node_types is None:
             # Fallback to default node types from PrimeKG
             node_types = [
                 "anatomy",
@@ -1438,53 +1480,53 @@ def get_uploaded_files(cfg: hydra.core.config_store.ConfigStore) -> None:
 def get_all_available_llms(cfg):
     """
     Get all available LLM models from configuration.
-    
+
     Args:
         cfg: Hydra configuration object
-        
+
     Returns:
         list: List of all available LLM model names
     """
     azure_llms = cfg.app.frontend.get("azure_openai_llms", [])
     ollama_llms = cfg.app.frontend.get("ollama_llms", [])
-    
+
     all_llms = (
-        cfg.app.frontend.get("openai_llms", []) +
-        cfg.app.frontend.get("nvidia_llms", []) +
-        azure_llms +
-        ollama_llms
+        cfg.app.frontend.get("openai_llms", [])
+        + cfg.app.frontend.get("nvidia_llms", [])
+        + azure_llms
+        + ollama_llms
     )
-    
+
     return all_llms
 
 
 def get_all_available_embeddings(cfg):
     """
     Get all available embedding models from configuration.
-    
+
     Args:
         cfg: Hydra configuration object
-        
+
     Returns:
         list: List of all available embedding model names
     """
     azure_embeddings = cfg.app.frontend.get("azure_openai_embeddings", [])
     ollama_embeddings = cfg.app.frontend.get("ollama_embeddings", [])
-    
+
     all_embeddings = (
-        cfg.app.frontend.get("openai_embeddings", []) +
-        cfg.app.frontend.get("nvidia_embeddings", []) +
-        azure_embeddings +
-        ollama_embeddings
+        cfg.app.frontend.get("openai_embeddings", [])
+        + cfg.app.frontend.get("nvidia_embeddings", [])
+        + azure_embeddings
+        + ollama_embeddings
     )
-    
+
     return all_embeddings
 
 
 def initialize_session_state(cfg, agent_type="T2B"):
     """
     Initialize unified session state for all AI Agents 4 Pharma apps.
-    
+
     Args:
         cfg: Hydra configuration object
         agent_type: str: Type of agent ("T2B", "T2KG", "T2S", "T2AA4P")
@@ -1492,39 +1534,41 @@ def initialize_session_state(cfg, agent_type="T2B"):
     import random
     import os
     import streamlit as st
-    
+
     # Core configuration
     if "config" not in st.session_state:
         st.session_state.config = cfg
-        
+
     if "current_user" not in st.session_state:
         st.session_state.current_user = cfg.app.frontend.default_user
-    
+
     # Chat and messaging
     if "messages" not in st.session_state:
         st.session_state.messages = []
-        
+
     if "project_name" not in st.session_state:
-        st.session_state.project_name = f"{agent_type}-" + str(random.randint(1000, 9999))
-        
+        st.session_state.project_name = f"{agent_type}-" + str(
+            random.randint(1000, 9999)
+        )
+
     if "run_id" not in st.session_state:
         st.session_state.run_id = None
-        
+
     if "unique_id" not in st.session_state:
         st.session_state.unique_id = random.randint(1, 1000)
-    
+
     # File management (common across all apps)
     if "uploaded_files" not in st.session_state:
         st.session_state.uploaded_files = []
         # Make upload directory if not exists
         upload_dir = cfg.app.frontend.get("upload_data_dir", "../files")
         os.makedirs(upload_dir, exist_ok=True)
-    
+
     # Model configuration
     if "llm_model" not in st.session_state:
         all_llms = get_all_available_llms(cfg)
         st.session_state.llm_model = all_llms[0] if all_llms else "OpenAI/gpt-4o-mini"
-        
+
     if "text_embedding_model" not in st.session_state:
         all_embeddings = get_all_available_embeddings(cfg)
         # Default to NVIDIA embedding as per current T2B app
@@ -1532,79 +1576,95 @@ def initialize_session_state(cfg, agent_type="T2B"):
         if default_embedding in all_embeddings:
             st.session_state.text_embedding_model = default_embedding
         else:
-            st.session_state.text_embedding_model = all_embeddings[0] if all_embeddings else "OpenAI/text-embedding-ada-002"
-    
+            st.session_state.text_embedding_model = (
+                all_embeddings[0] if all_embeddings else "OpenAI/text-embedding-ada-002"
+            )
+
     # Agent-specific initializations
     if agent_type == "T2KG":
         # Knowledge graph specific session state
         if "selections" not in st.session_state:
             st.session_state.selections = initialize_selections()
-            
+
         if "data_package_key" not in st.session_state:
             st.session_state.data_package_key = 0
-            
+
         if "multimodal_key" not in st.session_state:
             st.session_state.multimodal_key = 0
-            
+
         if "topk_nodes" not in st.session_state:
-            st.session_state.topk_nodes = cfg.app.frontend.get("reasoning_subgraph_topk_nodes", 15)
-            
+            st.session_state.topk_nodes = cfg.app.frontend.get(
+                "reasoning_subgraph_topk_nodes", 15
+            )
+
         if "topk_edges" not in st.session_state:
-            st.session_state.topk_edges = cfg.app.frontend.get("reasoning_subgraph_topk_edges", 15)
-    
+            st.session_state.topk_edges = cfg.app.frontend.get(
+                "reasoning_subgraph_topk_edges", 15
+            )
+
     elif agent_type == "T2B":
         # Biomodels specific session state
         if "sbml_file_path" not in st.session_state:
             st.session_state.sbml_file_path = None
-            
+
     elif agent_type == "T2S":
         # Scholars specific session state (placeholder for future)
         pass
-        
+
     elif agent_type == "T2AA4P":
         # Combined agent specific session state (hybrid of T2B + T2KG)
-        
+
         # T2B specific session state
         if "sbml_file_path" not in st.session_state:
             st.session_state.sbml_file_path = None
-            
+
         # T2B article upload key
         if "t2b_article_key" not in st.session_state:
             st.session_state.t2b_article_key = 0
-            
+
         # T2B uploaded files (separate from T2KG files)
         if "t2b_uploaded_files" not in st.session_state:
             st.session_state.t2b_uploaded_files = []
-            
+
         # T2KG specific session state
         if "selections" not in st.session_state:
             st.session_state.selections = initialize_selections()
-            
+
         if "data_package_key" not in st.session_state:
             st.session_state.data_package_key = 0
-            
+
         if "multimodal_key" not in st.session_state:
             st.session_state.multimodal_key = 0
-            
+
         # Special for T2AA4P: patient gene expression data
         if "endotype_key" not in st.session_state:
             st.session_state.endotype_key = 0
-            
+
         if "topk_nodes" not in st.session_state:
-            st.session_state.topk_nodes = cfg.app.frontend.get("reasoning_subgraph_topk_nodes", 15)
-            
+            st.session_state.topk_nodes = cfg.app.frontend.get(
+                "reasoning_subgraph_topk_nodes", 15
+            )
+
         if "topk_edges" not in st.session_state:
-            st.session_state.topk_edges = cfg.app.frontend.get("reasoning_subgraph_topk_edges", 15)
-            
+            st.session_state.topk_edges = cfg.app.frontend.get(
+                "reasoning_subgraph_topk_edges", 15
+            )
+
         # T2KG embedding model (special handling for T2AA4P)
         if "t2kg_emb_model" not in st.session_state:
             if cfg.app.frontend.get("default_embedding_model", "openai") == "ollama":
                 from langchain_ollama import OllamaEmbeddings
+
                 st.session_state.t2kg_emb_model = OllamaEmbeddings(
-                    model=cfg.app.frontend.get("ollama_embeddings", ["nomic-embed-text"])[0]
+                    model=cfg.app.frontend.get(
+                        "ollama_embeddings", ["nomic-embed-text"]
+                    )[0]
                 )
             else:
                 from langchain_openai import OpenAIEmbeddings
+
                 st.session_state.t2kg_emb_model = OpenAIEmbeddings(
-                    model=cfg.app.frontend.get("openai_embeddings", ["text-embedding-ada-002"])[0]
+                    model=cfg.app.frontend.get(
+                        "openai_embeddings", ["text-embedding-ada-002"]
+                    )[0]
                 )

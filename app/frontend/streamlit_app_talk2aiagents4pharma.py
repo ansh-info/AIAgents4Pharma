@@ -67,6 +67,7 @@ else:
 # Extract frontend config for backward compatibility
 cfg_t2kg = cfg.app.frontend
 
+
 # Set the logo using config
 def get_logo_path():
     container_path = cfg.app.frontend.logo_paths.container
@@ -85,11 +86,10 @@ def get_logo_path():
 
     return None  # File not found
 
+
 logo_path = get_logo_path()
 if logo_path:
-    st.logo(
-        image=logo_path, size="large", link=cfg.app.frontend.logo_link
-    )
+    st.logo(image=logo_path, size="large", link=cfg.app.frontend.logo_link)
 
 # Check required environment variables based on config
 required_env_vars = ["OPENAI_API_KEY"]
@@ -349,7 +349,7 @@ with main_col2:
                             "topk_edges": st.session_state.topk_edges,
                             "dic_source_graph": [
                                 {
-                                    "name": cfg.utils.database.milvus.milvus_db.database_name,
+                                    "name": t2kg_cfg.utils.database.milvus.milvus_db.database_name,
                                 }
                             ],
                         },
