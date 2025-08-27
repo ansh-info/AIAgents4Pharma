@@ -134,24 +134,10 @@ if "llm_model" not in st.session_state:
 # Initialize the app with default LLM model for the first time
 if "app" not in st.session_state:
     # Initialize the app
-    if st.session_state.llm_model in cfg.app.frontend.openai_llms:
-        print("Using OpenAI LLM model")
-        st.session_state.app = get_app(
-            st.session_state.unique_id,
-            llm_model=ChatOpenAI(
-                model=st.session_state.llm_model,
-                temperature=cfg.app.frontend.temperature,
-            ),
-        )
-    else:
-        print("Using Ollama LLM model")
-        st.session_state.app = get_app(
-            st.session_state.unique_id,
-            llm_model=ChatOllama(
-                model=st.session_state.llm_model,
-                temperature=cfg.app.frontend.temperature,
-            ),
-        )
+    st.session_state.app = get_app(
+        st.session_state.unique_id,
+        llm_model=streamlit_utils.get_base_chat_model(st.session_state.llm_model),
+    )
 
 if "topk_nodes" not in st.session_state:
     # Subgraph extraction settings
@@ -286,16 +272,7 @@ with main_col2:
                     config = {"configurable": {"thread_id": st.session_state.unique_id}}
 
                     # Prepare LLM and embedding model for updating the agent
-                    if st.session_state.llm_model in cfg.app.frontend.openai_llms:
-                        llm_model = ChatOpenAI(
-                            model=st.session_state.llm_model,
-                            temperature=cfg.app.frontend.temperature,
-                        )
-                    else:
-                        llm_model = ChatOllama(
-                            model=st.session_state.llm_model,
-                            temperature=cfg.app.frontend.temperature,
-                        )
+                    llm_model = streamlit_utils.get_base_chat_model(st.session_state.llm_model)
 
                     if cfg.app.frontend.default_embedding_model == "ollama":
                         emb_model = OllamaEmbeddings(
@@ -399,16 +376,7 @@ with main_col2:
                     ]
 
                     # Prepare LLM and embedding model for updating the agent
-                    if st.session_state.llm_model in cfg.app.frontend.openai_llms:
-                        llm_model = ChatOpenAI(
-                            model=st.session_state.llm_model,
-                            temperature=cfg.app.frontend.temperature,
-                        )
-                    else:
-                        llm_model = ChatOllama(
-                            model=st.session_state.llm_model,
-                            temperature=cfg.app.frontend.temperature,
-                        )
+                    llm_model = streamlit_utils.get_base_chat_model(st.session_state.llm_model)
 
                     if cfg.app.frontend.default_embedding_model == "ollama":
                         # For IBD BioBridge data, we still use Ollama embeddings
