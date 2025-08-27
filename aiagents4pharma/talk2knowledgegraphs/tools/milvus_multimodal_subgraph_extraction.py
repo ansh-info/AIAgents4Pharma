@@ -2,11 +2,13 @@
 Tool for performing multimodal subgraph extraction.
 """
 
+import asyncio
 import logging
 from typing import Annotated, Type
 
 import hydra
 import pandas as pd
+import pcst_fast
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import BaseTool
 from langchain_core.tools.base import InjectedToolCallId
@@ -15,12 +17,12 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 from pymilvus import Collection
 
+from ..utils.database import MilvusConnectionManager
 from ..utils.extractions.milvus_multimodal_pcst import (
     DynamicLibraryLoader,
     MultimodalPCSTPruning,
     SystemDetector,
 )
-from ..utils.database import MilvusConnectionManager
 from .load_arguments import ArgumentData
 
 # Initialize logger
@@ -148,6 +150,53 @@ class MultimodalSubgraphExtractionTool(BaseTool):
         res_df["use_description"] = False
         return res_df
 
+    async def _query_milvus_collection_async(
+        self, node_type, node_type_df, cfg_db, connection_manager
+    ):
+        """Helper method to query Milvus collection asynchronously for a specific node type."""
+        collection_name = (
+            f"{cfg_db.milvus_db.database_name}_nodes_{node_type.replace('/', '_')}"
+        )
+
+        # Query the collection with node names from multimodal_df
+        node_names_series = node_type_df["q_node_name"]
+        q_node_names = getattr(
+            node_names_series, "to_pandas", lambda series=node_names_series: series
+        )().tolist()
+
+        # Create filter expression for async query
+        node_names_str = ",".join(f'"{name}"' for name in q_node_names)
+        expr = f"node_name IN [{node_names_str}]"
+
+        q_columns = [
+            "node_id",
+            "node_name",
+            "node_type",
+            "feat",
+            "feat_emb",
+            "desc",
+            "desc_emb",
+        ]
+
+        # Perform async query
+        res = await connection_manager.async_query(
+            collection_name=collection_name, expr=expr, output_fields=q_columns
+        )
+
+        # Convert the embeddings into floats
+        for r_ in res:
+            r_["feat_emb"] = [float(x) for x in r_["feat_emb"]]
+            r_["desc_emb"] = [float(x) for x in r_["desc_emb"]]
+
+        # Convert the result to a DataFrame
+        res_df = (
+            self.loader.df.DataFrame(res)[q_columns]
+            if res
+            else self.loader.df.DataFrame(columns=q_columns)
+        )
+        res_df["use_description"] = False
+        return res_df
+
     def _prepare_query_modalities(
         self, prompt: dict, state: Annotated[dict, InjectedState], cfg_db: dict
     ):
@@ -201,6 +250,101 @@ class MultimodalSubgraphExtractionTool(BaseTool):
             query_df = self.loader.df.concat(query_df, ignore_index=True)
 
             # Update the state by adding the the selected node IDs
+            logger.log(logging.INFO, "Updating state with selected node IDs")
+            state["selections"] = (
+                getattr(query_df, "to_pandas", lambda: query_df)()
+                .groupby("node_type")["node_id"]
+                .apply(list)
+                .to_dict()
+            )
+
+            # Append a user prompt to the query dataframe
+            logger.log(logging.INFO, "Adding user prompt to query dataframe")
+            query_df = self.loader.df.concat([query_df, prompt_df]).reset_index(
+                drop=True
+            )
+        else:
+            # If no multimodal files are uploaded, use the prompt embeddings
+            query_df = prompt_df
+
+        return query_df
+
+    async def _prepare_query_modalities_async(
+        self,
+        prompt: dict,
+        state: Annotated[dict, InjectedState],
+        cfg_db: dict,
+        connection_manager,
+    ):
+        """
+        Prepare the modality-specific query for subgraph extraction asynchronously.
+
+        Args:
+            prompt: The dictionary containing the user prompt and embeddings
+            state: The injected state for the tool
+            cfg_db: The configuration dictionary for Milvus database
+            connection_manager: The MilvusConnectionManager instance
+
+        Returns:
+            A DataFrame containing the query embeddings and modalities
+        """
+        # Initialize dataframes
+        logger.log(logging.INFO, "Initializing dataframes (async)")
+        query_df = []
+        prompt_df = self.loader.df.DataFrame(
+            {
+                "node_id": "user_prompt",
+                "node_name": "User Prompt",
+                "node_type": "prompt",
+                "feat": prompt["text"],
+                "feat_emb": prompt["emb"],
+                "desc": prompt["text"],
+                "desc_emb": prompt["emb"],
+                "use_description": True,  # set to True for user prompt embedding
+            }
+        )
+
+        # Read multimodal files uploaded by the user
+        multimodal_df = self._read_multimodal_files(state)
+
+        # Check if the multimodal_df is empty
+        logger.log(logging.INFO, "Prepare query modalities (async)")
+        if len(multimodal_df) > 0:
+            # Create parallel tasks for querying each node type
+            logger.log(
+                logging.INFO,
+                "Querying Milvus database for each node type in multimodal_df (parallel)",
+            )
+
+            # Create async tasks for each node type
+            tasks = []
+            for node_type, node_type_df in multimodal_df.groupby("q_node_type"):
+                print(f"Processing node type: {node_type}")
+                task = self._query_milvus_collection_async(
+                    node_type, node_type_df, cfg_db, connection_manager
+                )
+                tasks.append(task)
+
+            # Execute all queries in parallel using hybrid approach
+            if len(tasks) == 1:
+                # Single task, run directly
+                query_results = [await tasks[0]]
+            else:
+                # Multiple tasks, but use sequential execution to avoid event loop issues
+                query_results = []
+                for task in tasks:
+                    result = await task
+                    query_results.append(result)
+
+            query_df.extend(query_results)
+
+            # Concatenate all results into a single DataFrame
+            logger.log(
+                logging.INFO, "Concatenating all results into a single DataFrame"
+            )
+            query_df = self.loader.df.concat(query_df, ignore_index=True)
+
+            # Update the state by adding the selected node IDs
             logger.log(logging.INFO, "Updating state with selected node IDs")
             state["selections"] = (
                 getattr(query_df, "to_pandas", lambda: query_df)()
@@ -335,6 +479,222 @@ class MultimodalSubgraphExtractionTool(BaseTool):
         )
 
         return subgraphs
+
+    async def _perform_subgraph_extraction_async(
+        self,
+        state: Annotated[dict, InjectedState],
+        cfg: dict,
+        cfg_db: dict,
+        query_df: pd.DataFrame,
+        connection_manager,
+    ) -> dict:
+        """
+        Perform multimodal subgraph extraction based on modal-specific embeddings asynchronously.
+
+        Args:
+            state: The injected state for the tool
+            cfg: The configuration dictionary
+            cfg_db: The configuration dictionary for Milvus database
+            query_df: The DataFrame containing the query embeddings and modalities
+            connection_manager: The MilvusConnectionManager instance
+
+        Returns:
+            A dictionary containing the extracted subgraph with nodes and edges
+        """
+        # Initialize the subgraph dictionary
+        subgraphs = []
+        unified_subgraph = {"nodes": [], "edges": []}
+
+        # Create parallel tasks for each query
+        tasks = []
+        query_info = []
+
+        for q in getattr(query_df, "to_pandas", lambda: query_df)().iterrows():
+            logger.log(logging.INFO, "===========================================")
+            logger.log(logging.INFO, "Processing query: %s", q[1]["node_name"])
+
+            # Store query info for later processing
+            query_info.append(q[1])
+
+            # Get dynamic metric type (overrides any config setting)
+            has_vector_processing = hasattr(cfg, "vector_processing")
+            if has_vector_processing:
+                dynamic_metrics_enabled = getattr(
+                    cfg.vector_processing, "dynamic_metrics", True
+                )
+            else:
+                dynamic_metrics_enabled = False
+            if has_vector_processing and dynamic_metrics_enabled:
+                dynamic_metric_type = self.loader.metric_type
+            else:
+                dynamic_metric_type = getattr(
+                    cfg, "search_metric_type", self.loader.metric_type
+                )
+
+            # Create PCST pruning instance
+            pcst_instance = MultimodalPCSTPruning(
+                topk=state["topk_nodes"],
+                topk_e=state["topk_edges"],
+                cost_e=cfg.cost_e,
+                c_const=cfg.c_const,
+                root=cfg.root,
+                num_clusters=cfg.num_clusters,
+                pruning=cfg.pruning,
+                verbosity_level=cfg.verbosity_level,
+                use_description=q[1]["use_description"],
+                metric_type=dynamic_metric_type,
+                loader=self.loader,
+            )
+
+            # Create async task for subgraph extraction
+            task = self._extract_single_subgraph_async(
+                pcst_instance, q[1], cfg_db, connection_manager
+            )
+            tasks.append(task)
+
+        # Execute all subgraph extractions sequentially to avoid event loop conflicts
+        subgraph_results = []
+        for i, task in enumerate(tasks):
+            logger.log(logging.INFO, f"Processing subgraph {i+1}/{len(tasks)}")
+            result = await task
+            subgraph_results.append(result)
+
+        # Process results
+        for i, subgraph in enumerate(subgraph_results):
+            query_row = query_info[i]
+            unified_subgraph["nodes"].append(subgraph["nodes"].tolist())
+            unified_subgraph["edges"].append(subgraph["edges"].tolist())
+            subgraphs.append(
+                (
+                    query_row["node_name"],
+                    subgraph["nodes"].tolist(),
+                    subgraph["edges"].tolist(),
+                )
+            )
+
+        # Concatenate and get unique node and edge indices
+        nodes_arrays = [
+            self.loader.py.array(list_) for list_ in unified_subgraph["nodes"]
+        ]
+        unified_subgraph["nodes"] = self.loader.py.unique(
+            self.loader.py.concatenate(nodes_arrays)
+        ).tolist()
+        edges_arrays = [
+            self.loader.py.array(list_) for list_ in unified_subgraph["edges"]
+        ]
+        unified_subgraph["edges"] = self.loader.py.unique(
+            self.loader.py.concatenate(edges_arrays)
+        ).tolist()
+
+        # Convert the unified subgraph and subgraphs to DataFrames
+        unified_subgraph = self.loader.df.DataFrame(
+            [
+                (
+                    "Unified Subgraph",
+                    unified_subgraph["nodes"],
+                    unified_subgraph["edges"],
+                )
+            ],
+            columns=["name", "nodes", "edges"],
+        )
+        subgraphs = self.loader.df.DataFrame(
+            subgraphs, columns=["name", "nodes", "edges"]
+        )
+
+        # Concatenate both DataFrames
+        subgraphs = self.loader.df.concat(
+            [unified_subgraph, subgraphs], ignore_index=True
+        )
+
+        return subgraphs
+
+    async def _extract_single_subgraph_async(
+        self, pcst_instance, query_row, cfg_db, connection_manager
+    ):
+        """
+        Extract a single subgraph asynchronously using the new async methods.
+        """
+        # Load edge index asynchronously with parallel batch processing
+        edge_index = await pcst_instance._load_edge_index_from_milvus_async(
+            cfg_db, connection_manager
+        )
+
+        # Compute prizes asynchronously (node and edge prizes in parallel)
+        prizes = await pcst_instance.compute_prizes_async(
+            query_row["desc_emb"],
+            query_row["feat_emb"],
+            cfg_db,
+            connection_manager,
+            query_row["node_type"],
+        )
+
+        # Get number of nodes from connection manager
+        nodes_collection = f"{cfg_db.milvus_db.database_name}_nodes"
+        stats = await connection_manager.async_get_collection_stats(nodes_collection)
+        num_nodes = stats["num_entities"]
+
+        # Compute costs in constructing the subgraph
+        edges_dict, prizes_final, costs, mapping = pcst_instance.compute_subgraph_costs(
+            edge_index, num_nodes, prizes
+        )
+
+        # Retrieve the subgraph using the PCST algorithm
+        result_vertices, result_edges = pcst_fast.pcst_fast(
+            edges_dict["edges"].tolist(),
+            prizes_final.tolist(),
+            costs.tolist(),
+            pcst_instance.root,
+            pcst_instance.num_clusters,
+            pcst_instance.pruning,
+            pcst_instance.verbosity_level,
+        )
+
+        # Get subgraph nodes and edges based on the result of the PCST algorithm
+        subgraph = pcst_instance.get_subgraph_nodes_edges(
+            num_nodes,
+            pcst_instance.loader.py.asarray(result_vertices),
+            {
+                "edges": pcst_instance.loader.py.asarray(result_edges),
+                "num_prior_edges": edges_dict["num_prior_edges"],
+                "edge_index": edge_index,
+            },
+            mapping,
+        )
+
+        return subgraph
+
+    def _run(
+        self,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        state: Annotated[dict, InjectedState],
+        prompt: str,
+        arg_data: ArgumentData = None,
+    ) -> Command:
+        """
+        Synchronous wrapper for the async _run_async method.
+        This maintains compatibility with LangGraph while using async operations internally.
+        """
+        import concurrent.futures
+
+        def run_in_thread():
+            """Run async method in a new thread with its own event loop."""
+            # Create a new event loop for this thread
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                result = new_loop.run_until_complete(
+                    self._run_async(tool_call_id, state, prompt, arg_data)
+                )
+                return result
+            finally:
+                # Properly cleanup the event loop
+                new_loop.close()
+                asyncio.set_event_loop(None)
+
+        # Always use a separate thread to avoid event loop conflicts
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(run_in_thread)
+            return future.result()
 
     def _prepare_final_subgraph(
         self, state: Annotated[dict, InjectedState], subgraph: dict, cfg_db
@@ -485,7 +845,7 @@ class MultimodalSubgraphExtractionTool(BaseTool):
         # CPU mode: return as-is for COSINE similarity
         return v
 
-    def _run(
+    async def _run_async(
         self,
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[dict, InjectedState],
@@ -540,10 +900,9 @@ class MultimodalSubgraphExtractionTool(BaseTool):
             logger.error("Failed to establish Milvus connection: %s", str(e))
             raise RuntimeError(f"Cannot connect to Milvus database: {str(e)}")
 
-        # Prepare the query embeddings and modalities
-        logger.log(logging.INFO, "_prepare_query_modalities")
-        # start = datetime.datetime.now()
-        query_df = self._prepare_query_modalities(
+        # Prepare the query embeddings and modalities (async)
+        logger.log(logging.INFO, "_prepare_query_modalities_async")
+        query_df = await self._prepare_query_modalities_async(
             {
                 "text": prompt,
                 "emb": [
@@ -552,18 +911,14 @@ class MultimodalSubgraphExtractionTool(BaseTool):
             },
             state,
             cfg_db,
+            connection_manager,
         )
-        # end = datetime.datetime.now()
-        # logger.log(logging.INFO, "_prepare_query_modalities time: %s seconds",
-        #            (end - start).total_seconds())
 
-        # Perform subgraph extraction
-        logger.log(logging.INFO, "_perform_subgraph_extraction")
-        # start = datetime.datetime.now()
-        subgraphs = self._perform_subgraph_extraction(state, cfg, cfg_db, query_df)
-        # end = datetime.datetime.now()
-        # logger.log(logging.INFO, "_perform_subgraph_extraction time: %s seconds",
-        #            (end - start).total_seconds())
+        # Perform subgraph extraction (will be updated to use async methods)
+        logger.log(logging.INFO, "_perform_subgraph_extraction_async")
+        subgraphs = await self._perform_subgraph_extraction_async(
+            state, cfg, cfg_db, query_df, connection_manager
+        )
 
         # Prepare subgraph as a NetworkX graph and textualized graph
         logger.log(logging.INFO, "_prepare_final_subgraph")
