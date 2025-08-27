@@ -81,56 +81,8 @@ if "OPENAI_API_KEY" not in os.environ:
     )
     st.stop()
 
-# Initialize current user
-if "current_user" not in st.session_state:
-    st.session_state.current_user = cfg.app.frontend.default_user
-
-# Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Initialize session state for SBML file uploader
-# if "sbml_key" not in st.session_state:
-#     st.session_state.sbml_key = 0
-
-# Initialize session state for selections
-if "selections" not in st.session_state:
-    st.session_state.selections = streamlit_utils.initialize_selections()
-
-# Initialize session state for pre-clinical data package uploader
-if "data_package_key" not in st.session_state:
-    st.session_state.data_package_key = 0
-
-# Initialize session state for multimodal data package uploader
-if "multimodal_key" not in st.session_state:
-    st.session_state.multimodal_key = 0
-
-# Initialize session state for uploaded files
-if "uploaded_files" not in st.session_state:
-    st.session_state.uploaded_files = []
-
-    # Make directories if not exists
-    os.makedirs(cfg.app.frontend.upload_data_dir, exist_ok=True)
-
-# Initialize project_name for Langsmith
-if "project_name" not in st.session_state:
-    # st.session_state.project_name = str(st.session_state.user_name) + '@' + str(uuid.uuid4())
-    st.session_state.project_name = "T2KG-" + str(random.randint(1000, 9999))
-
-# Initialize run_id for Langsmith
-if "run_id" not in st.session_state:
-    st.session_state.run_id = None
-
-# Initialize graph
-if "unique_id" not in st.session_state:
-    st.session_state.unique_id = random.randint(1, 1000)
-
-# Initialize the LLM model
-if "llm_model" not in st.session_state:
-    azure_llms = cfg.app.frontend.get("azure_openai_llms", [])
-    st.session_state.llm_model = tuple(
-        cfg.app.frontend.openai_llms + azure_llms + cfg.app.frontend.ollama_llms
-    )[0]
+# Initialize unified session state
+streamlit_utils.initialize_session_state(cfg, agent_type="T2KG")
 
 # Initialize the app with default LLM model for the first time
 if "app" not in st.session_state:
@@ -139,11 +91,6 @@ if "app" not in st.session_state:
         st.session_state.unique_id,
         llm_model=streamlit_utils.get_base_chat_model(st.session_state.llm_model),
     )
-
-if "topk_nodes" not in st.session_state:
-    # Subgraph extraction settings
-    st.session_state.topk_nodes = cfg.app.frontend.reasoning_subgraph_topk_nodes
-    st.session_state.topk_edges = cfg.app.frontend.reasoning_subgraph_topk_edges
 
 # Milvus connection is now handled by backend tools automatically
 # No frontend connection management needed
@@ -192,11 +139,7 @@ with main_col1:
         )
 
         # LLM panel (Only at the front-end for now)
-        # llms = ["gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"]
-        azure_llms = cfg.app.frontend.get("azure_openai_llms", [])
-        llms = tuple(
-            cfg.app.frontend.openai_llms + azure_llms + cfg.app.frontend.ollama_llms
-        )
+        llms = tuple(streamlit_utils.get_all_available_llms(cfg))
         st.selectbox(
             "Pick an LLM to power the agent",
             llms,
