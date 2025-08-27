@@ -306,6 +306,8 @@ def update_state_t2b(st):
 
 
 def update_state_t2kg(st):
+    # Get the config from session state
+    cfg = st.session_state.config
     dic = {
         "embedding_model": st.session_state.t2kg_emb_model,
         "uploaded_files": st.session_state.uploaded_files,
@@ -313,11 +315,10 @@ def update_state_t2kg(st):
         "topk_edges": st.session_state.topk_edges,
         "dic_source_graph": [
             {
-                "name": st.session_state.config["kg_name"],
-                "kg_pyg_path": st.session_state.config["kg_pyg_path"],
-                "kg_text_path": st.session_state.config["kg_text_path"],
+                "name": cfg.utils.database.milvus.milvus_db.database_name,
             }
         ],
+        "selections": st.session_state.selections,
     }
     return dic
 
