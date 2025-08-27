@@ -6,16 +6,17 @@ Utils for Streamlit.
 
 import datetime
 import os
+import re
 import tempfile
 
 import gravis
 import hydra
 import networkx as nx
-import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 import streamlit.components.v1 as components
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from langchain.callbacks.tracers import LangChainTracer
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
@@ -23,12 +24,25 @@ from langchain_core.messages import AIMessage, AIMessageChunk, ChatMessage, Huma
 from langchain_core.tracers.context import collect_runs
 from langchain_nvidia_ai_endpoints import ChatNVIDIA, NVIDIAEmbeddings
 from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langchain_openai.embeddings import OpenAIEmbeddings
 from langsmith import Client
 
-import glob
-import re
+
+def get_azure_token_provider():
+    """
+    Get Azure AD token provider for Azure OpenAI authentication.
+
+    Returns:
+        token provider for Azure AD authentication
+    """
+    try:
+        return get_bearer_token_provider(
+            DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
+        )
+    except Exception as e:
+        st.error(f"Failed to create Azure token provider: {e}")
+        return None
 
 
 def submit_feedback(user_response):
@@ -982,12 +996,59 @@ def get_base_chat_model(model_name) -> BaseChatModel:
         "NVIDIA/llama-3.1-405b-instruct": "meta/llama-3.1-405b-instruct",
         "NVIDIA/llama-3.1-70b-instruct": "meta/llama-3.1-70b-instruct",
         "OpenAI/gpt-4o-mini": "gpt-4o-mini",
+        "Azure/gpt-4o-mini": "gpt-4o-mini",  # Azure model mapping
     }
+
     if model_name.startswith("Llama"):
         return ChatOllama(model=dic_llm_models[model_name], temperature=0)
     elif model_name.startswith("NVIDIA"):
         return ChatNVIDIA(model=dic_llm_models[model_name], temperature=0)
-    return ChatOpenAI(model=dic_llm_models[model_name], temperature=0)
+    elif model_name.startswith("Azure/"):
+        # Azure OpenAI configuration
+        azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+        azure_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT")
+        api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01")
+        model_name_env = os.environ.get(
+            "AZURE_OPENAI_MODEL_NAME", dic_llm_models[model_name]
+        )
+        model_version = os.environ.get("AZURE_OPENAI_MODEL_VERSION")
+
+        if not azure_endpoint or not azure_deployment:
+            st.error(
+                "Azure OpenAI requires AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT environment variables"
+            )
+            return ChatOpenAI(
+                model=dic_llm_models[model_name], temperature=0
+            )  # Fallback to regular OpenAI
+
+        # Get Azure token provider
+        token_provider = get_azure_token_provider()
+        if not token_provider:
+            st.error("Failed to get Azure token provider")
+            return ChatOpenAI(
+                model=dic_llm_models[model_name], temperature=0
+            )  # Fallback to regular OpenAI
+
+        return AzureChatOpenAI(
+            azure_endpoint=azure_endpoint,
+            azure_deployment=azure_deployment,
+            api_version=api_version,
+            model_name=model_name_env,
+            model_version=model_version,
+            azure_ad_token_provider=token_provider,
+            temperature=0,
+        )
+    elif model_name.startswith("OpenAI/"):
+        # Regular OpenAI with optional custom base URL
+        base_url = os.environ.get("OPENAI_BASE_URL")
+        return ChatOpenAI(
+            model=dic_llm_models[model_name],
+            temperature=0,
+            base_url=base_url if base_url else None,
+        )
+
+    # Default fallback
+    return ChatOpenAI(model=dic_llm_models.get(model_name, model_name), temperature=0)
 
 
 @st.dialog("Warning ⚠️")

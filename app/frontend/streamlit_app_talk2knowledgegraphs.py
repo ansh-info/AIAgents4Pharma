@@ -5,18 +5,18 @@ Talk2KnowledgeGraphs: A Streamlit app for the Talk2KnowledgeGraphs graph.
 """
 
 import os
-import sys
 import random
-import streamlit as st
-import pandas as pd
+import sys
+
 import hydra
-from streamlit_feedback import streamlit_feedback
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from langchain_core.messages import ChatMessage
-from langchain_core.tracers.context import collect_runs
+import streamlit as st
 from langchain.callbacks.tracers import LangChainTracer
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_ollama import OllamaEmbeddings, ChatOllama
+from langchain_core.messages import AIMessage, ChatMessage, HumanMessage, SystemMessage
+from langchain_core.tracers.context import collect_runs
+from langchain_ollama import OllamaEmbeddings
+from langchain_openai import OpenAIEmbeddings
+from streamlit_feedback import streamlit_feedback
+
 from utils import streamlit_utils
 
 sys.path.append("./")
@@ -127,8 +127,9 @@ if "unique_id" not in st.session_state:
 
 # Initialize the LLM model
 if "llm_model" not in st.session_state:
+    azure_llms = cfg.app.frontend.get("azure_openai_llms", [])
     st.session_state.llm_model = tuple(
-        cfg.app.frontend.openai_llms + cfg.app.frontend.ollama_llms
+        cfg.app.frontend.openai_llms + azure_llms + cfg.app.frontend.ollama_llms
     )[0]
 
 # Initialize the app with default LLM model for the first time
@@ -192,7 +193,10 @@ with main_col1:
 
         # LLM panel (Only at the front-end for now)
         # llms = ["gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"]
-        llms = tuple(cfg.app.frontend.openai_llms + cfg.app.frontend.ollama_llms)
+        azure_llms = cfg.app.frontend.get("azure_openai_llms", [])
+        llms = tuple(
+            cfg.app.frontend.openai_llms + azure_llms + cfg.app.frontend.ollama_llms
+        )
         st.selectbox(
             "Pick an LLM to power the agent",
             llms,
@@ -272,7 +276,9 @@ with main_col2:
                     config = {"configurable": {"thread_id": st.session_state.unique_id}}
 
                     # Prepare LLM and embedding model for updating the agent
-                    llm_model = streamlit_utils.get_base_chat_model(st.session_state.llm_model)
+                    llm_model = streamlit_utils.get_base_chat_model(
+                        st.session_state.llm_model
+                    )
 
                     if cfg.app.frontend.default_embedding_model == "ollama":
                         emb_model = OllamaEmbeddings(
@@ -376,7 +382,9 @@ with main_col2:
                     ]
 
                     # Prepare LLM and embedding model for updating the agent
-                    llm_model = streamlit_utils.get_base_chat_model(st.session_state.llm_model)
+                    llm_model = streamlit_utils.get_base_chat_model(
+                        st.session_state.llm_model
+                    )
 
                     if cfg.app.frontend.default_embedding_model == "ollama":
                         # For IBD BioBridge data, we still use Ollama embeddings

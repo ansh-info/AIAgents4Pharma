@@ -19,11 +19,27 @@ kg_node_types:
 kg_pyg_path: "aiagents4pharma/talk2knowledgegraphs/tests/files/biobridge_multimodal_pyg_graph.pkl"
 kg_text_path: "aiagents4pharma/talk2knowledgegraphs/tests/files/biobridge_multimodal_text_graph.pkl"
 openai_api_key: ${oc.env:OPENAI_API_KEY}
+# OpenAI configuration - can use custom base_url for enterprise/Azure deployments
+openai_base_url: ${oc.env:OPENAI_BASE_URL,null}  # Optional: custom OpenAI endpoint
 openai_llms:
   - "OpenAI/gpt-4o-mini"
 openai_embeddings:
   - "text-embedding-ada-002"
   - "text-embedding-3-small"
+# Azure OpenAI configuration
+azure_openai_endpoint: ${oc.env:AZURE_OPENAI_ENDPOINT,null}  # Azure OpenAI endpoint
+azure_openai_deployment: ${oc.env:AZURE_OPENAI_DEPLOYMENT,null}  # Azure deployment name
+azure_openai_api_version: ${oc.env:AZURE_OPENAI_API_VERSION,"2024-02-01"}  # Azure API version
+azure_openai_model_name: ${oc.env:AZURE_OPENAI_MODEL_NAME,null}  # Model name for analytics
+azure_openai_model_version: ${oc.env:AZURE_OPENAI_MODEL_VERSION,null}  # Model version
+# Azure AD authentication (uses AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET)
+azure_client_id: ${oc.env:AZURE_CLIENT_ID,null}
+azure_tenant_id: ${oc.env:AZURE_TENANT_ID,null}
+azure_client_secret: ${oc.env:AZURE_CLIENT_SECRET,null}
+azure_openai_llms:
+  - "Azure/gpt-4o-mini"  # Will map to Azure deployment
+azure_openai_embeddings:
+  - "Azure/text-embedding-ada-002"
 ollama_llms:
   - "NVIDIA/llama-3.3-70b-instruct"
   - "NVIDIA/llama-3.1-405b-instruct"

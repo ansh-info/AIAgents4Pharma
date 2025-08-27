@@ -5,19 +5,17 @@ A Streamlit app for the Talk2AIAgents4Pharma graph.
 """
 
 import os
-import sys
 import random
+import sys
+
 import hydra
 import streamlit as st
-import pandas as pd
-from streamlit_feedback import streamlit_feedback
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_ollama import OllamaEmbeddings, ChatOllama
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from langchain_core.messages import ChatMessage
+from langchain_openai import OpenAIEmbeddings
+from langchain_core.messages import AIMessage, ChatMessage, HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.tracers.context import collect_runs
-from langchain.callbacks.tracers import LangChainTracer
+from langchain_ollama import OllamaEmbeddings
+from streamlit_feedback import streamlit_feedback
+
 from utils import streamlit_utils
 
 st.set_page_config(
@@ -158,8 +156,9 @@ if "run_id" not in st.session_state:
 
 # Initialize the LLM model
 if "llm_model" not in st.session_state:
+    azure_llms = cfg.app.frontend.get("azure_openai_llms", [])
     st.session_state.llm_model = tuple(
-        cfg.app.frontend.openai_llms + cfg.app.frontend.ollama_llms
+        cfg.app.frontend.openai_llms + azure_llms + cfg.app.frontend.ollama_llms
     )[0]
 
 # Initialize graph
@@ -239,7 +238,10 @@ with main_col1:
         )
 
         # LLM panel (Only at the front-end for now)
-        llms = tuple(cfg.app.frontend.openai_llms + cfg.app.frontend.ollama_llms)
+        azure_llms = cfg.app.frontend.get("azure_openai_llms", [])
+        llms = tuple(
+            cfg.app.frontend.openai_llms + azure_llms + cfg.app.frontend.ollama_llms
+        )
         st.selectbox(
             "Pick an LLM to power the agent",
             llms,
