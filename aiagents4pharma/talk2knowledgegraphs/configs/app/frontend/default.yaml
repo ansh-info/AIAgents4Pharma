@@ -26,6 +26,11 @@ openai_llms:
 openai_embeddings:
   - "text-embedding-ada-002"
   - "text-embedding-3-small"
+# Rate limiting and retry configuration
+llm_max_retries: 5  # Number of retries on rate limit or transient errors
+llm_timeout: 60     # Timeout in seconds for LLM requests
+embedding_max_retries: 3  # Number of retries for embedding requests
+embedding_timeout: 30     # Timeout in seconds for embedding requests
 # Azure OpenAI configuration
 azure_openai_endpoint: ${oc.env:AZURE_OPENAI_ENDPOINT,null} # Azure OpenAI endpoint
 azure_openai_deployment: ${oc.env:AZURE_OPENAI_DEPLOYMENT,null} # Azure deployment name

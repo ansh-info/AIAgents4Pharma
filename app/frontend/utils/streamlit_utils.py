@@ -313,7 +313,8 @@ def update_state_t2b(st):
     dic = {
         "sbml_file_path": [st.session_state.sbml_file_path],
         "text_embedding_model": get_text_embedding_model(
-            st.session_state.text_embedding_model
+            st.session_state.text_embedding_model,
+            st.session_state.config
         ),
     }
     return dic
@@ -399,7 +400,7 @@ def get_response(agent, graphs_visuals, app, st, prompt):
     #     {"sbml_file_path": [st.session_state.sbml_file_path]}
     # )
     app.update_state(
-        config, {"llm_model": get_base_chat_model(st.session_state.llm_model)}
+        config, {"llm_model": get_base_chat_model(st.session_state.llm_model, st.session_state.config)}
     )
     # app.update_state(
     #     config,
@@ -973,16 +974,24 @@ def render_graph(graph_dict: dict, key: str, save_graph: bool = False):
 #         )
 
 
-def get_text_embedding_model(model_name) -> Embeddings:
+def get_text_embedding_model(model_name, cfg=None) -> Embeddings:
     """
     Function to get the text embedding model.
 
     Args:
         model_name: str: The name of the model
+        cfg: Optional[DictConfig]: Configuration object containing retry/timeout settings
 
     Returns:
         Embeddings: The text embedding model
     """
+    # Get retry and timeout settings from config or use defaults
+    max_retries = 3   # Default for embeddings
+    timeout = 30      # Default for embeddings
+    
+    if cfg and hasattr(cfg, 'app') and hasattr(cfg.app, 'frontend'):
+        max_retries = getattr(cfg.app.frontend, 'embedding_max_retries', 3)
+        timeout = getattr(cfg.app.frontend, 'embedding_timeout', 30)
     dic_text_embedding_models = {
         "NVIDIA/llama-3.2-nv-embedqa-1b-v2": "nvidia/llama-3.2-nv-embedqa-1b-v2",
         "OpenAI/text-embedding-ada-002": "text-embedding-ada-002",
@@ -1003,7 +1012,9 @@ def get_text_embedding_model(model_name) -> Embeddings:
                 "Azure OpenAI requires AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT environment variables"
             )
             return OpenAIEmbeddings(
-                model=dic_text_embedding_models[model_name]
+                model=dic_text_embedding_models[model_name],
+                max_retries=max_retries,
+                timeout=timeout
             )  # Fallback to regular OpenAI
 
         # Get Azure token provider
@@ -1011,7 +1022,9 @@ def get_text_embedding_model(model_name) -> Embeddings:
         if not token_provider:
             st.error("Failed to get Azure token provider")
             return OpenAIEmbeddings(
-                model=dic_text_embedding_models[model_name]
+                model=dic_text_embedding_models[model_name],
+                max_retries=max_retries,
+                timeout=timeout
             )  # Fallback to regular OpenAI
 
         from langchain_openai.embeddings import AzureOpenAIEmbeddings
@@ -1021,6 +1034,8 @@ def get_text_embedding_model(model_name) -> Embeddings:
             azure_deployment=azure_deployment,
             api_version=api_version,
             azure_ad_token_provider=token_provider,
+            max_retries=max_retries,
+            timeout=timeout,
         )
     elif model_name in dic_text_embedding_models and not model_name.startswith(
         ("OpenAI/", "NVIDIA/", "Azure/")
@@ -1035,20 +1050,30 @@ def get_text_embedding_model(model_name) -> Embeddings:
         return OpenAIEmbeddings(
             model=dic_text_embedding_models.get(
                 model_key, model_name.replace("OpenAI/", "")
-            )
+            ),
+            max_retries=max_retries,
+            timeout=timeout
         )
 
 
-def get_base_chat_model(model_name) -> BaseChatModel:
+def get_base_chat_model(model_name, cfg=None) -> BaseChatModel:
     """
     Function to get the base chat model.
 
     Args:
         model_name: str: The name of the model
+        cfg: Optional[DictConfig]: Configuration object containing retry/timeout settings
 
     Returns:
         BaseChatModel: The base chat model
     """
+    # Get retry and timeout settings from config or use defaults
+    max_retries = 5  # Default
+    timeout = 60     # Default
+    
+    if cfg and hasattr(cfg, 'app') and hasattr(cfg.app, 'frontend'):
+        max_retries = getattr(cfg.app.frontend, 'llm_max_retries', 5)
+        timeout = getattr(cfg.app.frontend, 'llm_timeout', 60)
     dic_llm_models = {
         "NVIDIA/llama-3.3-70b-instruct": "meta/llama-3.3-70b-instruct",
         "NVIDIA/llama-3.1-405b-instruct": "meta/llama-3.1-405b-instruct",
@@ -1059,11 +1084,11 @@ def get_base_chat_model(model_name) -> BaseChatModel:
     }
 
     if model_name.startswith("Llama"):
-        return ChatOllama(model=dic_llm_models[model_name], temperature=0)
+        return ChatOllama(model=dic_llm_models[model_name], temperature=0, timeout=timeout)
     elif model_name.startswith("Ollama/"):
-        return ChatOllama(model=dic_llm_models[model_name], temperature=0)
+        return ChatOllama(model=dic_llm_models[model_name], temperature=0, timeout=timeout)
     elif model_name.startswith("NVIDIA"):
-        return ChatNVIDIA(model=dic_llm_models[model_name], temperature=0)
+        return ChatNVIDIA(model=dic_llm_models[model_name], temperature=0, timeout=timeout)
     elif model_name.startswith("Azure/"):
         # Azure OpenAI configuration
         azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
@@ -1079,7 +1104,10 @@ def get_base_chat_model(model_name) -> BaseChatModel:
                 "Azure OpenAI requires AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT environment variables"
             )
             return ChatOpenAI(
-                model=dic_llm_models[model_name], temperature=0
+                model=dic_llm_models[model_name], 
+                temperature=0,
+                max_retries=max_retries,
+                timeout=timeout
             )  # Fallback to regular OpenAI
 
         # Get Azure token provider
@@ -1087,7 +1115,10 @@ def get_base_chat_model(model_name) -> BaseChatModel:
         if not token_provider:
             st.error("Failed to get Azure token provider")
             return ChatOpenAI(
-                model=dic_llm_models[model_name], temperature=0
+                model=dic_llm_models[model_name], 
+                temperature=0,
+                max_retries=max_retries,
+                timeout=timeout
             )  # Fallback to regular OpenAI
 
         return AzureChatOpenAI(
@@ -1098,6 +1129,8 @@ def get_base_chat_model(model_name) -> BaseChatModel:
             model_version=model_version,
             azure_ad_token_provider=token_provider,
             temperature=0,
+            max_retries=max_retries,
+            timeout=timeout,
         )
     elif model_name.startswith("OpenAI/"):
         # Regular OpenAI with optional custom base URL
@@ -1106,10 +1139,17 @@ def get_base_chat_model(model_name) -> BaseChatModel:
             model=dic_llm_models[model_name],
             temperature=0,
             base_url=base_url if base_url else None,
+            max_retries=max_retries,
+            timeout=timeout,
         )
 
     # Default fallback
-    return ChatOpenAI(model=dic_llm_models.get(model_name, model_name), temperature=0)
+    return ChatOpenAI(
+        model=dic_llm_models.get(model_name, model_name), 
+        temperature=0,
+        max_retries=max_retries,
+        timeout=timeout
+    )
 
 
 @st.dialog("Warning ⚠️")
@@ -1148,7 +1188,8 @@ def update_text_embedding_model(app):
         config,
         {
             "text_embedding_model": get_text_embedding_model(
-                st.session_state.text_embedding_model
+                st.session_state.text_embedding_model,
+                st.session_state.config
             )
         },
     )
@@ -1294,7 +1335,8 @@ def get_t2b_uploaded_files(app):
             {
                 "pdf_file_name": f.name,
                 "text_embedding_model": get_text_embedding_model(
-                    st.session_state.text_embedding_model
+                    st.session_state.text_embedding_model,
+                    st.session_state.config
                 ),
             },
         )
