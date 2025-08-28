@@ -1289,12 +1289,15 @@ def get_t2b_uploaded_files(app):
         # Create config for the agent
         config = {"configurable": {"thread_id": st.session_state.unique_id}}
         # Update the agent state with the PDF file name and text embedding model
-        app.update_state(config, {
-            "pdf_file_name": f.name,
-            "text_embedding_model": get_text_embedding_model(
-                st.session_state.text_embedding_model
-            )
-        })
+        app.update_state(
+            config,
+            {
+                "pdf_file_name": f.name,
+                "text_embedding_model": get_text_embedding_model(
+                    st.session_state.text_embedding_model
+                ),
+            },
+        )
 
         if article.name not in [
             uf["file_name"] for uf in st.session_state.t2b_uploaded_files
@@ -1613,8 +1616,15 @@ def initialize_session_state(cfg, agent_type="T2B"):
             st.session_state.sbml_file_path = None
 
     elif agent_type == "T2S":
-        # Scholars specific session state (placeholder for future)
-        pass
+        # Scholars specific session state
+        if "article_data" not in st.session_state:
+            st.session_state.article_data = {}
+
+        if "vector_store" not in st.session_state:
+            st.session_state.vector_store = None
+
+        if "zotero_initialized" not in st.session_state:
+            st.session_state.zotero_initialized = False
 
     elif agent_type == "T2AA4P":
         # Combined agent specific session state (hybrid of T2B + T2KG)

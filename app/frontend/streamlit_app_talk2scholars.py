@@ -514,7 +514,7 @@ with main_col2:
                     "Setting up the `agent` and `vector store`. This may take a moment..."
                 ):
                     # Initialize Zotero library and RAG index before greeting
-                    if "zotero_initialized" not in st.session_state:
+                    if not st.session_state.zotero_initialized:
                         initialize_zotero_and_build_store()
                     config: RunnableConfig = {
                         "configurable": {"thread_id": st.session_state.unique_id}
