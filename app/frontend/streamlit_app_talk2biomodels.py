@@ -136,8 +136,13 @@ def get_uploaded_files():
             # print (f.name)
         # Create config for the agent
         config = {"configurable": {"thread_id": st.session_state.unique_id}}
-        # Update the agent state with the selected LLM model
-        app.update_state(config, {"pdf_file_name": f.name})
+        # Update the agent state with the PDF file name and text embedding model
+        app.update_state(config, {
+            "pdf_file_name": f.name,
+            "text_embedding_model": streamlit_utils.get_text_embedding_model(
+                st.session_state.text_embedding_model
+            )
+        })
     # Return the uploaded file
     return uploaded_sbml_file
 

@@ -1288,8 +1288,13 @@ def get_t2b_uploaded_files(app):
             f.write(article.read())
         # Create config for the agent
         config = {"configurable": {"thread_id": st.session_state.unique_id}}
-        # Update the agent state with the selected LLM model
-        app.update_state(config, {"pdf_file_name": f.name})
+        # Update the agent state with the PDF file name and text embedding model
+        app.update_state(config, {
+            "pdf_file_name": f.name,
+            "text_embedding_model": get_text_embedding_model(
+                st.session_state.text_embedding_model
+            )
+        })
 
         if article.name not in [
             uf["file_name"] for uf in st.session_state.t2b_uploaded_files
