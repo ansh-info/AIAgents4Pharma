@@ -11,14 +11,18 @@ from ..utils.database.milvus_connection_manager import MilvusConnectionManager
 
 
 class FakeConnections:
+    """fake pymilvus.connections module"""
+
     def __init__(self):
         self._map = {}
         self._addr = {}
 
     def has_connection(self, alias):
+        """has_connection"""
         return alias in self._map
 
     def connect(self, alias, host, port, user, password):
+        """connect"""
         self._map[alias] = {
             "host": host,
             "port": port,
@@ -28,40 +32,56 @@ class FakeConnections:
         self._addr[alias] = (host, port)
 
     def disconnect(self, alias):
+        """disconnect"""
         self._map.pop(alias, None)
         self._addr.pop(alias, None)
 
     def get_connection_addr(self, alias):
+        """connection address"""
         return self._addr.get(alias, None)
 
 
 class FakeDB:
+    """fake pymilvus.db module"""
+
     def __init__(self):
+        """init"""
         self._using = None
 
     def using_database(self, name):
+        """using_database"""
         self._using = name
 
 
 class FakeCollection:
+    """fake pymilvus Collection class"""
+
     registry = {}
 
     def __init__(self, name):
+        """init"""
         self.name = name
         # Default num_entities for stats fallback
         self.num_entities = FakeCollection.registry.get(name, {}).get("num_entities", 7)
 
     def load(self):
+        """load"""
         FakeCollection.registry.setdefault(self.name, {}).update({"loaded": True})
 
     def query(self, expr=None, output_fields=None, limit=None):
+        """query"""
         return [{"id": 1}]
 
     def search(
         self, data=None, anns_field=None, param=None, limit=None, output_fields=None
     ):
+        """search"""
+
         class Hit:
+            """hit"""
+
             def __init__(self, idx, score):
+                """init"""
                 self.id = idx
                 self.score = score
 
@@ -69,20 +89,27 @@ class FakeCollection:
 
 
 class FakeSyncClient:
+    """fake pymilvus MilvusClient class"""
+
     def __init__(self, uri, token, db_name):
+        """init"""
         self.uri = uri
         self.token = token
         self.db_name = db_name
 
 
 class FakeAsyncClient:
+    """fake pymilvus AsyncMilvusClient class"""
+
     def __init__(self, uri, token, db_name):
+        """init"""
         self.uri = uri
         self.token = token
         self.db_name = db_name
         self._closed = False
 
     async def load_collection(self, collection_name):
+        """load_collection"""
         # mark loaded in registry
         FakeCollection.registry.setdefault(collection_name, {}).update(
             {"loaded_async": True}
@@ -91,12 +118,15 @@ class FakeAsyncClient:
     async def search(
         self, collection_name, data, anns_field, search_params, limit, output_fields
     ):
+        """search"""
         return [[{"id": i, "distance": 0.1 * i} for i in range(limit)]]
 
     async def query(self, collection_name, filter, output_fields, limit):
+        """search"""
         return [{"ok": True, "filter": filter}]
 
     async def close(self):
+        """simulate close"""
         self._closed = True
 
 
@@ -128,6 +158,7 @@ def patch_pymilvus(monkeypatch):
 
 @pytest.fixture
 def cfg():
+    """cfg fixture"""
     # minimal cfg namespace with milvus_db sub-keys used by the manager
     return SimpleNamespace(
         milvus_db=SimpleNamespace(
@@ -142,6 +173,7 @@ def cfg():
 
 
 def test_singleton_and_init(cfg):
+    """ "singleton and init"""
     # Two instances with same config key should be identical
     a = MilvusConnectionManager(cfg)
     b = MilvusConnectionManager(cfg)
@@ -151,6 +183,7 @@ def test_singleton_and_init(cfg):
 
 
 def test_ensure_connection_creates_and_reuses(cfg):
+    """ensure_connection creates and reuses"""
     mgr = MilvusConnectionManager(cfg)
     # First call creates connection and sets db
     assert mgr.ensure_connection() is True
@@ -159,6 +192,7 @@ def test_ensure_connection_creates_and_reuses(cfg):
 
 
 def test_get_connection_info_connected_and_disconnected(cfg):
+    """connection info connected and disconnected"""
     mgr = MilvusConnectionManager(cfg)
     # before ensure, not connected
     info = mgr.get_connection_info()
@@ -172,6 +206,7 @@ def test_get_connection_info_connected_and_disconnected(cfg):
 
 
 def test_get_sync_and_async_client(cfg):
+    """ "sync and async client singleton"""
     mgr = MilvusConnectionManager(cfg)
     c1 = mgr.get_sync_client()
     c2 = mgr.get_sync_client()
@@ -182,11 +217,13 @@ def test_get_sync_and_async_client(cfg):
 
 
 def test_test_connection_success(cfg):
+    """connection success"""
     mgr = MilvusConnectionManager(cfg)
     assert mgr.test_connection() is True
 
 
 def test_get_collection_success(cfg):
+    """collection success"""
     mgr = MilvusConnectionManager(cfg)
     coll = mgr.get_collection("dbX_nodes")
     assert isinstance(coll, FakeCollection)
@@ -195,10 +232,14 @@ def test_get_collection_success(cfg):
 
 
 def test_get_collection_failure_raises(cfg, monkeypatch):
+    """collection failure raises"""
     mgr = MilvusConnectionManager(cfg)
 
     class Boom(FakeCollection):
+        """collection that fails to load"""
+
         def load(self):
+            """load fails"""
             raise RuntimeError("load failed")
 
     mod = importlib.import_module(
@@ -212,6 +253,7 @@ def test_get_collection_failure_raises(cfg, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_async_search_success(cfg):
+    """async search success"""
     mgr = MilvusConnectionManager(cfg)
     res = await mgr.async_search(
         collection_name="dbX_edges",
@@ -227,10 +269,12 @@ async def test_async_search_success(cfg):
 
 @pytest.mark.asyncio
 async def test_async_search_falls_back_to_sync(cfg, monkeypatch):
+    """search fallback to sync"""
     mgr = MilvusConnectionManager(cfg)
 
     # Make Async client creation fail (get_async_client returns None)
     def bad_async_client(*a, **k):
+        """aync client fails"""
         return None
 
     mod = importlib.import_module(
@@ -251,13 +295,18 @@ async def test_async_search_falls_back_to_sync(cfg, monkeypatch):
 
 
 def test_sync_search_error_raises(cfg, monkeypatch):
+    """sync search error raises"""
     mgr = MilvusConnectionManager(cfg)
 
     class Boom(FakeCollection):
+        """version of Collection that fails to search"""
+
         def load(self):
+            """load no-op"""
             pass
 
         def search(self, *a, **k):
+            """search fails"""
             raise RuntimeError("sync search fail")
 
     mod = importlib.import_module(
@@ -273,6 +322,7 @@ def test_sync_search_error_raises(cfg, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_async_query_success(cfg):
+    """ "search success"""
     mgr = MilvusConnectionManager(cfg)
     res = await mgr.async_query(
         collection_name="dbX_nodes", expr="id > 0", output_fields=["id"], limit=1
@@ -283,9 +333,11 @@ async def test_async_query_success(cfg):
 
 @pytest.mark.asyncio
 async def test_async_query_falls_back_to_sync(cfg, monkeypatch):
+    """search fallback to sync"""
     mgr = MilvusConnectionManager(cfg)
 
     def bad_async_client(*a, **k):
+        """simulate async client creation failure"""
         return None
 
     monkeypatch.setattr(mgr, "get_async_client", bad_async_client, raising=True)
@@ -297,13 +349,18 @@ async def test_async_query_falls_back_to_sync(cfg, monkeypatch):
 
 
 def test_sync_query_error_raises(cfg, monkeypatch):
+    """sync query error raises"""
     mgr = MilvusConnectionManager(cfg)
 
     class Boom(FakeCollection):
+        """ "booming collection"""
+
         def load(self):
+            """load no-op"""
             pass
 
         def query(self, *a, **k):
+            """query fails"""
             raise RuntimeError("sync query fail")
 
     mod = importlib.import_module(
@@ -317,6 +374,7 @@ def test_sync_query_error_raises(cfg, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_async_load_collection_ok(cfg):
+    """async load collection ok"""
     mgr = MilvusConnectionManager(cfg)
     ok = await mgr.async_load_collection("dbX_nodes")
     assert ok is True
@@ -326,10 +384,14 @@ async def test_async_load_collection_ok(cfg):
 
 @pytest.mark.asyncio
 async def test_async_load_collection_error_raises(cfg, monkeypatch):
+    """load collection error raises"""
     mgr = MilvusConnectionManager(cfg)
 
     class BadAsync(FakeAsyncClient):
+        """bad async client"""
+
         async def load_collection(self, *a, **k):
+            """load_collection fails"""
             raise RuntimeError("boom")
 
     mod = importlib.import_module(
@@ -345,6 +407,7 @@ async def test_async_load_collection_error_raises(cfg, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_async_get_collection_stats_ok(cfg):
+    """async get collection stats ok"""
     mgr = MilvusConnectionManager(cfg)
     FakeCollection.registry["dbX_nodes"] = {"num_entities": 42}
     stats = await mgr.async_get_collection_stats("dbX_nodes")
@@ -353,15 +416,20 @@ async def test_async_get_collection_stats_ok(cfg):
 
 @pytest.mark.asyncio
 async def test_async_get_collection_stats_error(cfg, monkeypatch):
+    """ "async get collection stats error"""
     mgr = MilvusConnectionManager(cfg)
 
     class BadCollection(FakeCollection):
+        """bad collection"""
+
         def __init__(self, name):
+            """ "init"""
             # override to avoid FakeCollection.__init__ assigning to self.num_entities
             self.name = name
 
         @property
         def num_entities(self):
+            """num_entities fails"""
             raise RuntimeError("stats fail")
 
     mod = importlib.import_module(
@@ -379,6 +447,7 @@ async def test_async_get_collection_stats_error(cfg, monkeypatch):
 
 
 def test_disconnect_closes_both_clients(cfg):
+    """ "disconnect closes both clients"""
     mgr = MilvusConnectionManager(cfg)
     # create both clients
     mgr.get_sync_client()
@@ -392,24 +461,33 @@ def test_disconnect_closes_both_clients(cfg):
 
 
 def test_from_config_and_get_instance_are_singleton(cfg):
+    """ "config and get_instance singleton"""
     a = MilvusConnectionManager.from_config(cfg)
     b = MilvusConnectionManager.get_instance(cfg)
     assert a is b
 
 
 def test_from_hydra_config_success(monkeypatch):
+    """ "hydra config success"""
+
     # Fake hydra returning desired cfg shape
     class HydraCtx:
+        """ "hydra context"""
+
         def __enter__(self):
+            """ "enter"""
             return self
 
         def __exit__(self, *a):
+            """exit"""
             return False
 
     def initialize(**k):
+        """initialize"""
         return HydraCtx()
 
     def compose(config_name, overrides):
+        """compose"""
         return SimpleNamespace(
             utils=SimpleNamespace(
                 database=SimpleNamespace(
@@ -443,17 +521,25 @@ def test_from_hydra_config_success(monkeypatch):
 
 
 def test_from_hydra_config_failure_raises(monkeypatch):
+    """ "hydra config failure raises"""
+
     class HydraCtx:
+        """hydra context"""
+
         def __enter__(self):
+            """enter"""
             return self
 
         def __exit__(self, *a):
+            """ "exit"""
             return False
 
     def initialize(**k):
+        """initialize"""
         return HydraCtx()
 
     def compose(*a, **k):
+        """compose fails"""
         raise RuntimeError("compose fail")
 
     mod = importlib.import_module(
@@ -470,13 +556,17 @@ def test_from_hydra_config_failure_raises(monkeypatch):
 
 
 def test_get_async_client_init_exception_returns_none(cfg, monkeypatch):
+    """ "async client init exception returns None"""
 
     mod = importlib.import_module(
         "..utils.database.milvus_connection_manager", package=__package__
     )
 
     class BadAsyncClient:
+        """ "quote-unquote bad async client"""
+
         def __init__(self, *a, **k):
+            """init fails"""
             raise RuntimeError("cannot init async client")
 
     monkeypatch.setattr(mod, "AsyncMilvusClient", BadAsyncClient, raising=True)
@@ -486,6 +576,7 @@ def test_get_async_client_init_exception_returns_none(cfg, monkeypatch):
 
 
 def test_ensure_connection_milvus_exception_branch(cfg, monkeypatch):
+    """ensure_connection MilvusException branch"""
 
     mod = importlib.import_module(
         "..utils.database.milvus_connection_manager", package=__package__
@@ -494,9 +585,11 @@ def test_ensure_connection_milvus_exception_branch(cfg, monkeypatch):
 
     # has_connection → False so it tries to connect
     def has_conn(alias):
+        """connection exists"""
         return False
 
     def connect(*a, **k):
+        """connect fails with MilvusException"""
         raise MilvusException("boom")  # specific MilvusException
 
     monkeypatch.setattr(mod.connections, "has_connection", has_conn, raising=True)
@@ -507,6 +600,7 @@ def test_ensure_connection_milvus_exception_branch(cfg, monkeypatch):
 
 
 def test_ensure_connection_generic_exception_wrapped(cfg, monkeypatch):
+    """ensure_connection generic exception wrapped"""
 
     mod = importlib.import_module(
         "..utils.database.milvus_connection_manager", package=__package__
@@ -514,9 +608,11 @@ def test_ensure_connection_generic_exception_wrapped(cfg, monkeypatch):
     mgr = MilvusConnectionManager(cfg)
 
     def has_conn(alias):
+        """connection exists"""
         return False
 
     def connect(*a, **k):
+        """ "connect fails with generic exception"""
         raise RuntimeError("generic failure")  # generic exception
 
     monkeypatch.setattr(mod.connections, "has_connection", has_conn, raising=True)
@@ -527,6 +623,7 @@ def test_ensure_connection_generic_exception_wrapped(cfg, monkeypatch):
 
 
 def test_get_connection_info_error_branch(cfg, monkeypatch):
+    """ "get_connection_info error branch"""
     mod = importlib.import_module(
         "..utils.database.milvus_connection_manager", package=__package__
     )
@@ -534,9 +631,11 @@ def test_get_connection_info_error_branch(cfg, monkeypatch):
 
     # Force an exception when fetching connection info
     def has_conn(alias):
+        """connection exists"""
         return True
 
     def get_addr(alias):
+        """addr fails"""
         raise RuntimeError("addr fail")
 
     monkeypatch.setattr(mod.connections, "has_connection", has_conn, raising=True)
@@ -548,6 +647,7 @@ def test_get_connection_info_error_branch(cfg, monkeypatch):
 
 
 def test_test_connection_failure_returns_false(cfg, monkeypatch):
+    """connection failure returns false"""
     mgr = MilvusConnectionManager(cfg)
     # Make ensure_connection blow up so test_connection catches and returns False
     monkeypatch.setattr(
@@ -561,6 +661,7 @@ def test_test_connection_failure_returns_false(cfg, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_disconnect_uses_create_task_when_loop_running(cfg):
+    """disconnect uses create_task when loop running"""
     mgr = MilvusConnectionManager(cfg)
     # create async client so disconnect tries to close it
     acli = mgr.get_async_client()
@@ -575,10 +676,14 @@ async def test_disconnect_uses_create_task_when_loop_running(cfg):
 
 
 def test_disconnect_async_close_exception_sets_false(cfg, monkeypatch):
+    """disconnect async close exception sets false"""
     mgr = MilvusConnectionManager(cfg)
 
     class BadAsyncClose:
+        """bad async close"""
+
         async def close(self):
+            """delay and then raise"""
             raise RuntimeError("close fail")
 
     # Inject a "bad" async client
@@ -595,6 +700,7 @@ def test_disconnect_async_close_exception_sets_false(cfg, monkeypatch):
 
     # Stub asyncio.run to directly call the coro and raise
     def fake_run(coro):
+        """fake run"""
         # drive the coroutine to exception
         loop = _asyncio.new_event_loop()
         try:
@@ -611,6 +717,7 @@ def test_disconnect_async_close_exception_sets_false(cfg, monkeypatch):
 
 
 def test_disconnect_outer_exception_returns_false(cfg, monkeypatch):
+    """disconnect outer exception returns false"""
     mgr = MilvusConnectionManager(cfg)
     # Make connections.has_connection itself raise to jump to outer except
 

@@ -2,7 +2,6 @@
 Test cases for tools/milvus_multimodal_subgraph_extraction.py
 """
 
-# tests/test_milvus_multimodal_subgraph_extraction.py
 import asyncio
 import importlib
 import math
@@ -24,10 +23,12 @@ class FakeDF:
 
     @staticmethod
     def DataFrame(*args, **kwargs):
+        """df = pd.DataFrame(data, columns=cols)"""
         return pd.DataFrame(*args, **kwargs)
 
     @staticmethod
     def concat(objs, **kwargs):
+        """concatenated = pd.concat(objs, **kwargs)"""
         return pd.concat(objs, **kwargs)
 
 
@@ -35,22 +36,27 @@ class FakePY:
     """NumPy/CuPy-like shim exposed as loader.py"""
 
     def __init__(self):
+        """initialize linalg.norm"""
         self.linalg = types.SimpleNamespace(norm=lambda x: float(np.linalg.norm(x)))
 
     @staticmethod
     def array(x):
+        """if x is list/tuple, convert to np.array"""
         return np.array(x)
 
     @staticmethod
     def asarray(x):
+        """asarray = np.asarray(x)"""
         return np.asarray(x)
 
     @staticmethod
     def concatenate(xs):
+        """concatenated = np.concatenate(xs)"""
         return np.concatenate(xs)
 
     @staticmethod
     def unique(x):
+        """unique = np.unique(x)"""
         return np.unique(x)
 
 
@@ -63,7 +69,10 @@ def fake_loader_factory(monkeypatch):
     instances = {}
 
     class FakeDynamicLibraryLoader:
+        """fake of DynamicLibraryLoader with toggle-able attributes"""
+
         def __init__(self, detector):
+            """initialize with detector to set use_gpu default"""
             # toggle-able per-test
             self.use_gpu = getattr(detector, "use_gpu", False)
             # Expose df/py shims
@@ -75,11 +84,15 @@ def fake_loader_factory(monkeypatch):
 
         # allow test to tweak after construction
         def set(self, **kwargs):
+            """set attributes from kwargs"""
             for k, v in kwargs.items():
                 setattr(self, k, v)
 
     class FakeSystemDetector:
+        """fake of SystemDetector with fixed use_gpu"""
+
         def __init__(self):
+            """fixed use_gpu"""
             self.use_gpu = False
 
     # Patch imports inside the module under test
@@ -94,6 +107,7 @@ def fake_loader_factory(monkeypatch):
     )
 
     def get_loader(tool: MultimodalSubgraphExtractionTool):
+        """get the loader instance from the tool"""
         # Access the instance created during tool.__init__
         return tool.loader
 
@@ -105,7 +119,10 @@ def fake_hydra(monkeypatch):
     """Stub hydra.initialize and hydra.compose for both tool cfg and db cfg."""
 
     class CfgTool:
+        """cfg for tool; dynamic_metrics and search_metric_type are toggleable"""
+
         def __init__(self, dynamic_metrics=True, search_metric_type=None):
+            """initialize with toggles"""
             # required fields read by tool
             self.cost_e = 1.0
             self.c_const = 0.5
@@ -119,7 +136,10 @@ def fake_hydra(monkeypatch):
             )
 
     class CfgAll:
+        """cfg for db; fixed values"""
+
         def __init__(self):
+            """initialize with fixed values"""
             # expose utils.database.milvus with node color dict
             self.utils = types.SimpleNamespace(
                 database=types.SimpleNamespace(
@@ -134,17 +154,23 @@ def fake_hydra(monkeypatch):
             )
 
     class HydraCtx:
+        """hydra context manager stub"""
+
         def __enter__(self):
+            """enter returns self"""
             return self
 
         def __exit__(self, *a):
+            """exit does nothing"""
             return False
 
     def initialize(**kwargs):
+        """initialize returns context manager"""
         return HydraCtx()
 
     # Switchable return based on overrides/config_name
     def compose(config_name, overrides=None):
+        """compose returns different cfgs based on args"""
         if config_name == "config" and overrides:
             # tool config call
             # allow two modes: dynamic on/off and explicit search_metric_type
@@ -183,7 +209,10 @@ def fake_pcst_and_fast(monkeypatch):
     """Stub MultimodalPCSTPruning and pcst_fast.pcst_fast."""
 
     class FakePCST:
+        """fake of MultimodalPCSTPruning with simplified methods"""
+
         def __init__(self, **kwargs):
+            """initialize and record kwargs"""
             # Record arguments for dynamic metric assertions
             self.kwargs = kwargs
             self.root = kwargs.get("root", -1)
@@ -193,16 +222,19 @@ def fake_pcst_and_fast(monkeypatch):
             self.loader = kwargs["loader"]
 
         async def _load_edge_index_from_milvus_async(self, cfg_db, connection_manager):
+            """load edge index async; return dummy structure"""
             # Return a small edge_index structure that compute_subgraph_costs can accept
             return {"dummy": True}
 
         async def compute_prizes_async(
             self, desc_emb, feat_emb, cfg_db, connection_manager, node_type
         ):
+            """compute prizes async; return dummy prizes"""
             # Return a simple prizes object
             return {"prizes": np.array([1.0, 2.0, 3.0])}
 
         def compute_subgraph_costs(self, edge_index, num_nodes, prizes):
+            """compute subgraph costs; return dummy edges, prizes_final, costs, mapping"""
             # Return edges_dict, prizes_final, costs, mapping
             edges_dict = {
                 "edges": np.array([[0, 1], [1, 2], [2, 3]]),
@@ -216,6 +248,7 @@ def fake_pcst_and_fast(monkeypatch):
         def get_subgraph_nodes_edges(
             self, num_nodes, result_vertices, result_edges_bundle, mapping
         ):
+            """get subgraph nodes and edges; return dummy structure"""
             # Return a consistent "subgraph" structure with .tolist() available
             return {
                 "nodes": np.array([10, 11]),
@@ -223,6 +256,7 @@ def fake_pcst_and_fast(monkeypatch):
             }
 
     def fake_pcst_fast(edges, prizes, costs, root, num_clusters, pruning, verbosity):
+        """fake pcst_fast function; return fixed vertices and edges"""
         # Return (vertices, edges) indices; values don't matter because FakePCST.get_subgraph... ignores them
         return [0, 1], [0]
 
@@ -247,13 +281,18 @@ def fake_milvus_and_manager(monkeypatch):
     """
 
     class FakeCollection:
+        """fake of pymilvus.Collection with query method"""
+
         def __init__(self, name):
+            """initialize with name"""
             self.name = name
 
         def load(self):
+            """load does nothing"""
             return None
 
         def query(self, expr, output_fields):
+            """query returns fixed rows based on expr"""
             # Parse expr to determine which path we're in
             # expr can be:
             #  - node_name IN ["TP53","EGFR"]
@@ -332,23 +371,29 @@ def fake_milvus_and_manager(monkeypatch):
 
             # raise AssertionError(f"Unexpected expr: {expr}")
 
-    # ------------------ Connection Manager ------------------
     class FakeManager:
+        """fake of MilvusConnectionManager with async query method"""
+
         def __init__(self, cfg_db):
+            """initialize with cfg_db"""
             self.cfg_db = cfg_db
             self.connected = False
 
         def ensure_connection(self):
+            """ensure_connection sets connected True"""
             self.connected = True
 
         def test_connection(self):
+            """test_connection always returns True"""
             return True
 
         def get_connection_info(self):
+            """get_connection_info returns fixed dict"""
             return {"database": "primekg"}
 
         # Async Milvus-like helpers used by _query_milvus_collection_async
         async def async_query(self, collection_name, expr, output_fields):
+            """simulate async query returning rows based on expr"""
             # Mirror Collection.query behavior for async path
             col = FakeCollection(collection_name)
             # Add one case where a group yields no rows to exercise empty-async branch
@@ -357,6 +402,7 @@ def fake_milvus_and_manager(monkeypatch):
             return col.query(expr, output_fields)
 
         async def async_get_collection_stats(self, name):
+            """async get_collection_stats returns fixed num_entities"""
             # Used to compute num_nodes
             return {"num_entities": 1234}
 
@@ -371,6 +417,7 @@ def fake_milvus_and_manager(monkeypatch):
     # Patch the ConnectionManager class used inside the tool
     # so that constructing it yields our fake.
     def fake_manager_ctor(cfg_db):
+        """fake ctor returning FakeManager"""
         return FakeManager(cfg_db)
 
     # The tool imports MilvusConnectionManager from ..utils.database
@@ -385,6 +432,7 @@ def fake_read_excel(monkeypatch):
     """Patch pandas.read_excel to return multiple sheets to exercise concat/rename logic."""
 
     def _fake_read_excel(path, sheet_name=None):
+        """fake read_excel returning two sheets"""
         assert sheet_name is None
         # Two sheets; first has a hyphen in sheet-like node type to test hyphen->underscore logic upstream
         return {
@@ -408,7 +456,10 @@ def base_state():
     """Minimal viable state; uploaded_files will be supplied per-test."""
 
     class Embedder:
+        """embedder with fixed embed_query output"""
+
         def embed_query(self, text):
+            """embed_query returns fixed embedding"""
             # vector with norm=3 → normalized = [1/3, 2/3, 2/3] when enabled
             return [1.0, 2.0, 2.0]
 
@@ -429,6 +480,7 @@ def test_read_multimodal_files_empty(
     fake_pcst_and_fast,
     fake_milvus_and_manager,
 ):
+    """test _read_multimodal_files returns empty DataFrame when no files present"""
     tool = MultimodalSubgraphExtractionTool()
     loader = fake_loader_factory.get_loader(tool)
     # ensure CPU path default ok
@@ -442,6 +494,7 @@ def test_read_multimodal_files_empty(
 def test_normalize_vector_toggle(
     fake_loader_factory, fake_hydra, fake_pcst_and_fast, fake_milvus_and_manager
 ):
+    """normalize_vector returns normalized or original based on loader setting"""
     tool = MultimodalSubgraphExtractionTool()
     loader = fake_loader_factory.get_loader(tool)
 
@@ -469,6 +522,7 @@ async def test_run_async_happy_path(
     fake_read_excel,
     base_state,
 ):
+    """async run with Excel file exercises most code paths"""
     # Prepare state with a multimodal Excel file
     state = dict(base_state)
     state["uploaded_files"] = [{"file_type": "multimodal", "file_path": "/fake.xlsx"}]
@@ -517,7 +571,10 @@ async def test_dynamic_metric_selection_paths(
     )
 
     class CfgToolA:
+        """cfg with dynamic_metrics=True and search_metric_type=None"""
+
         def __init__(self):
+            """initialize with fixed values"""
             self.cost_e = 1.0
             self.c_const = 0.5
             self.root = -1
@@ -528,7 +585,10 @@ async def test_dynamic_metric_selection_paths(
             self.vector_processing = types.SimpleNamespace(dynamic_metrics=True)
 
     class CfgToolB:
+        """cfg with dynamic_metrics=False and search_metric_type='L2'"""
+
         def __init__(self):
+            """initialize with fixed values"""
             self.cost_e = 1.0
             self.c_const = 0.5
             self.root = -1
@@ -539,7 +599,10 @@ async def test_dynamic_metric_selection_paths(
             self.vector_processing = types.SimpleNamespace(dynamic_metrics=False)
 
     class CfgAll:
+        """cfg for db; fixed values"""
+
         def __init__(self):
+            """object with fixed values"""
             self.utils = types.SimpleNamespace(
                 database=types.SimpleNamespace(
                     milvus=types.SimpleNamespace(
@@ -550,19 +613,25 @@ async def test_dynamic_metric_selection_paths(
             )
 
     class HydraCtx:
+        """hydra context manager stub"""
+
         def __enter__(self):
+            """enter returns self"""
             return self
 
         def __exit__(self, *a):
+            """exit does nothing"""
             return False
 
     def initialize(**kwargs):
+        """initialize returns context manager"""
         return HydraCtx()
 
     # flip between tool cfg A then B when overrides are present; db cfg when not
     calls = {"i": 0}
 
     def compose(config_name, overrides=None):
+        """compose returns different cfgs based on args"""
         if config_name == "config" and overrides:
             calls["i"] += 1
             if calls["i"] == 1:
@@ -630,6 +699,7 @@ def test_run_sync_wrapper(
     fake_milvus_and_manager,
     base_state,
 ):
+    """run the sync wrapper which calls the async path internally"""
     tool = MultimodalSubgraphExtractionTool()
     loader = fake_loader_factory.get_loader(tool)
     loader.set(normalize_vectors=True)
@@ -664,10 +734,14 @@ def test_connection_error_raises_runtimeerror(
     )
 
     class ExplodingManager:
+        """exploding manager whose ensure_connection raises"""
+
         def __init__(self, cfg_db):
+            """initialize with cfg_db"""
             pass
 
         def ensure_connection(self):
+            """ "ensure_connection always raises"""
             raise RuntimeError("nope")
 
     # Patch manager ctor to explode
@@ -701,6 +775,7 @@ def test_prepare_query_modalities_async_with_excel_grouping(
     fake_read_excel,
     base_state,
 ):
+    """prepare_query_modalities_async with Excel file populates state['selections"""
     # Use the public async prep path via _run_async in another test,
     # but here directly target the helper to assert selections are added.
     tool = MultimodalSubgraphExtractionTool()
@@ -739,6 +814,7 @@ def test__query_milvus_collection_sync_casts_and_builds_expr(
     fake_loader_factory,
     fake_milvus_and_manager,  # provides FakeCollection patch
 ):
+    """query_milvus_collection builds expr and returns expected columns and types"""
 
     tool = MultimodalSubgraphExtractionTool()
     loader = fake_loader_factory.get_loader(tool)
@@ -782,6 +858,7 @@ def test__prepare_query_modalities_sync_with_multimodal_grouping(
     fake_milvus_and_manager,  # provides FakeCollection for node queries
     base_state,
 ):
+    """pepare_query_modalities with multimodal file populates state['selections']"""
 
     tool = MultimodalSubgraphExtractionTool()
     loader = fake_loader_factory.get_loader(tool)
@@ -840,6 +917,7 @@ def test__prepare_query_modalities_sync_prompt_only_branch(
     fake_loader_factory,
     base_state,
 ):
+    """run the prompt-only branch of _prepare_query_modalities"""
     tool = MultimodalSubgraphExtractionTool()
     fake_loader_factory.get_loader(tool).set(normalize_vectors=False)
 
@@ -862,6 +940,7 @@ def test__prepare_query_modalities_sync_prompt_only_branch(
 
     # Coerce whatever shape we got into a flat list of floats to compare
     def coerce_elem(x):
+        """coerce element to flat list of floats"""
         # single scalar -> list of one
         if not isinstance(x, (list, tuple)):
             return [float(x)]
@@ -889,6 +968,7 @@ async def test__prepare_query_modalities_async_single_task_branch(
     fake_hydra,  # <<< ensure Hydra is mocked
     base_state,
 ):
+    """prepare_query_modalities_async with single group exercises single-task path"""
     tool = MultimodalSubgraphExtractionTool()
     fake_loader_factory.get_loader(tool).set(normalize_vectors=False)
 
@@ -920,6 +1000,7 @@ def test__perform_subgraph_extraction_sync_unifies_nodes_edges(
     fake_loader_factory,
     base_state,
 ):
+    """perform_subgraph_extraction sync path unifies nodes/edges across multiple queries"""
     # Patch MultimodalPCSTPruning to implement .extract_subgraph for sync path
 
     mod = importlib.import_module(
@@ -929,10 +1010,14 @@ def test__perform_subgraph_extraction_sync_unifies_nodes_edges(
     call_counter = {"i": 0}
 
     class FakePCSTSync:
+        """fake of MultimodalPCSTPruning with extract_subgraph method"""
+
         def __init__(self, **kwargs):
+            """init with kwargs; ignore them"""
             pass
 
         def extract_subgraph(self, desc_emb, feat_emb, node_type, cfg_db):
+            """extract_subgraph returns different subgraphs per call"""
             # Return different subgraphs across calls to exercise union/unique
             call_counter["i"] += 1
             if call_counter["i"] == 1:
@@ -1006,6 +1091,7 @@ def test__prepare_final_subgraph_defaults_black_when_no_colors(
     fake_loader_factory,
     fake_milvus_and_manager,  # gives FakeCollection for node/edge lookups
 ):
+    """prepare_final_subgraph colors nodes black when no selections/colors present"""
     # Prepare a minimal subgraph DataFrame
     tool = MultimodalSubgraphExtractionTool()
     fake_loader_factory.get_loader(tool).set(normalize_vectors=False)
@@ -1038,11 +1124,13 @@ async def test__perform_subgraph_extraction_async_no_vector_processing_branch(
     fake_milvus_and_manager,  # <<< ensure FakeManager is used
     base_state,
 ):
+    """perform_subgraph_extraction async path with no vector_processing exercises else: branch"""
     tool = MultimodalSubgraphExtractionTool()
     fake_loader_factory.get_loader(tool).set(normalize_vectors=False)
 
     # Make _extract_single_subgraph_async return a fixed subgraph so we avoid PCST internals
     async def _fake_extract(pcst_instance, query_row, cfg_db, manager):
+        """fake _extract_single_subgraph_async returning fixed subgraph"""
         return {"nodes": np.array([10]), "edges": np.array([100])}
 
     monkeypatch.setattr(
@@ -1099,6 +1187,7 @@ def test__perform_subgraph_extraction_sync_uses_cfg_search_metric_type_when_no_v
     fake_loader_factory,
     base_state,
 ):
+    """perform_subgraph_extraction sync path uses cfg.search_metric_type when no vector_processing"""
     # Patch MultimodalPCSTPruning to capture metric_type passed in (line 412 path)
     mod = importlib.import_module(
         "..tools.milvus_multimodal_subgraph_extraction", package=__package__
@@ -1107,11 +1196,15 @@ def test__perform_subgraph_extraction_sync_uses_cfg_search_metric_type_when_no_v
     captured_metric_types = []
 
     class FakePCSTSync:
+        """fake of MultimodalPCSTPruning capturing metric_type in ctor"""
+
         def __init__(self, **kwargs):
+            """init capturing metric_type"""
             # Capture the metric_type used by the business logic
             captured_metric_types.append(kwargs.get("metric_type"))
 
         def extract_subgraph(self, desc_emb, feat_emb, node_type, cfg_db):
+            """extract_subgraph returns minimal subgraph"""
             # Minimal valid return for the sync path
             return {"nodes": np.array([10]), "edges": np.array([100])}
 

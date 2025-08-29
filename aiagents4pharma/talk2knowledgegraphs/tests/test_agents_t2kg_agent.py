@@ -2,11 +2,14 @@
 Test cases for agents/t2kg_agent.py
 """
 
-from unittest.mock import patch, MagicMock
-import pytest
-from langchain_core.messages import HumanMessage
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from unittest.mock import MagicMock, patch
+
 import pandas as pd
+import pytest
+from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langgraph.types import Command
+
 from ..agents.t2kg_agent import get_app
 from ..tools.milvus_multimodal_subgraph_extraction import (
     MultimodalSubgraphExtractionTool,
@@ -120,11 +123,11 @@ def test_t2kg_agent_openai_milvus_mock(input_dict):
     config = {"configurable": {"thread_id": unique_id}}
     app.update_state(config, input_dict)
     prompt = """
-    Adalimumab is a fully human monoclonal antibody (IgG1) 
+    Adalimumab is a fully human monoclonal antibody (IgG1)
     that specifically binds to tumor necrosis factor-alpha (TNF-α), a pro-inflammatory cytokine.
 
     I would like to get evidence from the knowledge graph about the mechanism of actions related to
-    Adalimumab in treating inflammatory bowel disease 
+    Adalimumab in treating inflammatory bowel disease
     (IBD). Please follow these steps:
     - Extract a subgraph from the PrimeKG that contains information about Adalimumab.
     - Summarize the extracted subgraph.
@@ -225,8 +228,6 @@ def test_t2kg_agent_openai_milvus_mock(input_dict):
         mock_conn_mgr.return_value = mock_conn_mgr_instance
 
         # Mock the tool's _run method to return a proper Command that updates state
-        from langgraph.types import Command
-        from langchain_core.messages import ToolMessage
 
         def mock_tool_execution(tool_call_id, state, prompt, arg_data=None):
             # Create a mock extracted graph

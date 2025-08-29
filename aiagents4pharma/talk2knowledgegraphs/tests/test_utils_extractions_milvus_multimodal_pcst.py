@@ -19,7 +19,10 @@ from ..utils.extractions.milvus_multimodal_pcst import (
 
 
 class FakeMilvusCollection:
+    """fake pymilvus.Collection with minimal methods for testing"""
+
     def __init__(self, name):
+        """test_system_detector_init_and_methods"""
         self.name = name
         # Default sizes; tests can monkeypatch attributes
         self.num_entities = 6
@@ -27,19 +30,26 @@ class FakeMilvusCollection:
         self._query_batches = {}  # dict: (start,end)->list of dict rows
 
     def load(self):  # no-op
+        """load collection"""
         return None
 
     def search(self, data, anns_field, param, limit, output_fields):
+        """search method"""
+
         # Return a list [hits], where hits is an iterable of objects with .id and .score
         # We'll synthesize predictable hits: ids = range(limit) with descending scores
         class Hit:
+            """hit object"""
+
             def __init__(self, i, s):
+                """init hit"""
                 self.id, self.score = i, s
 
         hits = [Hit(i, float(limit - i)) for i in range(limit)]
         return [hits]
 
     def query(self, expr, output_fields):
+        """query method"""
         # Expect expr like: triplet_index >= a and triplet_index < b
         # We'll extract a,b and yield rows accordingly
         if "triplet_index" in expr:
@@ -57,10 +67,12 @@ class FakeAsyncConnMgr:
     """Minimal async connection manager for *_async methods."""
 
     def __init__(self, num_nodes=10, num_edges=8):
+        """init"""
         self._num_nodes = num_nodes
         self._num_edges = num_edges
 
     async def async_get_collection_stats(self, collection_name):
+        """async get_collection_stats"""
         if collection_name.endswith("_edges"):
             return {"num_entities": self._num_edges}
         return {"num_entities": self._num_nodes}
@@ -68,17 +80,14 @@ class FakeAsyncConnMgr:
     async def async_search(
         self, collection_name, data, anns_field, param, limit, output_fields
     ):
+        """async search"""
         # Return list of dicts with 'id' and 'distance'
         return [[{"id": i, "distance": float(limit - i)} for i in range(limit)]]
 
 
-# ----------------------------
-# Fixtures to patch internals
-# ----------------------------
-
-
 @pytest.fixture
 def patch_milvus_collection(monkeypatch):
+    """patch pymilvus.Collection with FakeMilvusCollection"""
     # Patch pymilvus.Collection inside the module under test
 
     mod = importlib.import_module(
@@ -90,6 +99,7 @@ def patch_milvus_collection(monkeypatch):
 
 @pytest.fixture
 def fake_detector_cpu(monkeypatch):
+    """force CPU-only environment (macOS + no NVIDIA)"""
     # Make sure detector reports CPU (no GPU)
     det = SystemDetector.__new__(SystemDetector)
     det.os_type = "darwin"
@@ -101,6 +111,7 @@ def fake_detector_cpu(monkeypatch):
 
 @pytest.fixture
 def fake_detector_gpu(monkeypatch):
+    """force GPU-capable environment (Linux + NVIDIA)"""
     # Force GPU-capable environment (Linux + NVIDIA)
     det = SystemDetector.__new__(SystemDetector)
     det.os_type = "linux"
@@ -115,18 +126,26 @@ def patch_cupy_cudf(monkeypatch):
     """Provide minimal cupy/cudf-like objects for GPU branch."""
 
     class FakeCP:
+        """fake cupy with minimal methods"""
+
         float32 = np.float32
 
         @staticmethod
         def asarray(x):
+            """static asarray method"""
             return np.asarray(x)
 
         class linalg:
+            """linalg submodule"""
+
             @staticmethod
             def norm(x, axis=None, keepdims=False):
+                """norm method"""
                 return np.linalg.norm(x, axis=axis, keepdims=keepdims)
 
     class FakeCuDF:
+        """fake cudf with minimal methods"""
+
         DataFrame = pd.DataFrame
         concat = staticmethod(pd.concat)
 
@@ -140,6 +159,7 @@ def patch_cupy_cudf(monkeypatch):
 
 
 def test_dynamic_library_loader_cpu_path(fake_detector_cpu):
+    """test DynamicLibraryLoader in CPU mode"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     assert loader.use_gpu is False
     assert loader.metric_type == "COSINE"
@@ -153,6 +173,7 @@ def test_dynamic_library_loader_cpu_path(fake_detector_cpu):
 
 
 def test_dynamic_library_loader_gpu_path(fake_detector_gpu, patch_cupy_cudf):
+    """dynamic loader in GPU mode"""
     loader = DynamicLibraryLoader(fake_detector_gpu)
     assert loader.use_gpu is True
     assert loader.metric_type == "IP"
@@ -166,6 +187,7 @@ def test_dynamic_library_loader_gpu_path(fake_detector_gpu, patch_cupy_cudf):
 def test_prepare_collections_creates_expected_collections(
     monkeypatch, patch_milvus_collection, fake_detector_cpu
 ):
+    """prepare_collections creates expected collections based on modality"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     pcst = MultimodalPCSTPruning(loader=loader)
 
@@ -185,6 +207,7 @@ def test_prepare_collections_creates_expected_collections(
 async def test__load_edge_index_from_milvus_async_batches(
     monkeypatch, patch_milvus_collection, fake_detector_cpu
 ):
+    """load_edge_index_from_milvus_async handles batching correctly"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     pcst = MultimodalPCSTPruning(loader=loader)
     cfg = SimpleNamespace(
@@ -192,7 +215,10 @@ async def test__load_edge_index_from_milvus_async_batches(
     )
 
     class CountingCollection(FakeMilvusCollection):
+        """collection that forces specific num_entities for batching"""
+
         def __init__(self, name):
+            """init"""
             super().__init__(name)
             self.num_entities = 7  # forces batches: 0-3, 3-6, 6-7
 
@@ -219,6 +245,7 @@ async def test__load_edge_index_from_milvus_async_batches(
 def test__compute_node_prizes_search_branches(
     monkeypatch, patch_milvus_collection, fake_detector_cpu
 ):
+    """compute_node_prizes uses correct collection based on use_description"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     pcst_desc = MultimodalPCSTPruning(loader=loader, use_description=True, topk=4)
     pcst_feat = MultimodalPCSTPruning(loader=loader, use_description=False, topk=3)
@@ -240,6 +267,7 @@ def test__compute_node_prizes_search_branches(
 
 @pytest.mark.asyncio
 async def test__compute_node_prizes_async_uses_manager(fake_detector_cpu):
+    """compute_node_prizes_async uses connection manager and topk correctly"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     pcst = MultimodalPCSTPruning(loader=loader, topk=3, metric_type="COSINE")
 
@@ -256,6 +284,7 @@ async def test__compute_node_prizes_async_uses_manager(fake_detector_cpu):
 def test__compute_edge_prizes_and_scaling(
     monkeypatch, patch_milvus_collection, fake_detector_cpu
 ):
+    """compute_edge_prizes uses correct collection and scaling"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     pcst = MultimodalPCSTPruning(loader=loader, topk_e=4, c_const=0.2)
     cfg = SimpleNamespace(milvus_db=SimpleNamespace(database_name="primekg"))
@@ -270,6 +299,7 @@ def test__compute_edge_prizes_and_scaling(
 
 @pytest.mark.asyncio
 async def test__compute_edge_prizes_async_and_scaling(fake_detector_cpu):
+    """compute_edge_prizes_async uses connection manager and scaling"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     pcst = MultimodalPCSTPruning(loader=loader, topk_e=3, c_const=0.1)
 
@@ -286,6 +316,7 @@ async def test__compute_edge_prizes_async_and_scaling(fake_detector_cpu):
 def test_compute_prizes_calls_node_and_edge_paths(
     monkeypatch, patch_milvus_collection, fake_detector_cpu
 ):
+    """compute_prizes calls the node and edge prize methods and combines results"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     pcst = MultimodalPCSTPruning(loader=loader, topk=2, topk_e=2, use_description=False)
     cfg = SimpleNamespace(milvus_db=SimpleNamespace(database_name="primekg"))
@@ -301,6 +332,7 @@ def test_compute_prizes_calls_node_and_edge_paths(
 async def test_compute_prizes_async_uses_thread(
     fake_detector_cpu, patch_milvus_collection
 ):
+    """compute_prizes_async uses connection manager and returns combined prizes"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     pcst = MultimodalPCSTPruning(loader=loader, topk=2, topk_e=2)
     cfg = SimpleNamespace(milvus_db=SimpleNamespace(database_name="primekg"))
@@ -316,6 +348,7 @@ async def test_compute_prizes_async_uses_thread(
 
 
 def test_compute_subgraph_costs_and_mappings(fake_detector_cpu):
+    """compute_subgraph_costs creates expected outputs and mappings"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     pcst = MultimodalPCSTPruning(
         loader=loader, topk=2, topk_e=2, c_const=0.1, cost_e=0.5
@@ -344,6 +377,7 @@ def test_compute_subgraph_costs_and_mappings(fake_detector_cpu):
 
 
 def test_get_subgraph_nodes_edges_maps_virtuals(fake_detector_cpu):
+    """subgraph extraction maps virtuals and includes real edges/nodes"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     pcst = MultimodalPCSTPruning(loader=loader)
     num_nodes = 5
@@ -400,6 +434,7 @@ def test_extract_subgraph_pipeline(monkeypatch, fake_detector_cpu):
 
     # Provide a sync loader for edge index at the CLASS level (NamedTuple instances are immutable)
     def fake_load_edge_index(cfg):
+        """load_edge_index mock"""
         return np.array([[0, 1, 2, 3], [1, 2, 3, 4]])
 
     monkeypatch.setattr(
@@ -411,6 +446,7 @@ def test_extract_subgraph_pipeline(monkeypatch, fake_detector_cpu):
 
     # Mock compute_prizes → return consistent arrays
     def fake_compute_prizes(text_emb, query_emb, c):
+        """compute_prizes mock"""
         return {
             "nodes": np.zeros(colls["nodes"].num_entities, dtype=np.float32),
             "edges": np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32),
@@ -426,6 +462,7 @@ def test_extract_subgraph_pipeline(monkeypatch, fake_detector_cpu):
     # Mock compute_subgraph_costs → return edges_dict, prizes, costs, mapping
     # Keep mapping within the 0..3 columns of edge_index to avoid OOB
     def fake_costs(edge_index, num_nodes, prizes):
+        """fake costs"""
         edges_dict = {"edges": np.array([0, 1]), "num_prior_edges": 2}
         final_prizes = np.array([0, 0, 0, 0, 0], dtype=np.float32)
         costs = np.array([0.1, 0.2], dtype=np.float32)
@@ -441,10 +478,9 @@ def test_extract_subgraph_pipeline(monkeypatch, fake_detector_cpu):
 
     # Patch pcst_fast.pcst_fast
     def fake_pcst(edges, prizes, costs, root, num_clusters, pruning, verbosity):
+        """pcst_fast mock"""
         # Return vertices (some real) and edge indices [0,1]
         return [0, 1, 3], [0, 1]
-
-    import importlib
 
     mod = importlib.import_module(
         "..utils.extractions.milvus_multimodal_pcst", package=__package__
@@ -472,6 +508,8 @@ def test_module_import_gpu_try_block(monkeypatch):
 
     # Inject fakes so import succeeds
     class _FakeCP:
+        """fake cupy"""
+
         float32 = np.float32
 
         # @staticmethod
@@ -484,6 +522,8 @@ def test_module_import_gpu_try_block(monkeypatch):
         #         return np.linalg.norm(x, axis=axis, keepdims=keepdims)
 
     class _FakeCuDF:
+        """fake cudf"""
+
         DataFrame = pd.DataFrame
         concat = staticmethod(pd.concat)
 
@@ -507,6 +547,7 @@ def test_module_import_gpu_try_block(monkeypatch):
 
 
 def test_system_detector_init_and_methods(monkeypatch):
+    """successful detection of Linux + NVIDIA GPU environment"""
 
     mod = importlib.import_module(
         "..utils.extractions.milvus_multimodal_pcst", package=__package__
@@ -517,7 +558,10 @@ def test_system_detector_init_and_methods(monkeypatch):
     monkeypatch.setattr(mod.platform, "machine", lambda: "x86_64", raising=True)
 
     class _Ret:
+        """return object"""
+
         def __init__(self, rc):
+            """init"""
             self.returncode = rc
 
     monkeypatch.setattr(
@@ -536,6 +580,7 @@ def test_system_detector_init_and_methods(monkeypatch):
 
 
 def test_system_detector_detect_gpu_exception_path(monkeypatch):
+    """system detector handles exception in subprocess.run gracefully"""
 
     mod = importlib.import_module(
         "..utils.extractions.milvus_multimodal_pcst", package=__package__
@@ -546,6 +591,7 @@ def test_system_detector_detect_gpu_exception_path(monkeypatch):
     monkeypatch.setattr(mod.platform, "machine", lambda: "arm64", raising=True)
 
     def _boom(*a, **k):
+        """crash"""
         raise FileNotFoundError("no nvidia-smi")
 
     monkeypatch.setattr(mod.subprocess, "run", _boom, raising=True)
@@ -562,6 +608,7 @@ def test_system_detector_detect_gpu_exception_path(monkeypatch):
 
 
 def test_dynamic_loader_gpu_fallback_when_no_cudf(monkeypatch):
+    """dynamic loader falls back to CPU mode when CUDF is not available"""
     # Build a detector that *thinks* GPU is available
     det = SimpleNamespace(
         os_type="linux", architecture="x86_64", has_nvidia_gpu=True, use_gpu=True
@@ -582,6 +629,7 @@ def test_dynamic_loader_gpu_fallback_when_no_cudf(monkeypatch):
 
 
 def test_normalize_matrix_bottom_return_path(fake_detector_cpu):
+    """normalize_matrix takes the bottom return path when use_gpu is False"""
     # Start in CPU mode (use_gpu False), but force normalize_vectors True to skip the early return
     loader = DynamicLibraryLoader(fake_detector_cpu)
     loader.normalize_vectors = True  # override to enter the GPU-path check
@@ -594,20 +642,29 @@ def test_normalize_matrix_bottom_return_path(fake_detector_cpu):
 
 
 def test_to_list_to_arrow_and_default_paths(fake_detector_cpu):
+    """library loader to_list handles to_arrow and default paths"""
     loader = DynamicLibraryLoader(fake_detector_cpu)
 
     class _ArrowObj:
+        """arrow-like object"""
+
         def __init__(self, data):
+            """init"""
             self._data = data
 
         def to_pylist(self):
+            """pylist method"""
             return list(self._data)
 
     class _HasToArrow:
+        """has to_arrow method"""
+
         def __init__(self, data):
+            """init"""
             self._arrow = _ArrowObj(data)
 
         def to_arrow(self):
+            """arrow method"""
             return self._arrow
 
     # `to_arrow` path
