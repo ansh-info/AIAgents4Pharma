@@ -21,3 +21,13 @@ vector_processing:
 
 # Tool-specific configuration only
 # Database configuration moved to configs/utils/database/milvus/default.yaml
+
+## Important - node_colors_dict is added in order to pass the test for the
+## old multimodal_subgraph_extraction tool, later this tool along with the ollama configs will be removed
+node_colors_dict:
+  "gene/protein": "#6a79f7"
+  "molecular_function": "#82cafc"
+  "cellular_component": "#3f9b0b"
+  "biological_process": "#c5c9c7"
+  "drug": "#c4a661"
+  "disease": "#80013f"
