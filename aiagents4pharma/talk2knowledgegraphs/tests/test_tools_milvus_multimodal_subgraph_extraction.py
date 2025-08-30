@@ -15,7 +15,9 @@ import pytest
 # Import the tool under test (as you requested)
 from ..tools.milvus_multimodal_subgraph_extraction import (
     MultimodalSubgraphExtractionTool,
+    ExtractionParams,
 )
+from ..utils.database.milvus_connection_manager import QueryParams
 
 
 class FakeDF:
@@ -221,17 +223,23 @@ def fake_pcst_and_fast(monkeypatch):
             self.verbosity_level = kwargs.get("verbosity_level", 0)
             self.loader = kwargs["loader"]
 
-        async def _load_edge_index_from_milvus_async(self, cfg_db, connection_manager):
-            """load edge index async; return dummy structure"""
-            # Return a small edge_index structure that compute_subgraph_costs can accept
-            return {"dummy": True}
+        # async def _load_edge_index_from_milvus_async(self, cfg_db, connection_manager):
+        #     """load edge index async; return dummy structure"""
+        #     # Return a small edge_index structure that compute_subgraph_costs can accept
+        #     return {"dummy": True}
 
-        async def compute_prizes_async(
-            self, desc_emb, feat_emb, cfg_db, connection_manager, node_type
-        ):
+        async def load_edge_index_async(self, cfg_db, connection_manager):
+            """load edge index async; return dummy edge index array"""
+            # Return a proper numpy array for edge index
+            return np.array([[0, 1, 2], [1, 2, 3]])
+
+        async def compute_prizes_async(self, text_emb, query_emb, cfg, modality):
             """compute prizes async; return dummy prizes"""
-            # Return a simple prizes object
-            return {"prizes": np.array([1.0, 2.0, 3.0])}
+            # Return a simple prizes object matching the real interface
+            return {
+                "nodes": np.array([1.0, 2.0, 3.0, 4.0]),
+                "edges": np.array([0.1, 0.2, 0.3]),
+            }
 
         def compute_subgraph_costs(self, edge_index, num_nodes, prizes):
             """compute subgraph costs; return dummy edges, prizes_final, costs, mapping"""
@@ -392,14 +400,14 @@ def fake_milvus_and_manager(monkeypatch):
             return {"database": "primekg"}
 
         # Async Milvus-like helpers used by _query_milvus_collection_async
-        async def async_query(self, collection_name, expr, output_fields):
-            """simulate async query returning rows based on expr"""
+        async def async_query(self, params: QueryParams):
+            """simulate async query returning rows based on QueryParams"""
             # Mirror Collection.query behavior for async path
-            col = FakeCollection(collection_name)
+            col = FakeCollection(params.collection_name)
             # Add one case where a group yields no rows to exercise empty-async branch
             # if 'node_name IN ["NOHIT"]' in expr:
             #     return []
-            return col.query(expr, output_fields)
+            return col.query(params.expr, params.output_fields)
 
         async def async_get_collection_stats(self, name):
             """async get_collection_stats returns fixed num_entities"""
@@ -1172,11 +1180,13 @@ async def test__perform_subgraph_extraction_async_no_vector_processing_branch(
     manager = mod.MilvusConnectionManager(cfg_db)  # this uses your FakeManager
 
     out = await tool._perform_subgraph_extraction_async(
-        state=base_state,
-        cfg=cfg,
-        cfg_db=cfg_db,
-        query_df=qdf,
-        connection_manager=manager,
+        ExtractionParams(
+            state=base_state,
+            cfg=cfg,
+            cfg_db=cfg_db,
+            query_df=qdf,
+            connection_manager=manager,
+        )
     )
     pdf = getattr(out, "to_pandas", lambda: out)()
     assert "Unified Subgraph" in set(pdf["name"])

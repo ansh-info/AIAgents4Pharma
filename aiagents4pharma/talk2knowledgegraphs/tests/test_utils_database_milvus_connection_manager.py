@@ -7,7 +7,11 @@ from types import SimpleNamespace
 import pytest
 from pymilvus.exceptions import MilvusException
 
-from ..utils.database.milvus_connection_manager import MilvusConnectionManager
+from ..utils.database.milvus_connection_manager import (
+    MilvusConnectionManager,
+    SearchParams,
+    QueryParams,
+)
 
 
 class FakeConnections:
@@ -256,12 +260,14 @@ async def test_async_search_success(cfg):
     """async search success"""
     mgr = MilvusConnectionManager(cfg)
     res = await mgr.async_search(
-        collection_name="dbX_edges",
-        data=[[0.1, 0.2]],
-        anns_field="feat_emb",
-        param={"metric_type": "COSINE"},
-        limit=2,
-        output_fields=["id"],
+        SearchParams(
+            collection_name="dbX_edges",
+            data=[[0.1, 0.2]],
+            anns_field="feat_emb",
+            search_params={"metric_type": "COSINE"},
+            limit=2,
+            output_fields=["id"],
+        )
     )
     assert isinstance(res, list)
     assert len(res[0]) == 2
@@ -283,12 +289,14 @@ async def test_async_search_falls_back_to_sync(cfg, monkeypatch):
     monkeypatch.setattr(mgr, "get_async_client", bad_async_client, raising=True)
 
     res = await mgr.async_search(
-        collection_name="dbX_edges",
-        data=[[0.1, 0.2]],
-        anns_field="feat_emb",
-        param={"metric_type": "COSINE"},
-        limit=3,
-        output_fields=["id"],
+        SearchParams(
+            collection_name="dbX_edges",
+            data=[[0.1, 0.2]],
+            anns_field="feat_emb",
+            search_params={"metric_type": "COSINE"},
+            limit=3,
+            output_fields=["id"],
+        )
     )
     # Sync fallback should produce hits
     assert len(res[0]) == 3
@@ -316,7 +324,14 @@ def test_sync_search_error_raises(cfg, monkeypatch):
 
     with pytest.raises(MilvusException):
         mgr._sync_search(
-            "dbX_edges", [[0.1]], "feat_emb", {"metric_type": "COSINE"}, 1, ["id"]
+            SearchParams(
+                collection_name="dbX_edges",
+                data=[[0.1]],
+                anns_field="feat_emb",
+                search_params={"metric_type": "COSINE"},
+                limit=1,
+                output_fields=["id"],
+            )
         )
 
 
@@ -325,7 +340,12 @@ async def test_async_query_success(cfg):
     """ "search success"""
     mgr = MilvusConnectionManager(cfg)
     res = await mgr.async_query(
-        collection_name="dbX_nodes", expr="id > 0", output_fields=["id"], limit=1
+        QueryParams(
+            collection_name="dbX_nodes",
+            expr="id > 0",
+            output_fields=["id"],
+            limit=1,
+        )
     )
     assert isinstance(res, list)
     assert res[0]["ok"] is True
@@ -343,7 +363,12 @@ async def test_async_query_falls_back_to_sync(cfg, monkeypatch):
     monkeypatch.setattr(mgr, "get_async_client", bad_async_client, raising=True)
 
     res = await mgr.async_query(
-        collection_name="dbX_nodes", expr="id > 0", output_fields=["id"], limit=1
+        QueryParams(
+            collection_name="dbX_nodes",
+            expr="id > 0",
+            output_fields=["id"],
+            limit=1,
+        )
     )
     assert isinstance(res, list)
 
@@ -369,7 +394,14 @@ def test_sync_query_error_raises(cfg, monkeypatch):
     monkeypatch.setattr(mod, "Collection", Boom, raising=True)
 
     with pytest.raises(MilvusException):
-        mgr._sync_query("dbX_nodes", "x > 0", ["id"], 5)
+        mgr._sync_query(
+            QueryParams(
+                collection_name="dbX_nodes",
+                expr="x > 0",
+                output_fields=["id"],
+                limit=5,
+            )
+        )
 
 
 @pytest.mark.asyncio

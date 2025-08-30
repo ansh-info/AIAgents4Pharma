@@ -232,9 +232,7 @@ async def test__load_edge_index_from_milvus_async_batches(
 
     monkeypatch.setattr(pymilvus, "Collection", CountingCollection, raising=True)
 
-    edge_index = await pcst._load_edge_index_from_milvus_async(
-        cfg, connection_manager=None
-    )
+    edge_index = await pcst.load_edge_index_async(cfg, _connection_manager=None)
 
     assert edge_index.shape[0] == 2
     heads, tails = edge_index
@@ -341,7 +339,6 @@ async def test_compute_prizes_async_uses_thread(
         text_emb=[0.1, 0.2],
         query_emb=[0.1, 0.2],
         cfg=cfg,
-        connection_manager=manager,
         modality="gene/protein",
     )
     assert "nodes" in out and "edges" in out
@@ -409,7 +406,9 @@ def test_get_subgraph_nodes_edges_maps_virtuals(fake_detector_cpu):
     assert set(sub["nodes"].tolist()).issuperset({0, 1, 2, 3})
 
 
-def test_extract_subgraph_pipeline(monkeypatch, fake_detector_cpu):
+def test_extract_subgraph_pipeline(
+    monkeypatch, fake_detector_cpu, patch_milvus_collection
+):
     """End-to-end skeleton of extract_subgraph with its heavy deps mocked."""
     loader = DynamicLibraryLoader(fake_detector_cpu)
     pcst = MultimodalPCSTPruning(
@@ -432,17 +431,9 @@ def test_extract_subgraph_pipeline(monkeypatch, fake_detector_cpu):
         raising=True,
     )
 
-    # Provide a sync loader for edge index at the CLASS level (NamedTuple instances are immutable)
-    def fake_load_edge_index(cfg):
-        """load_edge_index mock"""
-        return np.array([[0, 1, 2, 3], [1, 2, 3, 4]])
-
-    monkeypatch.setattr(
-        MultimodalPCSTPruning,
-        "_load_edge_index_from_milvus",
-        staticmethod(fake_load_edge_index),
-        raising=False,
-    )
+    # Let load_edge_index run the real implementation for coverage
+    # The test mocks Collection to handle Milvus calls
+    pass
 
     # Mock compute_prizes → return consistent arrays
     def fake_compute_prizes(text_emb, query_emb, c):
