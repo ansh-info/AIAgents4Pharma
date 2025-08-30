@@ -28,6 +28,7 @@ from ..utils.extractions.milvus_multimodal_pcst import (
 )
 from .load_arguments import ArgumentData
 
+# pylint: disable=too-many-lines
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -18,11 +18,14 @@ from ..tools.milvus_multimodal_subgraph_extraction import (
 )
 from ..utils.database.milvus_connection_manager import QueryParams
 
+# pylint: disable=too-many-lines
+
 
 def _configure_hydra_for_dynamic_tests(monkeypatch, mod):
     """Install a minimal hydra into the target module for dynamic-metric tests.
     Returns the `CfgToolA` class so the caller can cover its helper methods.
     """
+
     class CfgToolA:
         """Tool cfg with dynamic_metrics enabled."""
 
@@ -111,9 +114,7 @@ def _configure_hydra_for_dynamic_tests(monkeypatch, mod):
                     )
                 )
             return types.SimpleNamespace(
-                tools=types.SimpleNamespace(
-                    multimodal_subgraph_extraction=CfgToolB()
-                )
+                tools=types.SimpleNamespace(multimodal_subgraph_extraction=CfgToolB())
             )
         if config_name == "config":
             return CfgAll()
@@ -128,6 +129,7 @@ def _configure_hydra_for_dynamic_tests(monkeypatch, mod):
 
     return CfgToolA
 
+
 class FakeDF:
     """Pandas-like shim exposed as loader.df"""
 
@@ -135,6 +137,7 @@ class FakeDF:
     def dataframe(*args, **kwargs):
         """df = pd.DataFrame(data, columns=cols)"""
         return pd.DataFrame(*args, **kwargs)
+
     # Backward-compatible alias for business code calling loader.df.DataFrame
     DataFrame = pd.DataFrame
 
@@ -791,11 +794,15 @@ async def test_dynamic_metric_selection_paths(request):
     assert "dic_extracted_graph" in cmd.update
     # cover cfg helper methods for A
     assert (
-        mod.hydra.compose("config", overrides=["x"]).tools.multimodal_subgraph_extraction.marker()
+        mod.hydra.compose(
+            "config", overrides=["x"]
+        ).tools.multimodal_subgraph_extraction.marker()
         is None
     )
     assert (
-        mod.hydra.compose("config", overrides=["x"]).tools.multimodal_subgraph_extraction.marker2()
+        mod.hydra.compose(
+            "config", overrides=["x"]
+        ).tools.multimodal_subgraph_extraction.marker2()
         is None
     )
 
@@ -816,11 +823,15 @@ async def test_dynamic_metric_selection_paths(request):
     assert "dic_extracted_graph" in cmd.update
     # cover cfg helper methods for B
     assert (
-        mod.hydra.compose("config", overrides=["y"]).tools.multimodal_subgraph_extraction.marker()
+        mod.hydra.compose(
+            "config", overrides=["y"]
+        ).tools.multimodal_subgraph_extraction.marker()
         is None
     )
     assert (
-        mod.hydra.compose("config", overrides=["y"]).tools.multimodal_subgraph_extraction.marker2()
+        mod.hydra.compose(
+            "config", overrides=["y"]
+        ).tools.multimodal_subgraph_extraction.marker2()
         is None
     )
     # db cfg helper methods
