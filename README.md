@@ -172,6 +172,7 @@ For contributors and developers, we have comprehensive documentation:
 
 - **[Developer Setup Guide](docs/developer/README.md)** - Complete setup instructions with UV, security implementation, and tooling
 - **[Testing & Linting Guide](docs/developer/TESTING_LINTING.md)** - How to run tests, coverage, and code quality checks
+- **[SonarCloud Integration](docs/developer/SONARCLOUD_SETUP.md)** - Code quality analysis and CI/CD integration
 - **[GitHub Workflows](docs/developer/WORKFLOWS.md)** - Understanding our CI/CD pipeline
 - **[Streamlit Security](docs/developer/STREAMLIT_SECURITY.md)** - File upload security implementation
 
@@ -199,8 +200,8 @@ uv run ruff check --fix .  # Lint and fix code
 uv run ruff format .  # Format code
 uv run pre-commit run --all-files  # Run all checks (linting, formatting, security)
 
-# Run submodule-specific checks
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2scholars/
+# Run submodule-specific checks (pylint configuration in pyproject.toml)
+uv run pylint aiagents4pharma/talk2scholars/
 uv run coverage run --include="aiagents4pharma/talk2scholars/*" -m pytest --cache-clear aiagents4pharma/talk2scholars/tests/ && uv run coverage report
 ```
 

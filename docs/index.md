@@ -172,6 +172,7 @@ For contributors and developers, we have comprehensive documentation:
 
 - **[Developer Setup Guide](developer/README.md)** - Complete setup instructions with UV, security implementation, and tooling
 - **[Testing & Linting Guide](developer/TESTING_LINTING.md)** - How to run tests, coverage, and code quality checks
+- **[SonarCloud Integration](developer/SONARCLOUD_SETUP.md)** - Code quality analysis and CI/CD integration
 - **[GitHub Workflows](developer/WORKFLOWS.md)** - Understanding our CI/CD pipeline
 - **[Streamlit Security](developer/STREAMLIT_SECURITY.md)** - File upload security implementation
 
@@ -199,12 +200,10 @@ uv run ruff check --fix .  # Lint and fix code
 uv run ruff format .  # Format code
 uv run pre-commit run --all-files  # Run all checks (linting, formatting, security)
 
-# Run submodule-specific checks
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2scholars/
+# Run submodule-specific checks (pylint configuration in pyproject.toml)
+uv run pylint aiagents4pharma/talk2scholars/
 uv run coverage run --include="aiagents4pharma/talk2scholars/*" -m pytest --cache-clear aiagents4pharma/talk2scholars/tests/ && uv run coverage report
 ```
-
-For detailed command reference, see [Testing & Linting Guide](developer/TESTING_LINTING.md).
 
 6. Commit and push your changes:
 
@@ -227,7 +226,7 @@ git push origin feat/your-feature-name
 - **Talk2KnowledgeGraphs**: [@awmulyadi](https://github.com/awmulyadi)
 - **Talk2Scholars**: [@ansh-info](https://github.com/ansh-info), [@gurdeep330](https://github.com/gurdeep330)
 
-Please refer to our [CONTRIBUTING.md](CONTRIBUTING.md) and [developer documentation](developer/) for detailed contribution guidelines and setup instructions.
+Please refer to our [CONTRIBUTING.md](CONTRIBUTING.md) and [developer documentation](docs/developer/) for detailed contribution guidelines and setup instructions.
 
 ## Feedback
 

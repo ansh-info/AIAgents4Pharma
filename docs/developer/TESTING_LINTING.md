@@ -230,12 +230,12 @@ uv run pytest aiagents4pharma/talk2cells/tests/
 #### Pylint for Individual Submodules
 
 ```bash
-# Run pylint on specific submodules with standard disable flags
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2scholars/
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2biomodels/
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2knowledgegraphs/
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2aiagents4pharma/
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2cells/
+# Run pylint on specific submodules (configuration in pyproject.toml)
+uv run pylint aiagents4pharma/talk2scholars/
+uv run pylint aiagents4pharma/talk2biomodels/
+uv run pylint aiagents4pharma/talk2knowledgegraphs/
+uv run pylint aiagents4pharma/talk2aiagents4pharma/
+uv run pylint aiagents4pharma/talk2cells/
 ```
 
 #### Coverage for Individual Submodules
@@ -444,14 +444,14 @@ uv run pylint aiagents4pharma/
 # Run on specific component
 uv run pylint aiagents4pharma/talk2scholars/
 
-# Disable specific warnings (standard configuration)
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/
+# Standard configuration (disabled rules configured in pyproject.toml)
+uv run pylint aiagents4pharma/
 
 # Run on each subfolder individually
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2scholars/
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2biomodels/
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2knowledgegraphs/
-uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2cells/
+uv run pylint aiagents4pharma/talk2scholars/
+uv run pylint aiagents4pharma/talk2biomodels/
+uv run pylint aiagents4pharma/talk2knowledgegraphs/
+uv run pylint aiagents4pharma/talk2cells/
 
 # Generate JSON report
 uv run pylint aiagents4pharma/ --output-format=json --reports=no > pylint-report.json
@@ -466,13 +466,8 @@ uv run pylint aiagents4pharma/ --errors-only
 [tool.pylint.MASTER]
 extension-pkg-allow-list = ["pcst_fast"]
 
-# Common disabled checks (adjust as needed)
-disable = [
-    "R0801",  # duplicate-code
-    "R0902",  # too-many-instance-attributes
-    "W0221",  # arguments-renamed
-    "W0122",  # exec-used
-]
+[tool.pylint.messages_control]
+disable = ["R0801", "R0902", "W0221", "W0122"]
 ```
 
 ---
