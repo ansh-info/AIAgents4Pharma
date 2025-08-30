@@ -7,9 +7,11 @@ separation of concerns between frontend and backend.
 """
 
 import asyncio
+import concurrent.futures
 import logging
 import threading
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+from dataclasses import dataclass
 
 import hydra
 from pymilvus import AsyncMilvusClient, Collection, MilvusClient, connections, db
@@ -18,6 +20,28 @@ from pymilvus.exceptions import MilvusException
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SearchParams:
+    """Parameters for search operations."""
+
+    collection_name: str
+    data: List
+    anns_field: str
+    search_params: Dict
+    limit: int
+    output_fields: Optional[List] = None
+
+
+@dataclass
+class QueryParams:
+    """Parameters for query operations."""
+
+    collection_name: str
+    expr: str
+    output_fields: Optional[List] = None
+    limit: Optional[int] = None
 
 
 class MilvusConnectionManager:
@@ -144,7 +168,7 @@ class MilvusConnectionManager:
                     "Created asynchronous AsyncMilvusClient for database: %s",
                     self.database_name,
                 )
-            except Exception as e:
+            except (MilvusException, RuntimeError, ConnectionError, OSError) as e:
                 logger.error("Failed to create async client: %s", str(e))
                 # Don't raise here, let the calling method handle the fallback
                 return None
@@ -199,7 +223,7 @@ class MilvusConnectionManager:
                 raise
             except Exception as e:
                 logger.error("Unexpected error during Milvus connection: %s", str(e))
-                raise MilvusException(f"Connection failed: {str(e)}")
+                raise MilvusException(f"Connection failed: {str(e)}") from e
 
     def get_connection_info(self) -> Dict[str, Any]:
         """
@@ -219,16 +243,15 @@ class MilvusConnectionManager:
                     "connected": True,
                     "connection_address": conn_addr,
                 }
-            else:
-                return {
-                    "alias": self.alias,
-                    "host": self.host,
-                    "port": self.port,
-                    "database": self.database_name,
-                    "connected": False,
-                    "connection_address": None,
-                }
-        except Exception as e:
+            return {
+                "alias": self.alias,
+                "host": self.host,
+                "port": self.port,
+                "database": self.database_name,
+                "connected": False,
+                "connection_address": None,
+            }
+        except (MilvusException, RuntimeError, ConnectionError, OSError) as e:
             logger.error("Error getting connection info: %s", str(e))
             return {"alias": self.alias, "connected": False, "error": str(e)}
 
@@ -249,7 +272,7 @@ class MilvusConnectionManager:
             logger.debug("Connection test successful")
             return True
 
-        except Exception as e:
+        except (MilvusException, RuntimeError, ConnectionError, OSError) as e:
             logger.error("Connection test failed: %s", str(e))
             return False
 
@@ -278,8 +301,6 @@ class MilvusConnectionManager:
                         loop.create_task(self._async_client.close())
                     except RuntimeError:
                         # No running loop, use asyncio.run in a thread
-                        import concurrent.futures
-
                         with concurrent.futures.ThreadPoolExecutor() as executor:
                             executor.submit(
                                 lambda: asyncio.run(self._async_client.close())
@@ -289,7 +310,7 @@ class MilvusConnectionManager:
                     logger.info(
                         "Closed async client for database: %s", self.database_name
                     )
-                except Exception as e:
+                except (RuntimeError, asyncio.TimeoutError) as e:
                     logger.warning("Error closing async client: %s", str(e))
                     # Still clear the reference even if close failed
                     self._async_client = None
@@ -302,7 +323,7 @@ class MilvusConnectionManager:
 
             return success
 
-        except Exception as e:
+        except (MilvusException, RuntimeError, ConnectionError, OSError) as e:
             logger.error("Error disconnecting from Milvus: %s", str(e))
             return False
 
@@ -331,27 +352,14 @@ class MilvusConnectionManager:
             logger.error("Failed to get collection %s: %s", collection_name, str(e))
             raise MilvusException(
                 f"Failed to get collection {collection_name}: {str(e)}"
-            )
+            ) from e
 
-    async def async_search(
-        self,
-        collection_name: str,
-        data: list,
-        anns_field: str,
-        param: dict,
-        limit: int,
-        output_fields: list = None,
-    ) -> list:
+    async def async_search(self, params: SearchParams) -> list:
         """
         Perform asynchronous vector search.
 
         Args:
-            collection_name: Name of the collection to search
-            data: Query vectors
-            anns_field: Vector field to search
-            param: Search parameters (metric_type, etc.)
-            limit: Number of results to return
-            output_fields: Fields to include in results
+            params: SearchParams object containing all search parameters
 
         Returns:
             List of search results
@@ -359,85 +367,63 @@ class MilvusConnectionManager:
         try:
             async_client = self.get_async_client()
             if async_client is None:
-                raise Exception("Failed to create async client")
+                raise MilvusException("Failed to create async client")
 
             # Ensure collection is loaded before searching
-            await async_client.load_collection(collection_name=collection_name)
+            await async_client.load_collection(collection_name=params.collection_name)
 
             results = await async_client.search(
-                collection_name=collection_name,
-                data=data,
-                anns_field=anns_field,
-                search_params=param,  # Changed from 'param' to 'search_params'
-                limit=limit,
-                output_fields=output_fields or [],
+                collection_name=params.collection_name,
+                data=params.data,
+                anns_field=params.anns_field,
+                search_params=params.search_params,
+                limit=params.limit,
+                output_fields=params.output_fields or [],
             )
-            logger.debug("Async search completed for collection: %s", collection_name)
+            logger.debug(
+                "Async search completed for collection: %s", params.collection_name
+            )
             return results
-        except Exception as e:
+        except MilvusException as e:
             logger.warning(
                 "Async search failed for collection %s: %s, falling back to sync",
-                collection_name,
+                params.collection_name,
                 str(e),
             )
             # Fallback to sync operation
-            return await asyncio.to_thread(
-                self._sync_search,
-                collection_name,
-                data,
-                anns_field,
-                param,
-                limit,
-                output_fields,
-            )
+            return await asyncio.to_thread(self._sync_search, params)
 
-    def _sync_search(
-        self,
-        collection_name: str,
-        data: list,
-        anns_field: str,
-        param: dict,
-        limit: int,
-        output_fields: list = None,
-    ) -> list:
+    def _sync_search(self, params: SearchParams) -> list:
         """Sync fallback for search operations."""
         try:
-            collection = Collection(name=collection_name)
+            collection = Collection(name=params.collection_name)
             collection.load()
             results = collection.search(
-                data=data,
-                anns_field=anns_field,
-                param=param,
-                limit=limit,
-                output_fields=output_fields or [],
+                data=params.data,
+                anns_field=params.anns_field,
+                param=params.search_params,
+                limit=params.limit,
+                output_fields=params.output_fields or [],
             )
             logger.debug(
-                "Sync fallback search completed for collection: %s", collection_name
+                "Sync fallback search completed for collection: %s",
+                params.collection_name,
             )
             return results
         except Exception as e:
             logger.error(
                 "Sync fallback search failed for collection %s: %s",
-                collection_name,
+                params.collection_name,
                 str(e),
             )
-            raise MilvusException(f"Search failed (sync fallback): {str(e)}")
+            raise MilvusException(f"Search failed (sync fallback): {str(e)}") from e
 
-    async def async_query(
-        self,
-        collection_name: str,
-        expr: str,
-        output_fields: list = None,
-        limit: int = None,
-    ) -> list:
+    async def async_query(self, params: QueryParams) -> list:
         """
         Perform asynchronous query with sync fallback.
 
         Args:
-            collection_name: Name of the collection to query
-            expr: Query expression
-            output_fields: Fields to include in results
-            limit: Maximum number of results
+            params: QueryParams object containing all query parameters
 
         Returns:
             List of query results
@@ -445,55 +431,52 @@ class MilvusConnectionManager:
         try:
             async_client = self.get_async_client()
             if async_client is None:
-                raise Exception("Failed to create async client")
+                raise MilvusException("Failed to create async client")
 
             # Ensure collection is loaded before querying
-            await async_client.load_collection(collection_name=collection_name)
+            await async_client.load_collection(collection_name=params.collection_name)
 
             results = await async_client.query(
-                collection_name=collection_name,
-                filter=expr,
-                output_fields=output_fields or [],
-                limit=limit,
+                collection_name=params.collection_name,
+                filter=params.expr,
+                output_fields=params.output_fields or [],
+                limit=params.limit,
             )
-            logger.debug("Async query completed for collection: %s", collection_name)
+            logger.debug(
+                "Async query completed for collection: %s", params.collection_name
+            )
             return results
-        except Exception as e:
+        except MilvusException as e:
             logger.warning(
                 "Async query failed for collection %s: %s, falling back to sync",
-                collection_name,
+                params.collection_name,
                 str(e),
             )
             # Fallback to sync operation
-            return await asyncio.to_thread(
-                self._sync_query, collection_name, expr, output_fields, limit
-            )
+            return await asyncio.to_thread(self._sync_query, params)
 
-    def _sync_query(
-        self,
-        collection_name: str,
-        expr: str,
-        output_fields: list = None,
-        limit: int = None,
-    ) -> list:
+    def _sync_query(self, params: QueryParams) -> list:
         """Sync fallback for query operations."""
         try:
-            collection = Collection(name=collection_name)
+            collection = Collection(name=params.collection_name)
             collection.load()
             results = collection.query(
-                expr=expr, output_fields=output_fields or [], limit=limit
+                expr=params.expr,
+                output_fields=params.output_fields or [],
+                limit=params.limit,
             )
             logger.debug(
-                "Sync fallback query completed for collection: %s", collection_name
+                "Sync fallback query completed for collection: %s",
+                params.collection_name,
             )
             return results
         except Exception as e:
             logger.error(
                 "Sync fallback query failed for collection %s: %s",
-                collection_name,
+                params.collection_name,
                 str(e),
             )
-            raise MilvusException(f"Query failed (sync fallback): {str(e)}")
+            raise MilvusException(f"Query failed (sync fallback): {str(e)}") from e
 
     async def async_load_collection(self, collection_name: str) -> bool:
         """
@@ -514,7 +497,7 @@ class MilvusConnectionManager:
             logger.error(
                 "Async load failed for collection %s: %s", collection_name, str(e)
             )
-            raise MilvusException(f"Async load failed: {str(e)}")
+            raise MilvusException(f"Async load failed: {str(e)}") from e
 
     async def async_get_collection_stats(self, collection_name: str) -> dict:
         """
@@ -527,7 +510,6 @@ class MilvusConnectionManager:
             dict: Collection statistics
         """
         try:
-            async_client = self.get_async_client()
             # Note: Using sync client methods through asyncio.to_thread as fallback
             # since AsyncMilvusClient might not have all stat methods
             stats = await asyncio.to_thread(
@@ -540,7 +522,7 @@ class MilvusConnectionManager:
                 collection_name,
                 str(e),
             )
-            raise MilvusException(f"Failed to get collection stats: {str(e)}")
+            raise MilvusException(f"Failed to get collection stats: {str(e)}") from e
 
     @classmethod
     def get_instance(cls, cfg: Dict[str, Any]) -> "MilvusConnectionManager":
@@ -625,4 +607,4 @@ class MilvusConnectionManager:
                 return cls(cfg)
         except Exception as e:
             logger.error("Failed to load Hydra configuration: %s", str(e))
-            raise MilvusException(f"Configuration loading failed: {str(e)}")
+            raise MilvusException(f"Configuration loading failed: {str(e)}") from e

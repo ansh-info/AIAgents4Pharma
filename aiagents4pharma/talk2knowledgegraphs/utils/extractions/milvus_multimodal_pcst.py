@@ -14,8 +14,8 @@ import pcst_fast
 from pymilvus import Collection
 
 try:
-    import cudf
-    import cupy as cp
+    import cudf  # type: ignore
+    import cupy as cp  # type: ignore
 
     CUDF_AVAILABLE = True
 except ImportError:
@@ -219,8 +219,8 @@ class MultimodalPCSTPruning(NamedTuple):
 
         return colls
 
-    async def _load_edge_index_from_milvus_async(
-        self, cfg: dict, connection_manager
+    async def load_edge_index_async(
+        self, cfg: dict, _connection_manager=None
     ) -> np.ndarray:
         """
         Load edge index using hybrid async/sync approach to avoid event loop issues.
@@ -230,7 +230,7 @@ class MultimodalPCSTPruning(NamedTuple):
 
         Args:
             cfg: The configuration dictionary containing the Milvus setup.
-            connection_manager: The MilvusConnectionManager instance.
+            _connection_manager: Unused parameter for interface compatibility.
 
         Returns:
             numpy.ndarray: Edge index array with shape [2, num_edges]
@@ -239,7 +239,6 @@ class MultimodalPCSTPruning(NamedTuple):
 
         def load_edges_sync():
             """Load edges synchronously to avoid event loop issues."""
-            from pymilvus import Collection
 
             collection_name = f"{cfg.milvus_db.database_name}_edges"
             edges_collection = Collection(name=collection_name)
@@ -277,6 +276,54 @@ class MultimodalPCSTPruning(NamedTuple):
 
         # Run in thread to avoid event loop conflicts
         return await asyncio.to_thread(load_edges_sync)
+
+    def load_edge_index(self, cfg: dict) -> np.ndarray:
+        """
+        Load edge index synchronously from Milvus collection.
+
+        This method queries the edges collection to get head_index and tail_index.
+
+        Args:
+            cfg: The configuration dictionary containing the Milvus setup.
+
+        Returns:
+            numpy.ndarray: Edge index array with shape [2, num_edges]
+        """
+        logger.log(logging.INFO, "Loading edge index from Milvus collection (sync)")
+
+        collection_name = f"{cfg.milvus_db.database_name}_edges"
+        edges_collection = Collection(name=collection_name)
+        edges_collection.load()
+
+        # Query all edges in batches
+        batch_size = getattr(cfg.milvus_db, "query_batch_size", 10000)
+        total_entities = edges_collection.num_entities
+        logger.log(logging.INFO, "Total edges to process: %d", total_entities)
+
+        head_list = []
+        tail_list = []
+
+        for start in range(0, total_entities, batch_size):
+            end = min(start + batch_size, total_entities)
+            logger.debug("Processing edge batch: %d to %d", start, end)
+
+            batch = edges_collection.query(
+                expr=f"triplet_index >= {start} and triplet_index < {end}",
+                output_fields=["head_index", "tail_index"],
+            )
+
+            head_list.extend([r["head_index"] for r in batch])
+            tail_list.extend([r["tail_index"] for r in batch])
+
+        # Convert to numpy array format expected by PCST
+        edge_index = self.loader.py.array([head_list, tail_list])
+        logger.log(
+            logging.INFO,
+            "Edge index loaded (sync): shape %s",
+            str(edge_index.shape),
+        )
+
+        return edge_index
 
     def _compute_node_prizes(self, query_emb: list, colls: dict) -> dict:
         """
@@ -469,12 +516,18 @@ class MultimodalPCSTPruning(NamedTuple):
             ]  # Use distance/score
             e_prizes[result_ids] = result_scores
 
-        # Further process the edge_prizes (same logic as sync version)
+        # Process edge prizes using helper method
+        return self._process_edge_prizes(e_prizes, topk_e)
+
+    def _process_edge_prizes(self, e_prizes, topk_e):
+        """Helper method to process edge prizes and reduce complexity."""
         unique_prizes, inverse_indices = self.loader.py.unique(
             e_prizes, return_inverse=True
         )
-        topk_e_values = unique_prizes[self.loader.py.argsort(-unique_prizes)[:topk_e]]
+        sorted_indices = self.loader.py.argsort(-unique_prizes)[:topk_e]
+        topk_e_values = unique_prizes[sorted_indices]
         last_topk_e_value = topk_e
+
         for k in range(topk_e):
             indices = (
                 inverse_indices == (unique_prizes == topk_e_values[k]).nonzero()[0]
@@ -512,12 +565,7 @@ class MultimodalPCSTPruning(NamedTuple):
         return {"nodes": n_prizes, "edges": e_prizes}
 
     async def compute_prizes_async(
-        self,
-        text_emb: list,
-        query_emb: list,
-        cfg: dict,
-        connection_manager,
-        modality: str,
+        self, text_emb: list, query_emb: list, cfg: dict, modality: str
     ) -> dict:
         """
         Compute node and edge prizes asynchronously in parallel using sync fallback.
@@ -526,7 +574,6 @@ class MultimodalPCSTPruning(NamedTuple):
             text_emb: The textual description embedding
             query_emb: The query embedding
             cfg: The configuration dictionary containing the Milvus setup
-            connection_manager: The MilvusConnectionManager instance
             modality: The modality to use for the subgraph extraction
 
         Returns:
@@ -534,14 +581,9 @@ class MultimodalPCSTPruning(NamedTuple):
         """
         logger.log(logging.INFO, "Computing prizes in parallel (hybrid async/sync)")
 
-        # Use the existing sync method wrapped in asyncio.to_thread for thread-safe parallel execution
-        def compute_prizes_sync():
-            # Use the original sync method with collections
-            colls = self.prepare_collections(cfg, modality)
-            return self.compute_prizes(text_emb, query_emb, colls)
-
-        # Run the sync computation in a thread to avoid event loop issues
-        return await asyncio.to_thread(compute_prizes_sync)
+        # Use existing sync method wrapped in asyncio.to_thread
+        colls = self.prepare_collections(cfg, modality)
+        return await asyncio.to_thread(self.compute_prizes, text_emb, query_emb, colls)
 
     def compute_subgraph_costs(self, edge_index, num_nodes: int, prizes: dict):
         """
@@ -706,7 +748,7 @@ class MultimodalPCSTPruning(NamedTuple):
 
         # Load edge index directly from Milvus (replaces pickle cache)
         logger.log(logging.INFO, "Loading edge index from Milvus")
-        edge_index = self._load_edge_index_from_milvus(cfg)
+        edge_index = self.load_edge_index(cfg)
 
         # Assert the topk and topk_e values for subgraph retrieval
         assert self.topk > 0, "topk must be greater than or equal to 0"
