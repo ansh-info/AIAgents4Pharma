@@ -116,6 +116,19 @@ uv run ruff check .
 uv run ruff format .
 ```
 
+#### 📋 **Pylint** - Comprehensive Static Analysis
+
+```bash
+# Analyze entire codebase (configuration in pyproject.toml)
+uv run pylint aiagents4pharma/
+
+# Analyze specific component
+uv run pylint aiagents4pharma/talk2scholars/
+
+# Generate JSON report for CI/CD
+uv run pylint aiagents4pharma/ --output-format=json --reports=no > pylint-report.json
+```
+
 #### 🔍 **MyPy** - Static Type Checking
 
 ```bash
@@ -171,7 +184,7 @@ uv run pre-commit run ruff
 uv run pre-commit run mypy
 ```
 
-### What runs on each commit:
+### What runs on each commit
 
 1. **Ruff** - Lints and fixes imports
 2. **MyPy** - Type checking (configured but currently disabled in pre-commit)
@@ -288,8 +301,9 @@ jobs:
 ```bash
 # Run the same checks as CI locally
 uv run pytest                    # Tests
-uv run pip-audit                # Security scan
-uv run safety check             # Alternative security scan
+uv run pylint aiagents4pharma/   # Static analysis (config in pyproject.toml)
+uv run pip-audit                 # Security scan
+uv run safety check              # Alternative security scan
 uv run bandit -r aiagents4pharma/ # Security scan
 uv run mypy aiagents4pharma/     # Type checking
 ```
@@ -302,8 +316,8 @@ The project includes comprehensive automated security scanning:
 # Weekly security audit (runs automatically)
 .github/workflows/security_audit.yml   # pip-audit + safety + bandit
 
-# SonarCloud analysis (runs on push/PR)
-.github/workflows/sonarcloud.yml       # Code quality + security
+# SonarCloud analysis (artifact-based, runs after tests)
+.github/workflows/sonarcloud.yml       # Modern CI/CD with artifact reuse
 
 # Manual security audit
 uv run pip-audit --desc
@@ -383,7 +397,7 @@ data_files = secure_file_upload(
 )
 ```
 
-#### Security Features:
+#### Security Features
 
 - **File type validation** - Only allowed extensions (prevents malware.exe → report.pdf)
 - **MIME type checking** - Detects file masquerading attacks
@@ -432,6 +446,7 @@ uv run pre-commit install
 ```bash
 # 1. Run quality checks
 uv run ruff check --fix .
+uv run pylint aiagents4pharma/
 uv run mypy aiagents4pharma/
 
 # 2. Run tests
@@ -530,6 +545,7 @@ uv lock --verbose
 
 ### CI/CD & Quality
 
+- [SonarCloud Setup Guide](SONARCLOUD_SETUP.md) - Complete SonarCloud integration guide
 - [SonarCloud](https://sonarcloud.io/) - Code quality and security analysis
 - [GitHub Actions](https://docs.github.com/en/actions) - CI/CD workflows
 - [Dependabot](https://docs.github.com/en/code-security/dependabot) - Automated dependency updates
