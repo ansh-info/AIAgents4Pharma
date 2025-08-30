@@ -129,6 +129,9 @@ filterwarnings = ["ignore::DeprecationWarning"]
 [tool.pylint.MASTER]
 extension-pkg-allow-list = ["pcst_fast"]
 
+[tool.pylint.messages_control]
+disable = ["R0801", "R0902", "W0221", "W0122"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100
