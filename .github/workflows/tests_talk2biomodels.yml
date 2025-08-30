@@ -41,6 +41,25 @@ jobs:
       - name: Run bandit security scan
         run: uv run bandit -c pyproject.toml -r aiagents4pharma/talk2biomodels
 
+      - name: Run bandit security scan with JSON output for SonarCloud
+        run: |
+          uv run bandit -c pyproject.toml -r aiagents4pharma/talk2biomodels -f json -o bandit-report.json || true
+        continue-on-error: true
+
+      - name: Run pylint with JSON output for SonarCloud
+        run: |
+          uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2biomodels --output-format=json --reports=no > pylint-report.json || true
+        continue-on-error: true
+
+      - name: Upload quality reports for SonarCloud
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports-talk2biomodels
+          path: |
+            pylint-report.json
+            bandit-report.json
+          retention-days: 1
+
   # Cross-platform testing matrix
   test-matrix:
     name: Tests
@@ -94,3 +113,12 @@ jobs:
           name: talk2biomodels-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+
+      - name: Upload test reports for SonarCloud
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-talk2biomodels
+          path: |
+            coverage.xml
+          retention-days: 1

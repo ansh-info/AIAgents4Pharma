@@ -44,6 +44,25 @@ jobs:
       - name: Run bandit security scan
         run: uv run bandit -c pyproject.toml -r aiagents4pharma/talk2aiagents4pharma
 
+      - name: Run bandit security scan with JSON output for SonarCloud
+        run: |
+          uv run bandit -c pyproject.toml -r aiagents4pharma/talk2aiagents4pharma -f json -o bandit-report.json || true
+        continue-on-error: true
+
+      - name: Run pylint with JSON output for SonarCloud
+        run: |
+          uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2aiagents4pharma --output-format=json --reports=no > pylint-report.json || true
+        continue-on-error: true
+
+      - name: Upload quality reports for SonarCloud
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports-talk2aiagents4pharma
+          path: |
+            pylint-report.json
+            bandit-report.json
+          retention-days: 1
+
   # Cross-platform testing with Ollama
   test-matrix:
     name: Tests
@@ -157,3 +176,12 @@ jobs:
           name: talk2aiagents4pharma-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+
+      - name: Upload test reports for SonarCloud
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-talk2aiagents4pharma
+          path: |
+            coverage.xml
+          retention-days: 1

@@ -2,10 +2,19 @@
 name: SonarCloud Analysis
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - "TESTS Talk2Scholars"
+      - "TESTS Talk2AIAgents4Pharma"
+      - "TESTS Talk2BioModels"
+      - "TESTS Talk2KnowledgeGraphs"
+      - "TESTS Talk2Cells"
+    types:
+      - completed
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 env:
@@ -15,66 +24,78 @@ jobs:
   sonarcloud:
     name: SonarCloud Analysis
     runs-on: ubuntu-latest
+    # Only run if triggered by workflow_run (with successful tests) or on PR events
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Shallow clones should be disabled for better analysis
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
-      - name: Install uv
+      # For workflow_run: Download artifacts from completed test run
+      - name: Download artifacts from workflow run
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+          pattern: "*-reports-*"
+          path: ./reports/
+          merge-multiple: true
+        continue-on-error: true
+
+      # For PR events: Generate reports inline (fallback for fork PRs)
+      - name: Install uv (PR fallback)
+        if: github.event_name == 'pull_request'
         uses: astral-sh/setup-uv@v4
 
-      - name: Set up Python
+      - name: Set up Python (PR fallback)
+        if: github.event_name == 'pull_request'
         run: uv python install 3.12
 
-      - name: Install dependencies
+      - name: Install dependencies (PR fallback)
+        if: github.event_name == 'pull_request'
         run: uv sync --frozen --extra dev
 
-      - name: Setup Ollama
+      - name: Generate coverage report (PR fallback)
+        if: github.event_name == 'pull_request'
         run: |
-          curl -fsSL https://ollama.com/install.sh | sh
-          export PATH="/usr/local/bin:$PATH"
-          echo "/usr/local/bin" >> $GITHUB_PATH
-          ollama serve &
-          sleep 10
-
-      - name: Pull Ollama models
-        run: |
-          ollama pull llama3.2:1b
-          ollama pull nomic-embed-text
-
-      - name: Verify Ollama setup
-        run: ollama list
-
-      - name: Run tests with coverage
-        run: |
-          uv run coverage run --source=aiagents4pharma -m pytest
+          uv run coverage run --source=aiagents4pharma -m pytest || true
           uv run coverage xml
+        continue-on-error: true
 
-      - name: Run pylint with JSON output
+      - name: Generate pylint report (PR fallback)
+        if: github.event_name == 'pull_request'
         run: |
           uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma --output-format=json --reports=no > pylint-report.json || true
         continue-on-error: true
 
-      - name: Run bandit security scan with JSON output
+      - name: Generate bandit report (PR fallback)
+        if: github.event_name == 'pull_request'
         run: |
           uv run bandit -c pyproject.toml -r aiagents4pharma -f json -o bandit-report.json || true
         continue-on-error: true
+
+      - name: List available reports
+        run: |
+          echo "Available reports:"
+          ls -la . | grep -E '\.(xml|json)$' || echo "No reports found"
+          if [ -d ./reports ]; then
+            echo "Reports directory contents:"
+            ls -la ./reports/
+          fi
+
+      - name: Move reports to root for SonarCloud
+        run: |
+          if [ -d ./reports ]; then
+            cp ./reports/*.xml . 2>/dev/null || true
+            cp ./reports/*.json . 2>/dev/null || true
+          fi
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v5.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} # Generate a token on Sonarcloud.io
-
-      - name: Upload analysis artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: sonarcloud-analysis
-          path: |
-            coverage.xml
-            pylint-report.json
-            bandit-report.json
-          retention-days: 30
