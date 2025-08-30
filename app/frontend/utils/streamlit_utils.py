@@ -29,6 +29,40 @@ from langchain_openai.embeddings import OpenAIEmbeddings
 from langsmith import Client
 
 
+def resolve_logo(cfg) -> str | None:
+    """
+    Resolve a logo path from config with safe fallbacks.
+
+    Args:
+        cfg: Hydra configuration object with app.frontend.logo_paths
+
+    Returns:
+        str | None: Path to logo image if found, else None
+    """
+    try:
+        container_path = cfg.app.frontend.logo_paths.container
+        local_path = cfg.app.frontend.logo_paths.local
+        relative_cfg = cfg.app.frontend.logo_paths.relative
+    except Exception:
+        # Minimal fallback if config paths are missing
+        container_path = "/app/docs/assets/VPE.png"
+        local_path = "docs/assets/VPE.png"
+        relative_cfg = "../../docs/assets/VPE.png"
+
+    if os.path.exists(container_path):
+        return container_path
+    if os.path.exists(local_path):
+        return local_path
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # __file__ is utils dir; adjust to app dir for relative
+    # Go up one to frontend
+    script_dir = os.path.dirname(script_dir)
+    relative_path = os.path.join(script_dir, relative_cfg)
+    if os.path.exists(relative_path):
+        return relative_path
+    return None
+
+
 def get_azure_token_provider():
     """
     Get Azure AD token provider for Azure OpenAI authentication.
@@ -313,10 +347,13 @@ def update_state_t2b(st):
     dic = {
         "sbml_file_path": [st.session_state.sbml_file_path],
         "text_embedding_model": get_text_embedding_model(
-            st.session_state.text_embedding_model,
-            st.session_state.config
+            st.session_state.text_embedding_model, st.session_state.config
         ),
     }
+    # If a PDF has been uploaded in this session, include it every turn
+    pdf_path = st.session_state.get("pdf_file_path")
+    if pdf_path:
+        dic["pdf_file_name"] = pdf_path
     return dic
 
 
@@ -400,7 +437,12 @@ def get_response(agent, graphs_visuals, app, st, prompt):
     #     {"sbml_file_path": [st.session_state.sbml_file_path]}
     # )
     app.update_state(
-        config, {"llm_model": get_base_chat_model(st.session_state.llm_model, st.session_state.config)}
+        config,
+        {
+            "llm_model": get_base_chat_model(
+                st.session_state.llm_model, st.session_state.config
+            )
+        },
     )
     # app.update_state(
     #     config,
@@ -426,7 +468,6 @@ def get_response(agent, graphs_visuals, app, st, prompt):
     elif agent == "T2KG":
         app.update_state(config, update_state_t2kg(st))
 
-    ERROR_FLAG = False
     with collect_runs() as cb:
         # Add Langsmith tracer
         tracer = LangChainTracer(project_name=st.session_state.project_name)
@@ -986,12 +1027,12 @@ def get_text_embedding_model(model_name, cfg=None) -> Embeddings:
         Embeddings: The text embedding model
     """
     # Get retry and timeout settings from config or use defaults
-    max_retries = 3   # Default for embeddings
-    timeout = 30      # Default for embeddings
-    
-    if cfg and hasattr(cfg, 'app') and hasattr(cfg.app, 'frontend'):
-        max_retries = getattr(cfg.app.frontend, 'embedding_max_retries', 3)
-        timeout = getattr(cfg.app.frontend, 'embedding_timeout', 30)
+    max_retries = 3  # Default for embeddings
+    timeout = 30  # Default for embeddings
+
+    if cfg and hasattr(cfg, "app") and hasattr(cfg.app, "frontend"):
+        max_retries = getattr(cfg.app.frontend, "embedding_max_retries", 3)
+        timeout = getattr(cfg.app.frontend, "embedding_timeout", 30)
     dic_text_embedding_models = {
         "NVIDIA/llama-3.2-nv-embedqa-1b-v2": "nvidia/llama-3.2-nv-embedqa-1b-v2",
         "OpenAI/text-embedding-ada-002": "text-embedding-ada-002",
@@ -1014,7 +1055,7 @@ def get_text_embedding_model(model_name, cfg=None) -> Embeddings:
             return OpenAIEmbeddings(
                 model=dic_text_embedding_models[model_name],
                 max_retries=max_retries,
-                timeout=timeout
+                timeout=timeout,
             )  # Fallback to regular OpenAI
 
         # Get Azure token provider
@@ -1024,7 +1065,7 @@ def get_text_embedding_model(model_name, cfg=None) -> Embeddings:
             return OpenAIEmbeddings(
                 model=dic_text_embedding_models[model_name],
                 max_retries=max_retries,
-                timeout=timeout
+                timeout=timeout,
             )  # Fallback to regular OpenAI
 
         from langchain_openai.embeddings import AzureOpenAIEmbeddings
@@ -1052,7 +1093,7 @@ def get_text_embedding_model(model_name, cfg=None) -> Embeddings:
                 model_key, model_name.replace("OpenAI/", "")
             ),
             max_retries=max_retries,
-            timeout=timeout
+            timeout=timeout,
         )
 
 
@@ -1069,11 +1110,11 @@ def get_base_chat_model(model_name, cfg=None) -> BaseChatModel:
     """
     # Get retry and timeout settings from config or use defaults
     max_retries = 5  # Default
-    timeout = 60     # Default
-    
-    if cfg and hasattr(cfg, 'app') and hasattr(cfg.app, 'frontend'):
-        max_retries = getattr(cfg.app.frontend, 'llm_max_retries', 5)
-        timeout = getattr(cfg.app.frontend, 'llm_timeout', 60)
+    timeout = 60  # Default
+
+    if cfg and hasattr(cfg, "app") and hasattr(cfg.app, "frontend"):
+        max_retries = getattr(cfg.app.frontend, "llm_max_retries", 5)
+        timeout = getattr(cfg.app.frontend, "llm_timeout", 60)
     dic_llm_models = {
         "NVIDIA/llama-3.3-70b-instruct": "meta/llama-3.3-70b-instruct",
         "NVIDIA/llama-3.1-405b-instruct": "meta/llama-3.1-405b-instruct",
@@ -1084,11 +1125,17 @@ def get_base_chat_model(model_name, cfg=None) -> BaseChatModel:
     }
 
     if model_name.startswith("Llama"):
-        return ChatOllama(model=dic_llm_models[model_name], temperature=0, timeout=timeout)
+        return ChatOllama(
+            model=dic_llm_models[model_name], temperature=0, timeout=timeout
+        )
     elif model_name.startswith("Ollama/"):
-        return ChatOllama(model=dic_llm_models[model_name], temperature=0, timeout=timeout)
+        return ChatOllama(
+            model=dic_llm_models[model_name], temperature=0, timeout=timeout
+        )
     elif model_name.startswith("NVIDIA"):
-        return ChatNVIDIA(model=dic_llm_models[model_name], temperature=0, timeout=timeout)
+        return ChatNVIDIA(
+            model=dic_llm_models[model_name], temperature=0, timeout=timeout
+        )
     elif model_name.startswith("Azure/"):
         # Azure OpenAI configuration
         azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
@@ -1104,10 +1151,10 @@ def get_base_chat_model(model_name, cfg=None) -> BaseChatModel:
                 "Azure OpenAI requires AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT environment variables"
             )
             return ChatOpenAI(
-                model=dic_llm_models[model_name], 
+                model=dic_llm_models[model_name],
                 temperature=0,
                 max_retries=max_retries,
-                timeout=timeout
+                timeout=timeout,
             )  # Fallback to regular OpenAI
 
         # Get Azure token provider
@@ -1115,10 +1162,10 @@ def get_base_chat_model(model_name, cfg=None) -> BaseChatModel:
         if not token_provider:
             st.error("Failed to get Azure token provider")
             return ChatOpenAI(
-                model=dic_llm_models[model_name], 
+                model=dic_llm_models[model_name],
                 temperature=0,
                 max_retries=max_retries,
-                timeout=timeout
+                timeout=timeout,
             )  # Fallback to regular OpenAI
 
         return AzureChatOpenAI(
@@ -1145,10 +1192,10 @@ def get_base_chat_model(model_name, cfg=None) -> BaseChatModel:
 
     # Default fallback
     return ChatOpenAI(
-        model=dic_llm_models.get(model_name, model_name), 
+        model=dic_llm_models.get(model_name, model_name),
         temperature=0,
         max_retries=max_retries,
-        timeout=timeout
+        timeout=timeout,
     )
 
 
@@ -1188,10 +1235,18 @@ def update_text_embedding_model(app):
         config,
         {
             "text_embedding_model": get_text_embedding_model(
-                st.session_state.text_embedding_model,
-                st.session_state.config
+                st.session_state.text_embedding_model, st.session_state.config
             )
         },
+    )
+
+
+def update_t2kg_embedding_model():
+    """
+    Update the T2KG embedding model in session from the selected text embedding model.
+    """
+    st.session_state.t2kg_emb_model = get_text_embedding_model(
+        st.session_state.text_embedding_model, st.session_state.config
     )
 
 
@@ -1335,11 +1390,13 @@ def get_t2b_uploaded_files(app):
             {
                 "pdf_file_name": f.name,
                 "text_embedding_model": get_text_embedding_model(
-                    st.session_state.text_embedding_model,
-                    st.session_state.config
+                    st.session_state.text_embedding_model, st.session_state.config
                 ),
             },
         )
+
+        # Persist PDF path in session for subsequent turns
+        st.session_state.pdf_file_path = f.name
 
         if article.name not in [
             uf["file_name"] for uf in st.session_state.t2b_uploaded_files
@@ -1369,6 +1426,13 @@ def get_t2b_uploaded_files(app):
                 if st.button("🗑️", key=uploaded_file["file_path"]):
                     with st.spinner("Removing uploaded file ..."):
                         st.session_state.t2b_uploaded_files.remove(uploaded_file)
+                        # Clear PDF reference if this was the active one
+                        if (
+                            st.session_state.get("pdf_file_path")
+                            and st.session_state.pdf_file_path
+                            == uploaded_file["file_path"]
+                        ):
+                            del st.session_state.pdf_file_path
                         st.cache_data.clear()
                         st.session_state.t2b_article_key += 1
                         st.rerun(scope="fragment")
@@ -1652,10 +1716,36 @@ def initialize_session_state(cfg, agent_type="T2B"):
                 "reasoning_subgraph_topk_edges", 15
             )
 
+        # Ensure T2KG has an embedding model in session
+        if "t2kg_emb_model" not in st.session_state:
+            if cfg.app.frontend.get("default_embedding_model", "openai") == "ollama":
+                from langchain_ollama import OllamaEmbeddings
+
+                st.session_state.t2kg_emb_model = OllamaEmbeddings(
+                    model=cfg.app.frontend.get(
+                        "ollama_embeddings", ["nomic-embed-text"]
+                    )[0]
+                )
+            else:
+                from langchain_openai import OpenAIEmbeddings
+
+                st.session_state.t2kg_emb_model = OpenAIEmbeddings(
+                    model=cfg.app.frontend.get(
+                        "openai_embeddings", ["text-embedding-ada-002"]
+                    )[0]
+                )
+
     elif agent_type == "T2B":
         # Biomodels specific session state
         if "sbml_file_path" not in st.session_state:
             st.session_state.sbml_file_path = None
+
+        # Keys used by the T2B upload fragment (PDF/article handling)
+        if "t2b_article_key" not in st.session_state:
+            st.session_state.t2b_article_key = 0
+
+        if "t2b_uploaded_files" not in st.session_state:
+            st.session_state.t2b_uploaded_files = []
 
     elif agent_type == "T2S":
         # Scholars specific session state

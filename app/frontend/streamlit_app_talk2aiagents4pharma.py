@@ -68,45 +68,16 @@ else:
 cfg_t2kg = cfg.app.frontend
 
 
-# Set the logo using config
-def get_logo_path():
-    container_path = cfg.app.frontend.logo_paths.container
-    local_path = cfg.app.frontend.logo_paths.local
-
-    if os.path.exists(container_path):
-        return container_path
-    elif os.path.exists(local_path):
-        return local_path
-    else:
-        # Fallback: try to find it relative to script location
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        relative_path = os.path.join(script_dir, cfg.app.frontend.logo_paths.relative)
-        if os.path.exists(relative_path):
-            return relative_path
-
-    return None  # File not found
-
-
-logo_path = get_logo_path()
+# Resolve logo via shared utility
+logo_path = streamlit_utils.resolve_logo(cfg)
 if logo_path:
-    st.logo(image=logo_path, size="large", link=cfg.app.frontend.logo_link)
+    # Guard for older Streamlit versions without st.logo
+    if hasattr(st, "logo"):
+        st.logo(image=logo_path, size="large", link=cfg.app.frontend.logo_link)
+    else:
+        st.image(image=logo_path, use_column_width=False)
 
-# Check required environment variables based on config
-required_env_vars = ["OPENAI_API_KEY"]
-missing_vars = [var for var in required_env_vars if var not in os.environ]
-
-# Check for optional NVIDIA API key if NVIDIA models are configured
-if cfg.app.frontend.nvidia_llms and "NVIDIA_API_KEY" not in os.environ:
-    missing_vars.append("NVIDIA_API_KEY")
-
-if missing_vars:
-    st.error(
-        f"Please set the {', '.join(missing_vars)} "
-        "environment variable(s) in the terminal where you run "
-        "the app. For more information, please refer to our "
-        "[documentation](https://virtualpatientengine.github.io/AIAgents4Pharma/#option-2-git)."
-    )
-    st.stop()
+# Defer provider-aware environment checks until session state is initialized
 
 ########################################################################################
 # Streamlit app
@@ -123,6 +94,32 @@ prompt = ChatPromptTemplate.from_messages(
 
 # Initialize unified session state
 streamlit_utils.initialize_session_state(cfg, agent_type="T2AA4P")
+
+# Provider-aware environment checks (non-blocking to keep uploads/UI usable)
+needed_env = set()
+llm_choice = st.session_state.get("llm_model", "")
+emb_choice = st.session_state.get("text_embedding_model", "")
+
+
+def needs(prefix: str) -> bool:
+    return llm_choice.startswith(prefix) or emb_choice.startswith(prefix)
+
+
+if needs("OpenAI/"):
+    needed_env.add("OPENAI_API_KEY")
+if needs("Azure/"):
+    # Azure OpenAI typically needs endpoint and deployment
+    for var in ("AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_DEPLOYMENT"):
+        needed_env.add(var)
+if needs("NVIDIA/"):
+    needed_env.add("NVIDIA_API_KEY")
+
+missing = [var for var in needed_env if var not in os.environ]
+if missing:
+    st.warning(
+        "Missing environment settings for the selected provider(s): "
+        + ", ".join(missing)
+    )
 
 # Initialize the app with default LLM model for the first time
 if "app" not in st.session_state:
@@ -153,10 +150,21 @@ with st.sidebar:
         key="st_slider_topk_nodes",
     )
     st.session_state.topk_nodes = topk_nodes
+    # Use dedicated edge min/max if present; fall back to node bounds
+    edges_min = getattr(
+        cfg.app.frontend,
+        "reasoning_subgraph_topk_edges_min",
+        cfg.app.frontend.reasoning_subgraph_topk_nodes_min,
+    )
+    edges_max = getattr(
+        cfg.app.frontend,
+        "reasoning_subgraph_topk_edges_max",
+        cfg.app.frontend.reasoning_subgraph_topk_nodes_max,
+    )
     topk_edges = st.slider(
         "Top-K (Edges)",
-        cfg.app.frontend.reasoning_subgraph_topk_nodes_min,
-        cfg.app.frontend.reasoning_subgraph_topk_nodes_max,
+        edges_min,
+        edges_max,
         st.session_state.topk_edges,
         key="st_slider_topk_edges",
     )

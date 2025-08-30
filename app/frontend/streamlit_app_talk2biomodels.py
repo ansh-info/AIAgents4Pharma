@@ -35,45 +35,15 @@ else:
     cfg = st.session_state.config
 
 
-# Set the logo, detect if we're in container or local development
-def get_logo_path():
-    container_path = cfg.app.frontend.logo_paths.container
-    local_path = cfg.app.frontend.logo_paths.local
-
-    if os.path.exists(container_path):
-        return container_path
-    elif os.path.exists(local_path):
-        return local_path
-    else:
-        # Fallback: try to find it relative to script location
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        relative_path = os.path.join(script_dir, cfg.app.frontend.logo_paths.relative)
-        if os.path.exists(relative_path):
-            return relative_path
-
-    return None  # File not found
-
-
-logo_path = get_logo_path()
+# Resolve logo via shared utility
+logo_path = streamlit_utils.resolve_logo(cfg)
 if logo_path:
-    st.logo(image=logo_path, size="large", link=cfg.app.frontend.logo_link)
+    if hasattr(st, "logo"):
+        st.logo(image=logo_path, size="large", link=cfg.app.frontend.logo_link)
+    else:
+        st.image(image=logo_path, use_column_width=False)
 
-# Check if required environment variables exist
-required_env_vars = ["OPENAI_API_KEY"]
-missing_vars = [var for var in required_env_vars if var not in os.environ]
-
-# Check for optional NVIDIA API key if NVIDIA models are configured
-if cfg.app.frontend.nvidia_llms and "NVIDIA_API_KEY" not in os.environ:
-    missing_vars.append("NVIDIA_API_KEY")
-
-if missing_vars:
-    st.error(
-        f"Please set the {', '.join(missing_vars)} "
-        "environment variable(s) in the terminal where you run "
-        "the app. For more information, please refer to our "
-        "[documentation](https://virtualpatientengine.github.io/AIAgents4Pharma/#option-2-git)."
-    )
-    st.stop()
+# Defer provider-aware environment checks until after session initialization
 
 # Import the agent
 sys.path.append("./")
@@ -81,6 +51,31 @@ from aiagents4pharma.talk2biomodels.agents.t2b_agent import get_app
 
 # Initialize unified session state
 streamlit_utils.initialize_session_state(cfg, agent_type="T2B")
+
+# Provider-aware environment checks (warn-only)
+needed_env = set()
+llm_choice = st.session_state.get("llm_model", "")
+emb_choice = st.session_state.get("text_embedding_model", "")
+
+
+def needs(prefix: str) -> bool:
+    return llm_choice.startswith(prefix) or emb_choice.startswith(prefix)
+
+
+if needs("OpenAI/"):
+    needed_env.add("OPENAI_API_KEY")
+if needs("Azure/"):
+    for var in ("AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_DEPLOYMENT"):
+        needed_env.add(var)
+if needs("NVIDIA/"):
+    needed_env.add("NVIDIA_API_KEY")
+
+missing = [var for var in needed_env if var not in os.environ]
+if missing:
+    st.warning(
+        "Missing environment settings for the selected provider(s): "
+        + ", ".join(missing)
+    )
 
 ########################################################################################
 # Streamlit app
@@ -104,47 +99,9 @@ if "app" not in st.session_state:
 app = st.session_state.app
 
 
-@st.fragment
-def get_uploaded_files():
-    """
-    Upload files.
-    """
-    # Upload the XML/SBML file
-    uploaded_sbml_file = st.file_uploader(
-        "Upload an XML/SBML file",
-        accept_multiple_files=False,
-        type=["xml", "sbml"],
-        help="Upload a QSP as an XML/SBML file",
-    )
-
-    # Upload the article
-    article = st.file_uploader(
-        "Upload an article",
-        help="Upload a PDF article to ask questions.",
-        accept_multiple_files=False,
-        type=["pdf"],
-        key="article",
-    )
-    # print (article)
-    # Update the agent state with the uploaded article
-    if article:
-        import tempfile
-
-        print(article.name)
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            f.write(article.read())
-            # print (f.name)
-        # Create config for the agent
-        config = {"configurable": {"thread_id": st.session_state.unique_id}}
-        # Update the agent state with the PDF file name and text embedding model
-        app.update_state(config, {
-            "pdf_file_name": f.name,
-            "text_embedding_model": streamlit_utils.get_text_embedding_model(
-                st.session_state.text_embedding_model
-            )
-        })
-    # Return the uploaded file
-    return uploaded_sbml_file
+# Use shared upload utility for T2B (SBML + PDF)
+def _get_uploaded_files_wrapper():
+    return streamlit_utils.get_t2b_uploaded_files(app)
 
 
 # Main layout of the app split into two columns
@@ -185,8 +142,8 @@ with main_col1:
             help="Used for Retrival Augmented Generation (RAG) and other tasks.",
         )
 
-        # Upload files
-        uploaded_sbml_file = get_uploaded_files()
+        # Upload files (SBML + PDF)
+        uploaded_sbml_file = _get_uploaded_files_wrapper()
 
         # Help text
         st.button(
