@@ -13,9 +13,6 @@ on:
       - completed
   workflow_dispatch:
 
-env:
-  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
 jobs:
   sonarcloud:
     name: SonarCloud Analysis
