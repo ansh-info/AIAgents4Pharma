@@ -35,7 +35,7 @@ jobs:
         run: uv sync --frozen --extra dev
 
       - name: Run pylint
-        run: uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2scholars
+        run: uv run pylint aiagents4pharma/talk2scholars
 
       - name: Run ruff linting
         run: uv run ruff check aiagents4pharma/talk2scholars
@@ -50,7 +50,7 @@ jobs:
 
       - name: Run pylint with JSON output for SonarCloud
         run: |
-          uv run pylint --disable=R0801,R0902,W0221,W0122 aiagents4pharma/talk2scholars --output-format=json --reports=no > pylint-report.json || true
+          uv run pylint aiagents4pharma/talk2scholars --output-format=json --reports=no > pylint-report.json || true
         continue-on-error: true
 
       - name: Upload quality reports for SonarCloud
