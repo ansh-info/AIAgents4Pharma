@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Dockerfile for the talk2aiagents4pharma application
+# Dockerfile for the talk2aiagents4pharma application test
 # Multi-stage build for optimized image size with UV package manager
 
 ARG BASE_IMAGE=ubuntu:24.04
