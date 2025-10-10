@@ -89,7 +89,7 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
+      - name: Build and Push GPU Image
         uses: docker/build-push-action@v6
         with:
           file: aiagents4pharma/talk2aiagents4pharma/Dockerfile
@@ -97,7 +97,23 @@ jobs:
           tags: |
             vpatientengine/talk2aiagents4pharma:${{ needs.version.outputs.version }}
             vpatientengine/talk2aiagents4pharma:latest
+            vpatientengine/talk2aiagents4pharma:${{ needs.version.outputs.version }}-gpu
+            vpatientengine/talk2aiagents4pharma:latest-gpu
           platforms: linux/amd64
+          build-args: |
+            INSTALL_CUDA=true
+
+      - name: Build and Push CPU Image
+        uses: docker/build-push-action@v6
+        with:
+          file: aiagents4pharma/talk2aiagents4pharma/Dockerfile
+          push: true
+          tags: |
+            vpatientengine/talk2aiagents4pharma:${{ needs.version.outputs.version }}-cpu
+            vpatientengine/talk2aiagents4pharma:latest-cpu
+          platforms: linux/amd64
+          build-args: |
+            INSTALL_CUDA=false
 
   # Separate job for talk2biomodels
   build-talk2biomodels:
@@ -188,7 +204,7 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
+      - name: Build and Push GPU Image
         uses: docker/build-push-action@v6
         with:
           file: aiagents4pharma/talk2knowledgegraphs/Dockerfile
@@ -196,4 +212,20 @@ jobs:
           tags: |
             vpatientengine/talk2knowledgegraphs:${{ needs.version.outputs.version }}
             vpatientengine/talk2knowledgegraphs:latest
+            vpatientengine/talk2knowledgegraphs:${{ needs.version.outputs.version }}-gpu
+            vpatientengine/talk2knowledgegraphs:latest-gpu
           platforms: linux/amd64
+          build-args: |
+            INSTALL_CUDA=true
+
+      - name: Build and Push CPU Image
+        uses: docker/build-push-action@v6
+        with:
+          file: aiagents4pharma/talk2knowledgegraphs/Dockerfile
+          push: true
+          tags: |
+            vpatientengine/talk2knowledgegraphs:${{ needs.version.outputs.version }}-cpu
+            vpatientengine/talk2knowledgegraphs:latest-cpu
+          platforms: linux/amd64
+          build-args: |
+            INSTALL_CUDA=false
