@@ -1,4 +1,4 @@
-# Dependency security monitoring workflow - focuses on vulnerability scanning
+# Dependency security monitoring workflow - focuses on vulnerability scanning test
 name: Dependency Security Audit
 
 on:
