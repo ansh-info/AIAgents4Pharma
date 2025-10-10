@@ -1,7 +1,7 @@
 version: "1.0.0"
 
 services:
-  # talk2knowledgegraphs with automatic data loading via entrypoint
+  # talk2knowledgegraphs with automatic data loading via entrypoint test
   talk2knowledgegraphs:
     container_name: talk2knowledgegraphs
     image: vpatientengine/talk2knowledgegraphs:latest-cpu
